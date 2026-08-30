@@ -1,0 +1,13 @@
+{
+  "name": "@overcode/extension",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ../../scripts/build-extension.mjs",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@overcode/shared-protocol": "workspace:*"
+  }
+}

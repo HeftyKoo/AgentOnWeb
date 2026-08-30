@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Overcode",
+  "description": "Your coding agent, everywhere.",
+  "version": "0.2.0",
+  "minimum_chrome_version": "132",
+  "permissions": ["cookies", "storage", "tabs"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "cycle-mode": {
+      "suggested_key": {
+        "default": "Alt+Shift+O",
+        "mac": "MacCtrl+Shift+O"
+      },
+      "description": "Cycle Chill, Focus, and Watch modes"
+    }
+  },
+  "action": {
+    "default_title": "Open Overcode"
+  }
+}

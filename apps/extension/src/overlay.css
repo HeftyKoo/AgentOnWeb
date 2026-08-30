@@ -1,0 +1,166 @@
+:host {
+  all: initial;
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+button, input { color: inherit; font: inherit; }
+button { cursor: pointer; }
+
+.overcode-root,
+.surface-shell {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+:host([data-mode="focus"]) .surface-shell { background: #11161b; }
+
+.harness-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: 0;
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 140ms ease, visibility 140ms ease;
+}
+
+:host([data-mode="watch"]) .harness-frame {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+:host([data-site-pass="true"]) .harness-frame {
+  opacity: 0.16;
+  pointer-events: none;
+}
+
+.surface-dock {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  padding: 4px 5px 4px 11px;
+  color: #d9e2dc;
+  background: rgba(8, 11, 14, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(14px) saturate(0.75);
+  pointer-events: auto;
+  transform: translateX(-50%);
+  gap: 4px;
+}
+
+.surface-brand,
+.surface-runtime,
+.surface-hint,
+.surface-dock button,
+.site-pass-label {
+  font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.surface-brand { color: #9df5bd; }
+.surface-runtime {
+  max-width: 150px;
+  overflow: hidden;
+  padding: 0 8px;
+  color: #7f8c84;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.surface-dock button {
+  padding: 8px 10px;
+  color: #8f9993;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+}
+
+.surface-dock button[aria-pressed="true"] {
+  color: #f4f7f5;
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.surface-hint {
+  padding: 0 8px 0 6px;
+  color: #98a39d;
+  letter-spacing: 0.04em;
+}
+
+:host([data-mode="watch"]) .surface-dock {
+  top: auto;
+  right: 18px;
+  bottom: 18px;
+  left: auto;
+  transform: none;
+}
+
+:host([data-site-pass="true"]) .surface-dock {
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.site-pass-label {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  z-index: 5;
+  display: none;
+  padding: 9px 13px;
+  color: #08100b;
+  background: #9df5bd;
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+
+:host([data-site-pass="true"]) .site-pass-label { display: block; }
+
+.surface-setup {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  width: min(440px, calc(100vw - 32px));
+  padding: 24px;
+  color: #eef3ef;
+  background: rgba(8, 12, 15, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.56);
+  backdrop-filter: blur(16px);
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+}
+
+.surface-setup[hidden] { display: none; }
+.surface-setup strong { font-size: 16px; }
+.surface-setup p { color: #9aa59e; font-size: 12px; line-height: 1.55; }
+.surface-setup form { display: grid; gap: 9px; }
+.surface-setup input,
+.surface-setup button {
+  min-height: 42px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+}
+.surface-setup button { color: #07110b; background: #9df5bd; border: 0; font-weight: 750; }
+.surface-setup small { display: block; margin-top: 12px; color: #d3a95a; line-height: 1.4; }
+
+@media (max-width: 760px) {
+  .surface-runtime,
+  .surface-hint { display: none; }
+}

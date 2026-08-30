@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/runtime-api" },
+    { "path": "packages/shared-protocol" },
+    { "path": "packages/core" },
+    { "path": "packages/runtime-deepseek-harness" },
+    { "path": "packages/local-bridge" },
+    { "path": "packages/overlay-ui" },
+    { "path": "apps/extension" }
+  ]
+}

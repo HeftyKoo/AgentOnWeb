@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Overcode overlay preview</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; color: #f7f4ed; background: #111318; font-family: Inter, system-ui, sans-serif; }
+      .site-nav { display: flex; height: 64px; align-items: center; justify-content: space-between; padding: 0 5vw; background: #090a0d; }
+      .site-nav strong { letter-spacing: .12em; }
+      .site-nav span { color: #8a8e98; }
+      .hero { position: relative; display: grid; min-height: 67vh; align-content: end; padding: 7vw; overflow: hidden; background: linear-gradient(0deg, rgba(7,8,11,.96), rgba(7,8,11,.08)), radial-gradient(circle at 72% 36%, #9a5936, transparent 30%), linear-gradient(135deg, #253754, #171a24 55%, #553127); }
+      .hero::before { position: absolute; inset: 12% 8% 22% 48%; border: 1px solid rgba(255,255,255,.15); border-radius: 24px; background: rgba(255,255,255,.04); content: ""; transform: rotate(-4deg); }
+      .hero small { color: #e9a16e; letter-spacing: .16em; }
+      .hero h1 { max-width: 640px; margin: 15px 0 9px; font-size: clamp(40px, 6vw, 82px); line-height: .95; letter-spacing: -.06em; }
+      .hero p { max-width: 520px; color: #a9adb5; line-height: 1.6; }
+      .cards { display: grid; padding: 32px 5vw 80px; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+      .card { height: 150px; padding: 18px; background: linear-gradient(145deg, #212a3a, #17191f); border-radius: 14px; }
+      .card:nth-child(2) { background: linear-gradient(145deg, #3f2b28, #19171a); }
+      .card:nth-child(3) { background: linear-gradient(145deg, #24372f, #151918); }
+      .card:nth-child(4) { background: linear-gradient(145deg, #34304a, #191820); }
+      #overcode-preview { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+      #overcode-preview > * { pointer-events: auto; }
+    </style>
+  </head>
+  <body>
+    <nav class="site-nav"><strong>AFTER HOURS</strong><span>Explore · Library · Continue watching</span></nav>
+    <section class="hero"><small>FEATURED TONIGHT</small><h1>City lights, quiet code.</h1><p>A mock streaming page remains native and usable beneath the coding workspace.</p></section>
+    <section class="cards"><div class="card">Continue watching</div><div class="card">Slow cinema</div><div class="card">Live sessions</div><div class="card">Documentaries</div></section>
+    <div id="overcode-preview"></div>
+    <script src="./preview.js"></script>
+  </body>
+</html>
