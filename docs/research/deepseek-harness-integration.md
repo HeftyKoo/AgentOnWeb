@@ -1,5 +1,7 @@
 # DeepSeek Harness programmatic integration for Overcode
 
+> Historical research for the retired custom-agent-UI prototype. Superseded by the user's requirement to preserve the native DSH interaction and plugins. The active implementation is Chrome extension + DSH plugin with native one-click authorization; see [README](../../README.md). Do not use the ACP recommendation below as the current product architecture.
+
 Research snapshot: 2026-08-29 (Asia/Shanghai)
 
 ## Recommendation
