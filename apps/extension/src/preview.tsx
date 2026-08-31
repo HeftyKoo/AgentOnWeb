@@ -1,4 +1,7 @@
+import { createDock } from "./dock.js";
+import { DEFAULT_SURFACE_OPACITY } from "./interaction.js";
 import styles from "./overlay.css";
+import type { SurfaceViewState } from "./shared.js";
 
 const style = document.createElement("style");
 style.textContent = styles;
@@ -11,34 +14,34 @@ container.className = "overcode-root";
 const shell = document.createElement("section");
 shell.className = "surface-shell";
 const frame = document.createElement("iframe");
-frame.className = "harness-frame";
+frame.className = "runtime-frame";
 frame.title = "DeepSeek Harness native surface preview";
 frame.src = new URL(location.href).searchParams.get("surface") ?? "about:blank";
-const dock = document.createElement("nav");
-dock.className = "surface-dock";
-const brand = document.createElement("span");
-brand.className = "surface-brand";
-brand.textContent = "OVERCODE";
-const runtime = document.createElement("span");
-runtime.className = "surface-runtime";
-runtime.textContent = "DeepSeek Harness native UI";
-dock.append(brand, runtime);
-for (const mode of ["chill", "focus", "watch"] as const) {
-  const button = document.createElement("button");
-  button.textContent = mode;
-  button.setAttribute("aria-pressed", String(mode === "chill"));
-  button.addEventListener("click", () => {
-    container.dataset.mode = mode;
-    dock.querySelectorAll("button").forEach((sibling) => {
-      sibling.setAttribute("aria-pressed", String(sibling === button));
-    });
-  });
-  dock.append(button);
-}
-const hint = document.createElement("span");
-hint.className = "surface-hint";
-hint.textContent = "HOLD ⌥ FOR WEBSITE";
-dock.append(hint);
-shell.append(frame, dock);
+const dock = createDock();
+let state: SurfaceViewState = {
+  mode: "chill",
+  opacity: DEFAULT_SURFACE_OPACITY,
+  connection: "connected",
+  paired: true,
+  endpoint: "ws://127.0.0.1:3847",
+};
+const render = () => {
+  container.dataset.mode = state.mode;
+  container.style.setProperty("--overcode-surface-opacity", String(state.opacity));
+  dock.render(state);
+};
+dock.onMode = (mode) => {
+  state = { ...state, mode };
+  render();
+};
+dock.onOpacity = (opacity) => {
+  state = { ...state, opacity };
+  render();
+};
+dock.onOpacityPreview = (opacity) => {
+  container.style.setProperty("--overcode-surface-opacity", String(opacity));
+};
+dock.setExpanded(true);
+shell.append(frame, dock.element);
 container.append(shell);
-container.dataset.mode = "chill";
+render();

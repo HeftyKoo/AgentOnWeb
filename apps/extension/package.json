@@ -8,6 +8,7 @@
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
-    "@overcode/shared-protocol": "workspace:*"
+    "@overcode/shared-protocol": "workspace:*",
+    "@phosphor-icons/core": "2.1.1"
   }
 }

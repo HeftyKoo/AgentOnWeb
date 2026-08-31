@@ -1,4 +1,4 @@
-import type { HarnessSurface } from "@overcode/shared-protocol";
+import type { NativeSurface } from "@overcode/shared-protocol";
 
 export interface SurfaceCookieDetails {
   readonly url: string;
@@ -18,7 +18,7 @@ export function topLevelSite(pageUrl: string): string | undefined {
 }
 
 export function surfaceCookieDetails(
-  surface: HarnessSurface,
+  surface: NativeSurface,
   pageUrl: string,
   nowMilliseconds = Date.now(),
 ): SurfaceCookieDetails | undefined {

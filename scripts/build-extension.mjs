@@ -1,5 +1,5 @@
 import { build } from "esbuild";
-import { copyFile, mkdir, rm } from "node:fs/promises";
+import { copyFile, cp, mkdir, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,7 +27,7 @@ await Promise.all([
     bundle: true,
     entryPoints: [resolve(app, "src/content.tsx")],
     format: "iife",
-    loader: { ".css": "text" },
+    loader: { ".css": "text", ".png": "dataurl", ".svg": "text" },
     minify: false,
     outfile: resolve(outdir, "content.js"),
     platform: "browser",
@@ -35,6 +35,7 @@ await Promise.all([
     target: ["chrome116"],
   }),
   copyFile(resolve(app, "manifest.json"), resolve(outdir, "manifest.json")),
+  cp(resolve(app, "icons"), resolve(outdir, "icons"), { recursive: true }),
 ]);
 
 console.log(`Built extension at ${outdir}`);

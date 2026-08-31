@@ -7,7 +7,7 @@ await build({
   bundle: true,
   entryPoints: [resolve(root, "apps/extension/src/preview.tsx")],
   format: "iife",
-  loader: { ".css": "text" },
+  loader: { ".css": "text", ".png": "dataurl", ".svg": "text" },
   minify: false,
   outfile: resolve(root, "apps/extension/preview/preview.js"),
   platform: "browser",

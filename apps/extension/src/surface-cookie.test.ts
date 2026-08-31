@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { HarnessSurface } from "@overcode/shared-protocol";
+import type { NativeSurface } from "@overcode/shared-protocol";
 import { surfaceCookieDetails, topLevelSite } from "./surface-cookie.js";
 
-const surface: HarnessSurface = {
+const surface: NativeSurface = {
   runtimeId: "deepseek-harness",
   displayName: "DeepSeek Harness",
   url: "http://localhost:3080/",
