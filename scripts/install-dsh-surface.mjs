@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
+import "./build-dsh-plugin.mjs";
 
 const packagePath = resolve(import.meta.dirname, "../packages/dsh-surface-plugin");
 const child = spawn("dsh", ["plugin", "--profile", "web", "add", packagePath], {

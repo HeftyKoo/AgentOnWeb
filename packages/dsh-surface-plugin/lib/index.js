@@ -1,2 +1,1 @@
-/** Host-side marker for the Overcode browser-surface client plugin. */
-export function apply() {}
+export { apply, inject } from "./host.js";

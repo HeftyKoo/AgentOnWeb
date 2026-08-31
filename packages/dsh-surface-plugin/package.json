@@ -1,24 +1,32 @@
 {
   "name": "@overcode/dsh-surface",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "./lib/index.js",
+  "scripts": { "build": "node ../../scripts/build-dsh-plugin.mjs" },
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-client-ui-theme"
+        "@deepseek-ai/dsh-client-ui-theme",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-settings-general",
+        "@deepseek-ai/dsh-api-session-controller"
       ],
       "platform": "web"
     }
   },
   "files": [
+    "cordis.patch.yml",
     "lib/index.js",
+    "lib/host.js",
     "lib/client.js"
   ]
 }

@@ -6,6 +6,7 @@
     { "path": "packages/core" },
     { "path": "packages/runtime-deepseek-harness" },
     { "path": "packages/runtime-connector" },
+    { "path": "packages/dsh-surface-plugin" },
     { "path": "packages/overlay-ui" },
     { "path": "apps/extension" }
   ]
