@@ -1,0 +1,10 @@
+{
+  "name": "@overcode/runtime-connector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/server.ts",
+  "scripts": { "build": "tsc -b", "typecheck": "tsc -b --pretty false" },
+  "dependencies": { "@overcode/shared-protocol": "workspace:*", "ws": "^8.18.3" },
+  "devDependencies": { "@types/ws": "^8.18.1" }
+}

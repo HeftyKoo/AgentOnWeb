@@ -9,7 +9,6 @@
     "build:extension": "node scripts/build-extension.mjs",
     "build:preview": "node scripts/build-preview.mjs",
     "check": "pnpm typecheck && pnpm test && pnpm build",
-    "dev:bridge": "pnpm --filter @overcode/local-bridge dev",
     "install:dsh-surface": "node scripts/install-dsh-surface.mjs",
     "preview": "node scripts/serve-preview.mjs",
     "test": "vitest run",
