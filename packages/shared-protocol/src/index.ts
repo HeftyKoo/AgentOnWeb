@@ -1,26 +1,41 @@
-export const PROTOCOL_VERSION = 2 as const;
-export const DEFAULT_BRIDGE_ENDPOINT = "ws://127.0.0.1:3847";
+export const PROTOCOL_VERSION = 3 as const;
+/** Small loopback-only discovery range; no network or arbitrary-port scanning. */
+export const CONNECTOR_PORTS = [3847, 3848, 3849, 3850] as const;
 
 export type OvercodeMode = "chill" | "focus" | "watch";
 
-export interface HarnessSurfaceCookie {
+export interface SurfaceCookie {
   readonly name: string;
   readonly value: string;
   readonly maxAgeSeconds: number;
 }
 
-export interface HarnessSurface {
+export interface NativeSurface {
   readonly runtimeId: string;
   readonly displayName: string;
   readonly url: string;
-  readonly cookie: HarnessSurfaceCookie;
+  readonly cookie: SurfaceCookie;
+}
+
+export interface RuntimeDescriptor {
+  readonly id: string;
+  readonly displayName: string;
+  readonly surfaceKind: "web";
+  readonly capabilities: { readonly translucency: boolean; readonly optionTap: boolean };
+}
+
+/** Runtime-specific lifecycle, native UI and authentication stay behind this Interface. */
+export interface SurfaceAdapter {
+  readonly runtime: RuntimeDescriptor;
+  readonly approvalUrl: string;
+  getSurface(): Promise<NativeSurface>;
 }
 
 export interface ClientHello {
   readonly kind: "hello";
   readonly protocolVersion: typeof PROTOCOL_VERSION;
   readonly credential?: string;
-  readonly pairingCode?: string;
+  readonly intent?: "discover" | "pair";
   readonly clientNonce: string;
 }
 
@@ -30,6 +45,21 @@ export interface ServerHello {
   readonly connectionId: string;
   readonly credential?: string;
   readonly paired: boolean;
+  readonly runtime?: RuntimeDescriptor;
+}
+
+export interface ServerAvailable {
+  readonly kind: "available";
+  readonly protocolVersion: typeof PROTOCOL_VERSION;
+  readonly runtime: RuntimeDescriptor;
+  readonly approvalUrl: string;
+}
+
+export interface ServerPending {
+  readonly kind: "pending";
+  readonly requestId: string;
+  readonly expiresAt: number;
+  readonly approvalUrl: string;
 }
 
 export interface ServerReject {
@@ -49,7 +79,7 @@ export interface ClientRequest {
 }
 
 export type RuntimeCommandResult =
-  | HarnessSurface
+  | NativeSurface
   | { readonly ok: true };
 
 export interface ServerResponse {
@@ -61,4 +91,4 @@ export interface ServerResponse {
 }
 
 export type ClientFrame = ClientHello | ClientRequest;
-export type ServerFrame = ServerHello | ServerReject | ServerResponse;
+export type ServerFrame = ServerHello | ServerReject | ServerResponse | ServerAvailable | ServerPending;
