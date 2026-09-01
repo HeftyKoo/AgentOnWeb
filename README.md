@@ -59,7 +59,7 @@ Future runtimes implement `SurfaceAdapter`: a runtime descriptor, native authori
 - Node.js 22.19 or newer
 - pnpm 11.5 for this workspace
 - Chrome 132 or newer with Developer mode available
-- DeepSeek Harness `dsh-v0.1.2-alpha.1`
+- DeepSeek Harness `dsh-v0.1.2-alpha.3` (`@deepseek-ai/dsh@0.1.2-alpha.3`)
 - `DEEPSEEK_API_KEY` available to the `dsh` process
 
 The local `dsh` wrapper installed for this project reads `DEEPSEEK_API_KEY` from `~/.hermes/.env` at process start without copying the key into Overcode.
@@ -137,4 +137,4 @@ pnpm build:preview
 pnpm preview
 ```
 
-The real acceptance surface is the unpacked extension on a normal website with just the normal DSH Web process running. See `docs/verification/plugin-connection.md` for the requirement-by-requirement audit and test evidence.
+The real acceptance surface is the unpacked extension on a normal website with just the normal DSH Web process running. See `docs/verification/plugin-connection.md` for the requirement-by-requirement audit and `docs/verification/dsh-alpha3-compatibility.md` for the latest DSH architecture compatibility evidence.

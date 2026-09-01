@@ -1,8 +1,11 @@
 {
   "name": "@overcode/dsh-surface",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "main": "./lib/index.js",
   "scripts": { "build": "node ../../scripts/build-dsh-plugin.mjs" },
   "exports": {
@@ -16,6 +19,7 @@
     "client": {
       "inject": [
         "@deepseek-ai/dsh-client-ui-theme",
+        "@deepseek-ai/dsh-client-ui-renderer",
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-ui-settings-general",
         "@deepseek-ai/dsh-api-session-controller"
