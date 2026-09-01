@@ -1,8 +1,8 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/shared-protocol" },
-    { "path": "packages/runtime-connector" },
+    { "path": "packages/connector-contract" },
+    { "path": "packages/connector-host" },
     { "path": "packages/dsh-surface-plugin" },
     { "path": "apps/extension" }
   ]

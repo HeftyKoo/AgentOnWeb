@@ -11,9 +11,9 @@ Package versions describe independently published artifacts. The handshake depen
 ## Components
 
 - `apps/extension` discovers local runtime plugins, requests native authorization, installs partitioned runtime cookies, and presents the native surface above normal websites.
-- `packages/runtime-connector` owns loopback discovery, approval requests, credential authentication, revocation, and the two protocol commands: `surface.get` and `connection.ping`.
+- `packages/connector-host` owns loopback discovery, approval requests, credential authentication, revocation, and the two protocol commands: `surface.get` and `connection.ping`.
 - `packages/dsh-surface-plugin` runs inside `dsh web`, exposes the authenticated DSH surface, renders authorization controls in native DSH slots, and retains the bounded native-view bookmark.
-- `packages/shared-protocol` defines the complete protocol-v1 wire contract and runtime capabilities.
+- `packages/connector-contract` defines and validates the complete protocol-v1 wire contract and runtime capabilities.
 
 ## Connection lifecycle
 

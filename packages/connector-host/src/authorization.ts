@@ -18,7 +18,7 @@ export class AuthorizationError extends Error {
   constructor(readonly code: string, message: string) { super(message); }
 }
 
-/** Only the native runtime's authenticated UI may call decide() or revoke(). */
+/** Only the native host's authenticated UI may call decide() or revoke(). */
 export class Authorization {
   #grants: Grant[];
   #waiting = new Map<string, Waiting>();

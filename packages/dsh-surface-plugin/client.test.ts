@@ -98,6 +98,10 @@ describe("DeepSeek Harness surface client", () => {
     expect(overrideTokens).not.toHaveBeenCalled();
     expect(require).toHaveBeenCalledWith("react");
     expect(register.mock.calls.map(([entry]) => entry.name)).toEqual(["shell.overlay", "settings.section"]);
+    expect(register.mock.calls).toEqual([
+      [expect.objectContaining({ name: "shell.overlay", id: "overcode-authorization" }), expect.any(Function)],
+      [expect.objectContaining({ name: "settings.section", id: "overcode", label: "Overcode" }), expect.any(Function)],
+    ]);
     expect(fetch).toHaveBeenCalledWith("/api/overcode/connections", { cache: "no-store" });
     expect(register.mock.calls.some(([entry]) => /session|conversation|tool/.test(entry.name))).toBe(false);
     for (const cleanup of cleanups) cleanup();
@@ -128,9 +132,24 @@ describe("DeepSeek Harness surface client", () => {
     expect(harness.sessions.open).not.toHaveBeenCalled();
     harness.stop();
   });
+
+  it("does not let a hidden website partition overwrite the shared native selection", async () => {
+    const harness = await nativeViewHarness("hidden");
+    harness.start();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(harness.fetch).not.toHaveBeenCalled();
+
+    harness.select("another-session");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(harness.bookmark()).toEqual({ sessionId: "saved-session" });
+
+    harness.show();
+    await vi.waitFor(() => expect(harness.sessions.open).toHaveBeenCalledWith("saved-session"));
+    harness.stop();
+  });
 });
 
-async function nativeViewHarness() {
+async function nativeViewHarness(initialVisibility: DocumentVisibilityState = "visible") {
   const source = await readFile(new URL("./lib/client.js", import.meta.url), "utf8");
   let plugin: { apply(context: unknown): void } | undefined;
   let bookmark: any = { sessionId: "saved-session" };
@@ -151,11 +170,19 @@ async function nativeViewHarness() {
     location: { hash: "#overcode=frame-nonce" }, name: "", parent: { postMessage: vi.fn() },
     addEventListener: vi.fn(), removeEventListener: vi.fn(),
   };
+  let visibilityState = initialVisibility;
+  const documentListeners = new Map<string, () => void>();
+  const document = {
+    get visibilityState() { return visibilityState; },
+    addEventListener(type: string, listener: () => void) { documentListeners.set(type, listener); },
+    removeEventListener(type: string) { documentListeners.delete(type); },
+  };
   const cleanups: (() => void)[] = [];
-  runInNewContext(source, { window, URLSearchParams, fetch, document: { addEventListener: vi.fn(), removeEventListener: vi.fn() } });
+  runInNewContext(source, { window, URLSearchParams, fetch, document });
   return {
     fetch, sessions, select, bookmark: () => bookmark,
     start: () => plugin?.apply({ sessions, theme: { overrideTokens: () => () => {} }, effect: (setup: () => () => void) => cleanups.push(setup()) }),
+    show: () => { visibilityState = "visible"; documentListeners.get("visibilitychange")?.(); },
     stop: () => cleanups.forEach((cleanup) => cleanup()),
   };
 }

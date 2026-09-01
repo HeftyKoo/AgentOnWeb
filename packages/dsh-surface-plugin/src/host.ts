@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { Authorization, startConnector } from "../../runtime-connector/src/server.js";
-import type { NativeSurface, SurfaceAdapter } from "../../shared-protocol/src/index.js";
+import { Authorization, startConnector } from "@overcode/connector-host";
+import type { NativeSurface, SurfaceAdapter } from "@overcode/connector-contract";
 import { NativeViewState } from "./view-state.js";
 
 export const inject = ["webServer", "connection"];

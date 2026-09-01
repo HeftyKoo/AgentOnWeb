@@ -8,10 +8,13 @@
     "build": "pnpm -r build",
     "build:extension": "node scripts/build-extension.mjs",
     "build:preview": "node scripts/build-preview.mjs",
-    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "check": "pnpm check:architecture && pnpm typecheck && pnpm test && pnpm build",
+    "check:architecture": "node scripts/check-architecture.mjs",
     "install:dsh-surface": "node scripts/install-dsh-surface.mjs",
+    "package:extension": "node scripts/package-extension.mjs",
     "preview": "node scripts/serve-preview.mjs",
-    "test": "vitest run",
+    "release:audit": "pnpm check && node scripts/release-audit.mjs",
+    "test": "pnpm --filter @overcode/dsh-surface build && vitest run",
     "typecheck": "tsc -b --pretty false"
   },
   "devDependencies": {

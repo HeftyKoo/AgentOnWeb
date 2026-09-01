@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { once } from "node:events";
 import WebSocket from "ws";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PROTOCOL_VERSION, type ServerFrame, type SurfaceAdapter } from "@overcode/shared-protocol";
+import { PROTOCOL_VERSION, type ServerFrame, type SurfaceAdapter } from "@overcode/connector-contract";
 import { Authorization, startConnector, type Connector } from "./server.js";
 const directories: string[] = [];
 const servers: Connector[] = [];

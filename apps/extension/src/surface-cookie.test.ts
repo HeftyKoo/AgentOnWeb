@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { NativeSurface } from "@overcode/shared-protocol";
+import type { NativeSurface } from "@overcode/connector-contract";
 import { surfaceCookieDetails, topLevelSite } from "./surface-cookie.js";
 
 const surface: NativeSurface = {

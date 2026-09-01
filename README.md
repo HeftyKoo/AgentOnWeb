@@ -35,6 +35,8 @@ Real website
             └─ native DSH UI + existing Web-profile plugins
 
 MV3 background
+  ├─ ConnectionCoordinator (connection state machine)
+  ├─ PartitionLeases (per-site cookie ownership)
   └─ authenticated loopback connector protocol v1
        └─ Overcode DSH plugin, INSIDE the existing dsh web process
             ├─ native DSH authorization + Settings → Overcode
@@ -46,9 +48,11 @@ The DSH plugin exchanges the runtime's launch token inside the local process and
 Active packages:
 
 - `apps/extension`: MV3 background, native-surface host, mode dock, and presentation CSS
-- `packages/runtime-connector`: runtime-independent discovery, expiring approval requests, credentials, revocation, and transport; no executable or agent supervisor
+- `packages/connector-host`: runtime-independent discovery, expiring approval requests, credentials, revocation, and transport; no executable or agent supervisor
 - `packages/dsh-surface-plugin`: native DSH host Adapter, authorization/settings contribution, transparency, and Alt pass-through
-- `packages/shared-protocol`: native-surface Interface, current wire contract, and capability declarations
+- `packages/connector-contract`: native-surface Interface, runtime codecs, current wire contract, and capability declarations
+
+Dependencies point inward: the extension and connector host depend on the contract; the DSH package composes the host only at build time. The MV3 background is a Chrome composition root rather than the owner of connection or cookie-lifecycle rules. `pnpm check:architecture` enforces these package names, dependency edges, and source boundaries.
 
 Future runtimes implement `SurfaceAdapter`: a runtime descriptor, native authorization URL, and `getSurface()`. Native session management and tools never move into Overcode. Codex/Claude Code would each need their own native-surface Adapter (for example, an authenticated browser terminal for a CLI); they are not implemented or routed through DSH. A protocol version/capability change is required if a future surface cannot satisfy the existing Web contract.
 

@@ -1,6 +1,6 @@
 import type { AddressInfo } from "node:net";
 import { WebSocketServer, WebSocket } from "ws";
-import { CONNECTOR_PORTS, PROTOCOL_VERSION, type SurfaceAdapter, type ServerFrame } from "@overcode/shared-protocol";
+import { CONNECTOR_PORTS, PROTOCOL_VERSION, encodeFrame, parseClientFrame, type SurfaceAdapter, type ServerFrame } from "@overcode/connector-contract";
 import { Authorization, AuthorizationError, EXTENSION_ORIGIN } from "./authorization.js";
 export { Authorization } from "./authorization.js";
 
@@ -49,22 +49,20 @@ async function listen(port: number, adapter: SurfaceAdapter, authority: Authoriz
     socket.on("message", (raw, binary) => {
       void (async () => {
         if (binary) throw new Error("Binary frames are not supported.");
-        const frame: unknown = JSON.parse(raw.toString());
-        if (!frame || typeof frame !== "object" || Array.isArray(frame)) throw new Error("Invalid frame.");
-        const f = frame as Record<string, unknown>;
+        const frame = parseClientFrame(JSON.parse(raw.toString()));
         if (phase === "hello") {
-          if (f.kind !== "hello" || f.protocolVersion !== PROTOCOL_VERSION) throw new Error("Connector protocol mismatch.");
+          if (frame.kind !== "hello" || frame.protocolVersion !== PROTOCOL_VERSION) throw new Error("Connector protocol mismatch.");
           phase = "pending";
           clearTimeout(timeout);
-          if (f.intent === "discover") {
+          if (frame.intent === "discover") {
             send(socket, { kind: "available", protocolVersion: PROTOCOL_VERSION, runtime: adapter.runtime, approvalUrl: adapter.approvalUrl });
             socket.close(1000, "Discovery complete"); return;
           }
           let grantId: string;
-          if (typeof f.credential === "string") {
-            credential = f.credential;
+          if (frame.credential) {
+            credential = frame.credential;
             grantId = authority.authenticate(origin, credential);
-          } else if (f.intent === "pair") {
+          } else if (frame.intent === "pair") {
             const pending = authority.request(origin);
             cancel = pending.cancel;
             send(socket, { kind: "pending", approvalUrl: adapter.approvalUrl });
@@ -78,18 +76,17 @@ async function listen(port: number, adapter: SurfaceAdapter, authority: Authoriz
           grants.set(socket, grantId);
           phase = "ready";
           send(socket, { kind: "hello", protocolVersion: PROTOCOL_VERSION, runtime: adapter.runtime,
-            ...(f.intent === "pair" && credential ? { credential } : {}) });
+            ...(frame.intent === "pair" && credential ? { credential } : {}) });
           return;
         }
         if (phase !== "ready" || !credential) throw new Error("Wait for native runtime approval.");
         authority.authenticate(origin, credential);
-        if (f.kind !== "request" || typeof f.id !== "string" || f.id.length > 128 || !f.command || typeof f.command !== "object") throw new Error("Invalid request.");
-        const type = (f.command as { type?: unknown }).type;
-        if (type !== "surface.get" && type !== "connection.ping") throw new Error("Unknown connector command.");
+        if (frame.kind !== "request") throw new Error("Wait for the connector handshake.");
+        const type = frame.command.type;
         const result = type === "surface.get" ? await adapter.getSurface() : { ok: true as const };
         // An authorization revoked during an asynchronous adapter call must not leak a surface.
         authority.authenticate(origin, credential);
-        send(socket, { kind: "response", id: f.id, ok: true, result });
+        send(socket, { kind: "response", id: frame.id, ok: true, result });
       })().catch(fail);
     });
   });
@@ -104,5 +101,5 @@ async function listen(port: number, adapter: SurfaceAdapter, authority: Authoriz
 }
 
 function send(socket: WebSocket, frame: ServerFrame): void {
-  if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(frame));
+  if (socket.readyState === WebSocket.OPEN) socket.send(encodeFrame(frame));
 }

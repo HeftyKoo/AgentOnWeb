@@ -1,13 +1,17 @@
 {
   "name": "@overcode/dsh-surface",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
+  "description": "Present DeepSeek Harness securely above any website through Overcode.",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
   },
   "main": "./lib/index.js",
-  "scripts": { "build": "node ../../scripts/build-dsh-plugin.mjs" },
+  "scripts": {
+    "build": "node ../../scripts/build-dsh-plugin.mjs",
+    "prepack": "pnpm run build"
+  },
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
@@ -32,5 +36,14 @@
     "lib/index.js",
     "lib/host.js",
     "lib/client.js"
-  ]
+  ],
+  "publishConfig": { "access": "public" },
+  "overcode": {
+    "dsh": "0.1.2-alpha.3",
+    "connectorProtocol": 1
+  },
+  "devDependencies": {
+    "@overcode/connector-contract": "workspace:*",
+    "@overcode/connector-host": "workspace:*"
+  }
 }

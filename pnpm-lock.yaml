@@ -32,20 +32,20 @@ importers:
 
   apps/extension:
     dependencies:
-      '@overcode/shared-protocol':
+      '@overcode/connector-contract':
         specifier: workspace:*
-        version: link:../../packages/shared-protocol
+        version: link:../../packages/connector-contract
       '@phosphor-icons/core':
         specifier: 2.1.1
         version: 2.1.1
 
-  packages/dsh-surface-plugin: {}
+  packages/connector-contract: {}
 
-  packages/runtime-connector:
+  packages/connector-host:
     dependencies:
-      '@overcode/shared-protocol':
+      '@overcode/connector-contract':
         specifier: workspace:*
-        version: link:../shared-protocol
+        version: link:../connector-contract
       ws:
         specifier: ^8.18.3
         version: 8.21.3
@@ -54,7 +54,14 @@ importers:
         specifier: ^8.18.1
         version: 8.18.1
 
-  packages/shared-protocol: {}
+  packages/dsh-surface-plugin:
+    devDependencies:
+      '@overcode/connector-contract':
+        specifier: workspace:*
+        version: link:../connector-contract
+      '@overcode/connector-host':
+        specifier: workspace:*
+        version: link:../connector-host
 
 packages:
 

@@ -1,8 +1,8 @@
+/** Exact wire compatibility version shared by both connector peers. */
 export const PROTOCOL_VERSION = 1 as const;
+
 /** Small loopback-only discovery range; no network or arbitrary-port scanning. */
 export const CONNECTOR_PORTS = [3847, 3848, 3849, 3850] as const;
-
-export type OvercodeMode = "chill" | "focus" | "watch";
 
 export interface SurfaceCookie {
   readonly name: string;
@@ -57,10 +57,13 @@ export interface ServerPending {
   readonly approvalUrl: string;
 }
 
-export interface ServerReject {
-  readonly kind: "error";
+export interface ProtocolFailure {
   readonly code: string;
   readonly message: string;
+}
+
+export interface ServerReject extends ProtocolFailure {
+  readonly kind: "error";
 }
 
 export type RuntimeCommand =
@@ -73,17 +76,11 @@ export interface ClientRequest {
   readonly command: RuntimeCommand;
 }
 
-export type RuntimeCommandResult =
-  | NativeSurface
-  | { readonly ok: true };
+export type RuntimeCommandResult = NativeSurface | { readonly ok: true };
 
-export interface ServerResponse {
-  readonly kind: "response";
-  readonly id: string;
-  readonly ok: boolean;
-  readonly result?: RuntimeCommandResult;
-  readonly error?: { readonly code: string; readonly message: string };
-}
+export type ServerResponse =
+  | { readonly kind: "response"; readonly id: string; readonly ok: true; readonly result: RuntimeCommandResult }
+  | { readonly kind: "response"; readonly id: string; readonly ok: false; readonly error: ProtocolFailure };
 
 export type ClientFrame = ClientHello | ClientRequest;
 export type ServerFrame = ServerHello | ServerReject | ServerResponse | ServerAvailable | ServerPending;

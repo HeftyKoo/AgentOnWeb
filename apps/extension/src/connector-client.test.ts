@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { PROTOCOL_VERSION } from "@overcode/shared-protocol";
+import { PROTOCOL_VERSION } from "@overcode/connector-contract";
 import { discoverRuntimes, isLocalSurfaceUrl, isNativeSurface, isRuntimeDescriptor } from "./connector-client.js";
 import { isContentRequest } from "./shared.js";
 describe("native surface trust", () => {

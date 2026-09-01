@@ -8,5 +8,5 @@
     "types": ["chrome"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "references": [{ "path": "../../packages/shared-protocol" }]
+  "references": [{ "path": "../../packages/connector-contract" }]
 }

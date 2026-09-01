@@ -8,7 +8,7 @@ const origin = `chrome-extension://${"a".repeat(32)}`;
 async function open() { const dir = await mkdtemp(join(tmpdir(), "overcode-auth-")); directories.push(dir); return Authorization.open(dir); }
 afterEach(async () => { vi.useRealTimers(); await Promise.all(directories.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))); });
 
-describe("native one-click authorization", () => {
+describe("connector host authorization", () => {
   it("issues no credential until approved; stores only a hash and binds the origin across restart", async () => {
     const authority = await open();
     const pending = authority.request(origin);

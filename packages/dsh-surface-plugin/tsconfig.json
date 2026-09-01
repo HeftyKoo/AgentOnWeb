@@ -2,5 +2,5 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "outDir": "dist", "rootDir": "src" },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../shared-protocol" }, { "path": "../runtime-connector" }]
+  "references": [{ "path": "../connector-contract" }, { "path": "../connector-host" }]
 }

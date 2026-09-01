@@ -2,7 +2,7 @@ import chillIcon from "@phosphor-icons/core/regular/cloud-sun.svg";
 import focusIcon from "@phosphor-icons/core/regular/crosshair-simple.svg";
 import opacityIcon from "@phosphor-icons/core/regular/circle-half-tilt.svg";
 import watchIcon from "@phosphor-icons/core/regular/eye.svg";
-import type { OvercodeMode } from "@overcode/shared-protocol";
+import type { OvercodeMode } from "@overcode/connector-contract";
 import logoDataUrl from "./assets/overcode-mark.png";
 import type { SurfaceViewState } from "./shared.js";
 

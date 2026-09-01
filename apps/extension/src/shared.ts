@@ -1,4 +1,4 @@
-import type { OvercodeMode, RuntimeDescriptor } from "@overcode/shared-protocol";
+import type { OvercodeMode, RuntimeDescriptor } from "@overcode/connector-contract";
 
 export const STATE_STORAGE_KEY = "overcode.surface-state";
 export const CREDENTIAL_STORAGE_KEY = "overcode.runtime-credentials";

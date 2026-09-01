@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PROTOCOL_VERSION } from "@overcode/shared-protocol";
+import { PROTOCOL_VERSION } from "@overcode/connector-contract";
 import { COOKIE_SCOPES_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, type StateUpdate, type SurfaceCommand } from "./shared.js";
 
 const transport = vi.hoisted(() => ({

@@ -24,7 +24,8 @@ button { cursor: pointer; }
   background: #0b0e11;
 }
 
-/* A remembered Focus mode must not cover the website while disconnected. */
+/* Focus is opaque only while its workspace is actively presented. */
+.overcode-root[data-active="false"] .surface-shell { background: transparent; }
 .overcode-root[data-has-surface="false"] .surface-shell { background: transparent; }
 
 .runtime-frame {

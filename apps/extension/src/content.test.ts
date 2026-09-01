@@ -116,6 +116,8 @@ describe("page-local Overcode visibility", () => {
     expect(p.host.hidden).toBe(false);
     expect(p.frame.hidden).toBe(true);
     expect(p.shadow.querySelector<HTMLElement>(".surface-dock")!.hidden).toBe(false);
+    const styles = p.shadow.querySelector("style")!.textContent!;
+    expect(styles).toMatch(/\.overcode-root\[data-active="false"\]\s+\.surface-shell\s*\{[^}]*background:\s*transparent/du);
     p.emit("state.update");
     p.emit("surface.toggle");
     expect(p.frame.hidden).toBe(false);
