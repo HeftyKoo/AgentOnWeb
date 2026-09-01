@@ -84,7 +84,7 @@ pnpm build:extension
 Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `apps/extension/dist`.
 
 1. Start DSH normally with `dsh web`; keep that process running. DSH opens its own authenticated native page.
-2. On a normal HTTP(S) website, click Overcode's **Connect**.
+2. On a normal HTTP(S) website, Overcode opens its connection panel by default. Click **Connect** when you need it.
 3. Overcode discovers local runtime plugins and opens the native workspace. Click **Allow connection** in DSH. The request expires after two minutes; **Decline** grants no access.
 4. Return to your website. Subsequent connections reuse the installation credential, including after a DSH restart. No pairing code, port, or API key is entered in the extension.
 5. Revoke a browser from **DSH Settings → Overcode → Revoke connection**. Reconnecting then requires fresh approval.
@@ -93,11 +93,16 @@ For this development build the extension is unpacked and the DSH package is loca
 
 ## Modes and interaction
 
-- **Chill** is the default and remains full-screen. DSH's native layers become highly translucent so the website stays visible behind the coding workspace.
+- Overcode is **open by default** on each normal fresh page. When disconnected, it shows the connection panel together with the original 32 px Overcode dock in the lower-right corner.
+- Close or **Esc** dismisses the connection panel/workspace but keeps that lower-right dock available. Background reconnects preserve the dismissed state and do not take page focus.
+- Expand the lower-right dock and choose **Chill**, **Focus**, or **Watch** to reopen Overcode. While disconnected, every mode opens the same connection panel; the selected mode takes effect after a native surface is available.
+- Click the **Overcode toolbar icon** or press `Control+Shift+O` on macOS (`Alt+Shift+O` elsewhere) to toggle the connection panel/workspace on the current tab. The lower-right dock remains the consistent in-page entry point. The shortcut is customizable at `chrome://extensions/shortcuts`.
+- Dismissing is independent of connection and mode: it keeps an already-mounted workspace and its native tasks alive. Reopening restores the selected mode. A workspace discovered while dismissed waits for an explicit toolbar or mode action before loading into that page.
+- **Chill** is the default mode when opened and remains full-screen. DSH's native layers become highly translucent so the website stays visible behind the coding workspace.
 - **Focus** keeps the same native DSH surface but places it over an opaque background.
 - **Watch** keeps DSH running and mounted while hiding it, leaving the website fully interactive and a small mode dock in the lower-right corner.
 - The presentation controls collapse to a single 32 px Overcode mark. Click the mark to reveal the three icon-only mode controls and Chill opacity slider.
-- Switch directly to **Chill**, **Focus**, or **Watch** with `Control+Shift+1`, `Control+Shift+2`, or `Control+Shift+3` on macOS. Other platforms request `Alt+Shift+1`, `Alt+Shift+2`, and `Alt+Shift+3`. Chrome may remap conflicts at `chrome://extensions/shortcuts`.
+- Switch directly to **Chill**, **Focus**, or **Watch** with `Control+Shift+1`, `Control+Shift+2`, or `Control+Shift+3` on macOS. These shortcuts also reveal Overcode on the current tab; while disconnected, they reveal the connection panel. Other platforms request `Alt+Shift+1`, `Alt+Shift+2`, and `Alt+Shift+3`. Chrome may remap conflicts at `chrome://extensions/shortcuts`.
 - Double-tap **Option/Alt** in Chill to latch website click-through. Double-tap it again to return interaction to DSH. This gesture is separate from the three display-mode shortcuts.
 - Chill opacity is adjustable from 20–90% in the expanded icon controls and persists across tabs and browser restarts. Focus always remains opaque; Watch remains hidden.
 

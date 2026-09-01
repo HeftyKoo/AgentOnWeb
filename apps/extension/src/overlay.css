@@ -7,7 +7,7 @@
 :host([hidden]) { display: none !important; }
 
 * { box-sizing: border-box; }
-button, input { color: inherit; font: inherit; }
+button, input, select { color: inherit; font: inherit; }
 button { cursor: pointer; }
 
 .overcode-root,
@@ -23,6 +23,9 @@ button { cursor: pointer; }
 .overcode-root[data-mode="focus"] .surface-shell {
   background: #0b0e11;
 }
+
+/* A remembered Focus mode must not cover the website while disconnected. */
+.overcode-root[data-has-surface="false"] .surface-shell { background: transparent; }
 
 .runtime-frame {
   position: absolute;
@@ -68,6 +71,8 @@ button { cursor: pointer; }
   color: #e9eee9;
   pointer-events: auto;
 }
+
+.surface-dock[hidden] { display: none; }
 
 .surface-palette {
   display: flex;
@@ -245,26 +250,38 @@ button { cursor: pointer; }
   left: 50%;
   z-index: 3;
   width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
   padding: 22px;
   color: #eef3ef;
-  background: rgba(8, 12, 15, 0.96);
+  background: #0b1012;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 2px;
   pointer-events: auto;
   transform: translate(-50%, -50%);
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .surface-setup[hidden] { display: none; }
 .surface-setup strong { font-size: 15px; }
+.surface-setup-header { display: flex; align-items: flex-start; gap: 12px; justify-content: space-between; }
 .surface-setup p { color: #98a39d; font-size: 12px; line-height: 1.55; }
 .surface-setup form { display: grid; gap: 8px; }
-.surface-setup input,
-.surface-setup button {
+.surface-setup select,
+.surface-setup form button {
   min-height: 40px;
   padding: 0 11px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 2px;
 }
-.surface-setup button { color: #07110b; background: #9df5bd; border: 0; font-weight: 750; }
-.surface-setup small { display: block; margin-top: 10px; color: #d3a95a; line-height: 1.4; }
+.surface-setup form button { color: #07110b; background: #9df5bd; border: 0; font-weight: 750; }
+.surface-setup form button:disabled { opacity: 0.6; cursor: wait; }
+.surface-setup-close { flex: none; min-height: 32px; padding: 0 8px; color: #b9c4bd; background: transparent; border: 1px solid #465149; border-radius: 2px; font: inherit; }
+.surface-setup-close:hover { color: #eef3ef; border-color: #9df5bd; }
+.surface-setup button:focus-visible,
+.surface-setup select:focus-visible { outline: 2px solid #9df5bd; outline-offset: 3px; }
+.surface-setup:focus { outline: none; }
+.surface-setup small { display: block; margin-top: 10px; color: #aebbb2; line-height: 1.4; }
+.surface-setup small[data-error="true"] { color: #d3a95a; }
+.surface-setup .surface-setup-hint { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.12); font-size: 11px; }

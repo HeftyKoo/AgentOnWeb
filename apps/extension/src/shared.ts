@@ -40,6 +40,21 @@ export interface StateUpdate {
   readonly state: SurfaceViewState;
 }
 
+// Visibility belongs to each page, not to the shared runtime connection or mode.
+// Only an explicit toolbar/keyboard action sends one of these messages.
+export interface SurfaceCommand {
+  readonly source: "overcode-background";
+  readonly type: "surface.toggle" | "surface.show";
+  readonly state: SurfaceViewState;
+}
+
+export function isSurfaceCommand(value: unknown): value is SurfaceCommand {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { source?: unknown; type?: unknown; state?: unknown };
+  return candidate.source === "overcode-background" &&
+    (candidate.type === "surface.toggle" || candidate.type === "surface.show") && Boolean(candidate.state);
+}
+
 export function isContentRequest(value: unknown): value is ContentRequest {
   if (!value || typeof value !== "object") return false;
   const candidate = value as { source?: unknown; type?: unknown; mode?: unknown; opacity?: unknown; runtimeId?: unknown };

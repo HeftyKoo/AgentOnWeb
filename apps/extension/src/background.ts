@@ -1,7 +1,7 @@
 import type { NativeSurface, OvercodeMode } from "@overcode/shared-protocol";
 import { ConnectorClient, discoverRuntimes, isNativeSurface, type AvailableRuntime } from "./connector-client.js";
 import { DEFAULT_SURFACE_OPACITY, normalizeSurfaceOpacity } from "./interaction.js";
-import { CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, isContentRequest, type ContentRequest, type StateUpdate, type SurfaceViewState } from "./shared.js";
+import { CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, isContentRequest, type ContentRequest, type StateUpdate, type SurfaceCommand, type SurfaceViewState } from "./shared.js";
 import { surfaceCookieDetails, topLevelSite } from "./surface-cookie.js";
 
 let state: SurfaceViewState = { mode: "chill", opacity: DEFAULT_SURFACE_OPACITY, connection: "disconnected", paired: false, endpoint: "" };
@@ -56,10 +56,15 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, respond) => {
   );
   return true;
 });
-chrome.commands.onCommand.addListener((command) => {
-  void initialized.then(() => { if (command === "mode-chill") setMode("chill"); if (command === "mode-focus") setMode("focus"); if (command === "mode-watch") setMode("watch"); });
+chrome.commands.onCommand.addListener((command, tab) => {
+  void initialized.then(async () => {
+    const mode = command === "mode-chill" ? "chill" : command === "mode-focus" ? "focus" : command === "mode-watch" ? "watch" : undefined;
+    if (!mode) return;
+    setMode(mode);
+    await presentInTab(tab, "surface.show");
+  });
 });
-chrome.action.onClicked.addListener(() => { void initialized.then(() => setMode(state.mode === "watch" ? "chill" : "watch")); });
+chrome.action.onClicked.addListener((tab) => { void initialized.then(() => presentInTab(tab, "surface.toggle")); });
 chrome.tabs.onRemoved.addListener((id) => frameNames.delete(id));
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name !== "overcode-reconnect") return;
@@ -127,6 +132,17 @@ async function openApproval(url: string): Promise<void> {
 }
 
 function setMode(mode: OvercodeMode): void { patch({ mode }); }
+
+async function presentInTab(tab: chrome.tabs.Tab | undefined, type: SurfaceCommand["type"]): Promise<void> {
+  const target = tab ?? (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0];
+  if (target?.id === undefined || !target.url || !topLevelSite(target.url)) return;
+  try {
+    await chrome.tabs.sendMessage(target.id, { source: "overcode-background", type, state: await viewForTab(target) } satisfies SurfaceCommand);
+  } catch {
+    // Restricted pages and tabs without a content script cannot host Overcode.
+  }
+}
+
 type StatePatch = { [K in keyof SurfaceViewState]?: SurfaceViewState[K] | undefined };
 function patch(next: StatePatch): void {
   state = { ...state, ...next } as SurfaceViewState;

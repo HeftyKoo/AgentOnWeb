@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY } from "./shared.js";
+import { CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, type StateUpdate, type SurfaceCommand } from "./shared.js";
 
 const transport = vi.hoisted(() => ({
   discover: vi.fn(), connect: vi.fn(), close: vi.fn(), request: vi.fn(),
@@ -31,7 +31,7 @@ function createChrome() {
     runtime: { id: "extension-test", onMessage: event() },
     commands: { onCommand: event() }, action: { onClicked: event() },
     alarms: { create: vi.fn(async () => {}), onAlarm: event() },
-    tabs: { query: vi.fn(async () => [tab]), sendMessage: vi.fn(async () => {}), onRemoved: event(),
+    tabs: { query: vi.fn(async () => [tab]), sendMessage: vi.fn(async (_id: number, _message: StateUpdate | SurfaceCommand) => {}), onRemoved: event(),
       update: vi.fn(async () => {}), create: vi.fn(async () => {}) },
     windows: { update: vi.fn(async () => {}) },
     storage: { local: {
@@ -63,6 +63,45 @@ beforeEach(() => {
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("MV3 native connection lifecycle", () => {
+  it("toggles only the clicked tab without switching modes or connecting", async () => {
+    data = { [STATE_STORAGE_KEY]: { mode: "focus" } };
+    await boot();
+    chromeMock.tabs.sendMessage.mockClear();
+    const onClick = chromeMock.action.onClicked.addListener.mock.calls[0]![0];
+    onClick(tab);
+    await vi.waitFor(() => expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(tab.id, {
+      source: "overcode-background", type: "surface.toggle", state: expect.objectContaining({ mode: "focus" }),
+    }));
+    expect(chromeMock.tabs.sendMessage).toHaveBeenCalledOnce();
+    expect(transport.connect).not.toHaveBeenCalled();
+    expect(transport.discover).not.toHaveBeenCalled();
+  });
+
+  it("mode shortcuts reveal only the active tab while preserving shared mode updates", async () => {
+    const otherTab = { ...tab, id: 2, url: "https://example.net/" };
+    chromeMock.tabs.query.mockResolvedValue([tab, otherTab]);
+    await boot();
+    chromeMock.tabs.sendMessage.mockClear();
+    const onCommand = chromeMock.commands.onCommand.addListener.mock.calls[0]![0];
+    onCommand("mode-watch", otherTab);
+    await vi.waitFor(() => expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(otherTab.id, {
+      source: "overcode-background", type: "surface.show", state: expect.objectContaining({ mode: "watch" }),
+    }));
+    const commands = chromeMock.tabs.sendMessage.mock.calls.filter(([, message]) => message.type !== "state.update");
+    expect(commands).toHaveLength(1);
+    expect(commands[0]![0]).toBe(otherTab.id);
+    expect((await message("state.get")).result.mode).toBe("watch");
+    expect(transport.connect).not.toHaveBeenCalled();
+  });
+
+  it("ignores toolbar actions on restricted browser pages", async () => {
+    await boot(); chromeMock.tabs.sendMessage.mockClear();
+    const onClick = chromeMock.action.onClicked.addListener.mock.calls[0]![0];
+    onClick({ ...tab, url: "chrome://extensions/" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
+  });
+
   it("requires explicit connection and keeps credentials out of content-script state", async () => {
     await boot(); expect(transport.connect).not.toHaveBeenCalled();
     expect(chromeMock.storage.local.setAccessLevel).toHaveBeenCalledWith({ accessLevel: "TRUSTED_CONTEXTS" });

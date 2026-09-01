@@ -22,6 +22,7 @@ export interface SurfaceDock {
   onMode: (mode: OvercodeMode) => void;
   onOpacityPreview: (opacity: number) => void;
   onOpacity: (opacity: number) => void;
+  focus: () => void;
   render: (state: SurfaceViewState) => void;
   setExpanded: (expanded: boolean) => void;
 }
@@ -42,6 +43,7 @@ export function createDock(): SurfaceDock {
     onMode: (_mode: OvercodeMode) => {},
     onOpacityPreview: (_opacity: number) => {},
     onOpacity: (_opacity: number) => {},
+    focus: () => toggle.focus({ preventScroll: true }),
     render(state) {
       for (const [mode, button] of buttons) {
         button.setAttribute("aria-pressed", String(state.mode === mode));

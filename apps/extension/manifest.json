@@ -24,6 +24,12 @@
     }
   ],
   "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+O",
+        "mac": "MacCtrl+Shift+O"
+      }
+    },
     "mode-chill": {
       "suggested_key": {
         "default": "Alt+Shift+1",
@@ -47,7 +53,7 @@
     }
   },
   "action": {
-    "default_title": "Open Overcode",
+    "default_title": "Show / hide Overcode",
     "default_icon": {
       "16": "icons/overcode-16.png",
       "32": "icons/overcode-32.png"

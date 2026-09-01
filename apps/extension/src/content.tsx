@@ -1,13 +1,14 @@
 import { createDock } from "./dock.js";
 import { DEFAULT_SURFACE_OPACITY, DoubleTapLatch } from "./interaction.js";
 import styles from "./overlay.css";
-import { isStateUpdate, type ContentRequest, type SurfaceViewState } from "./shared.js";
+import { isStateUpdate, isSurfaceCommand, type ContentRequest, type SurfaceViewState } from "./shared.js";
 
 const HOST_ID = "overcode-extension-root";
 
 if (!document.getElementById(HOST_ID)) {
   const host = document.createElement("div");
   host.id = HOST_ID;
+  host.hidden = true;
   host.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none;isolation:isolate;";
   const shadow = host.attachShadow({ mode: "closed" });
   const style = document.createElement("style");
@@ -18,6 +19,7 @@ if (!document.getElementById(HOST_ID)) {
   shell.className = "surface-shell";
   shell.setAttribute("aria-label", "Overcode native coding workspace");
   const frame = document.createElement("iframe");
+  frame.hidden = true;
   frame.className = "runtime-frame";
   frame.title = "Native coding workspace";
   frame.allow = "clipboard-read; clipboard-write";
@@ -41,6 +43,12 @@ if (!document.getElementById(HOST_ID)) {
   let surfaceOrigin: string | undefined;
   let frameNonce: string | undefined;
   let sitePassActive = false;
+  // Each page starts open. Closing deactivates the panel/workspace while the
+  // original lower-right dock remains available as the in-page re-entry point.
+  let visible = true;
+  let receivedUpdate = false;
+  let previousFocus = document.activeElement instanceof HTMLElement && document.activeElement !== host
+    ? document.activeElement : undefined;
   const optionLatch = new DoubleTapLatch();
 
   const send = (request: ContentRequest) => {
@@ -51,9 +59,11 @@ if (!document.getElementById(HOST_ID)) {
     send({ source: "overcode-content", type: "runtime.connect", ...(runtimeId ? { runtimeId } : {}) });
   };
   setup.onApproval = () => send({ source: "overcode-content", type: "runtime.approval" });
+  setup.onClose = () => setVisible(false);
   dock.onMode = (mode) => {
     setSitePass(false);
     optionLatch.reset();
+    setVisible(true);
     send({ source: "overcode-content", type: "mode.set", mode });
   };
   dock.onOpacity = (opacity) => {
@@ -94,7 +104,9 @@ if (!document.getElementById(HOST_ID)) {
       optionLatch.reset();
     }
     dock.render(state);
-    setup.render(state);
+    setup.render(state, visible);
+    root.dataset.active = String(visible);
+    root.dataset.hasSurface = String(Boolean(state.surface));
     // Keep the native authorization tab usable before pairing; never overlay
     // its approval UI or recursively embed a runtime into itself.
     if ([state.nativeUrl, state.approvalUrl, state.surface?.url].some((url) => url && location.origin === new URL(url).origin)) {
@@ -109,11 +121,12 @@ if (!document.getElementById(HOST_ID)) {
       frameNonce = undefined;
       return;
     }
-    if (location.origin === new URL(state.surface.url).origin) {
-      host.hidden = true;
+    // Once mounted, closing leaves the frame and native task untouched. A
+    // workspace discovered while closed waits for an explicit mode/open action.
+    if (!visible) {
+      frame.hidden = true;
       return;
     }
-    host.hidden = false;
     const nextNonce = state.surface.frameName.replace(/^overcode:/u, "");
     const nextSource = new URL(state.surface.url);
     nextSource.hash = new URLSearchParams({ overcode: nextNonce }).toString();
@@ -129,8 +142,52 @@ if (!document.getElementById(HOST_ID)) {
     postPresentation();
   };
 
+  const setVisible = (next: boolean) => {
+    if (next === visible) {
+      render(state);
+      if (next && !state.surface) setup.element.focus({ preventScroll: true });
+      return;
+    }
+    if (next && document.activeElement instanceof HTMLElement && document.activeElement !== host) {
+      previousFocus = document.activeElement;
+    }
+    const hadFocus = document.activeElement === host;
+    visible = next;
+    setSitePass(false);
+    optionLatch.reset();
+    dock.setExpanded(false);
+    render(state);
+    if (!next) {
+      if (hadFocus && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+      previousFocus = undefined;
+    } else if (!host.hidden) {
+      if (!state.surface) setup.element.focus({ preventScroll: true });
+      else if (state.mode === "watch") dock.focus();
+      else frame.focus({ preventScroll: true });
+    }
+  };
+
   chrome.runtime.onMessage.addListener((message: unknown) => {
-    if (isStateUpdate(message)) render(message.state);
+    if (isStateUpdate(message)) {
+      receivedUpdate = true;
+      render(message.state);
+    }
+    if (isSurfaceCommand(message)) {
+      receivedUpdate = true;
+      state = message.state;
+      const next = message.type === "surface.toggle" ? !visible : true;
+      if (next === visible) render(state);
+      else setVisible(next);
+    }
+  });
+
+  // Escape belongs to our own controls only. Do not consume Escape in the
+  // website or the native iframe, where it may dismiss a menu or cancel input.
+  shell.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setVisible(false);
   });
 
   const setSitePass = (active: boolean) => {
@@ -144,7 +201,7 @@ if (!document.getElementById(HOST_ID)) {
     }
   };
   const handleOptionTap = () => {
-    if (state.mode !== "chill") {
+    if (!visible || host.hidden || !state.surface || state.mode !== "chill") {
       setSitePass(false);
       optionLatch.reset();
       return;
@@ -167,20 +224,34 @@ if (!document.getElementById(HOST_ID)) {
 
   void chrome.runtime.sendMessage({ source: "overcode-content", type: "state.get" } satisfies ContentRequest)
     .then((response: { ok?: boolean; result?: SurfaceViewState } | undefined) => {
-      if (response?.result) render(response.result);
-    });
+      // A slow initial snapshot must not overwrite a newer explicit open/update.
+      if (response?.result && !receivedUpdate) render(response.result);
+    }).catch(() => render(state));
 }
 
 function createSetup(): {
   element: HTMLElement;
   onConnect: (runtimeId?: string) => void;
   onApproval: () => void;
-  render: (state: SurfaceViewState) => void;
+  onClose: () => void;
+  render: (state: SurfaceViewState, active: boolean) => void;
 } {
   const element = document.createElement("div");
   element.className = "surface-setup";
+  element.tabIndex = -1;
+  element.setAttribute("role", "dialog");
+  element.setAttribute("aria-labelledby", "overcode-setup-title");
+  const header = document.createElement("div");
+  header.className = "surface-setup-header";
   const title = document.createElement("strong");
+  title.id = "overcode-setup-title";
   title.textContent = "Your coding agent, everywhere.";
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "surface-setup-close";
+  close.textContent = "Close";
+  close.setAttribute("aria-label", "Close Overcode");
+  header.append(title, close);
   const copy = document.createElement("p");
   copy.textContent = "Start your coding runtime with its Overcode plugin. Approve this browser once in the native workspace.";
   const form = document.createElement("form");
@@ -191,14 +262,19 @@ function createSetup(): {
   submit.type = "submit";
   submit.textContent = "Connect";
   const status = document.createElement("small");
+  status.setAttribute("role", "status");
+  const hint = document.createElement("p");
+  hint.className = "surface-setup-hint";
+  hint.textContent = "Open again from the Overcode toolbar icon or your extension shortcut. Esc closes this panel.";
   form.append(runtimes, submit);
-  element.append(title, copy, form, status);
+  element.append(header, copy, form, status, hint);
   const api = {
     element,
     onConnect: (_runtimeId?: string) => {},
     onApproval: () => {},
-    render(state: SurfaceViewState) {
-      element.hidden = Boolean(state.surface);
+    onClose: () => {},
+    render(state: SurfaceViewState, active: boolean) {
+      element.hidden = Boolean(state.surface) || !active;
       const list = state.runtimes ?? [];
       const selected = runtimes.value;
       runtimes.replaceChildren(...list.map((runtime) => {
@@ -211,9 +287,11 @@ function createSetup(): {
       form.dataset.pending = String(state.connection === "awaiting-approval");
       submit.disabled = state.connection === "connecting";
       submit.textContent = state.connection === "awaiting-approval" ? "Open workspace to approve" : state.connection === "connecting" ? "Finding runtime…" : "Connect";
-      status.textContent = state.error ?? (state.connection === "awaiting-approval" ? "Waiting for your approval in the native workspace…" : state.paired ? "Reconnecting to your native workspace…" : "No pairing code or API key needed.");
+      status.dataset.error = String(Boolean(state.error));
+      status.textContent = state.error ?? (state.connection === "awaiting-approval" ? "Waiting for your approval in the native workspace…" : state.connection === "reconnecting" ? "Reconnecting in the background. You can close this panel." : state.connection === "connecting" ? "Looking for your native workspace…" : state.connection === "connected" ? "Loading your native workspace…" : "Not connected. Connect when you're ready.");
     },
   };
+  close.addEventListener("click", () => api.onClose());
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     if (form.dataset.pending === "true") api.onApproval();
