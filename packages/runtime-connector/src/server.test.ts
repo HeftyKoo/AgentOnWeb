@@ -26,7 +26,7 @@ async function connect(server: Connector, headers = { Origin: origin }) {
   await once(socket, "open"); return socket;
 }
 function hello(socket: WebSocket, extras: Record<string, unknown>) {
-  socket.send(JSON.stringify({ kind: "hello", protocolVersion: PROTOCOL_VERSION, clientNonce: "test-client-nonce", ...extras }));
+  socket.send(JSON.stringify({ kind: "hello", protocolVersion: PROTOCOL_VERSION, ...extras }));
 }
 async function frame(socket: WebSocket): Promise<ServerFrame> { const [data] = await once(socket, "message"); return JSON.parse(String(data)) as ServerFrame; }
 afterEach(async () => {
@@ -52,11 +52,11 @@ describe("runtime-independent connector", () => {
     expect(pending.kind).toBe("pending");
     if (pending.kind !== "pending") throw new Error("Expected pending");
     const authorized = frame(first);
-    await authority.decide(pending.requestId, true);
+    await authority.decide(authority.snapshot().pending[0]!.id, true);
     const accepted = await authorized;
     if (accepted.kind !== "hello" || !accepted.credential) throw new Error("Expected credential");
     const second = await connect(server); hello(second, { credential: accepted.credential });
-    expect(await frame(second)).toMatchObject({ kind: "hello", paired: true });
+    expect(await frame(second)).toMatchObject({ kind: "hello", runtime: { id: adapter.runtime.id } });
     second.send(JSON.stringify({ kind: "request", id: "surface", command: { type: "surface.get" } }));
     expect(await frame(second)).toMatchObject({ kind: "response", result: { runtimeId: "test-native-runtime", cookie: { value: "private-cookie" } } });
     const revoked = frame(second);
@@ -78,14 +78,14 @@ describe("runtime-independent connector", () => {
     const website = new WebSocket(`ws://127.0.0.1:${server.port}`, { headers: { Origin: "https://example.org" } }); sockets.push(website);
     expect((await once(website, "close"))[0]).toBe(4403);
     const socket = await connect(server);
-    hello(socket, { protocolVersion: 2, intent: "pair" });
+    hello(socket, { protocolVersion: PROTOCOL_VERSION + 1, intent: "pair" });
     expect(await frame(socket)).toMatchObject({ kind: "error" });
   });
   it("declines requests without issuing a credential", async () => {
     const { server, authority } = await setup(); const socket = await connect(server);
     hello(socket, { intent: "pair" }); const pending = await frame(socket);
     if (pending.kind !== "pending") throw new Error("Expected pending");
-    const denied = frame(socket); await authority.decide(pending.requestId, false);
+    const denied = frame(socket); await authority.decide(authority.snapshot().pending[0]!.id, false);
     expect(await denied).toMatchObject({ kind: "error", code: "DENIED" });
     expect(authority.snapshot().grants).toHaveLength(0);
   });
@@ -93,7 +93,7 @@ describe("runtime-independent connector", () => {
     const { server, authority } = await setup(); const socket = await connect(server);
     hello(socket, { intent: "pair" }); const pending = await frame(socket);
     if (pending.kind !== "pending") throw new Error("Expected pending");
-    const accepted = frame(socket); await authority.decide(pending.requestId, true); await accepted;
+    const accepted = frame(socket); await authority.decide(authority.snapshot().pending[0]!.id, true); await accepted;
     let release!: () => void;
     const waiting = new Promise<void>((resolve) => { release = resolve; });
     vi.mocked(adapter.getSurface).mockImplementationOnce(async () => {

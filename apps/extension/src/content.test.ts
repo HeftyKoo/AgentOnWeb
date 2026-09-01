@@ -6,8 +6,8 @@ import type { ContentRequest, StateUpdate, SurfaceCommand, SurfaceViewState } fr
 
 let source: string;
 const pages: JSDOM[] = [];
-const idle: SurfaceViewState = { mode: "chill", connection: "disconnected", paired: false, endpoint: "", opacity: 0.6 };
-const connected: SurfaceViewState = { ...idle, paired: true, connection: "connected", surface: {
+const idle: SurfaceViewState = { mode: "chill", connection: "disconnected", opacity: 0.6 };
+const connected: SurfaceViewState = { ...idle, connection: "connected", surface: {
   runtimeId: "native-test", displayName: "Native test", url: "http://localhost:3080/", frameName: "overcode:test-nonce",
 } };
 
@@ -64,7 +64,7 @@ describe("page-local Overcode visibility", () => {
     expect(p.shadow.querySelector<HTMLElement>(".surface-setup")!.hidden).toBe(true);
   });
 
-  it("opens by default with the setup and original lower-right dock", async () => {
+  it("opens by default with the setup and collapsed lower-right dock", async () => {
     const p = await page();
     expect(p.host.hidden).toBe(false);
     expect(p.shadow.querySelector<HTMLElement>(".surface-setup")!.hidden).toBe(false);
@@ -95,7 +95,7 @@ describe("page-local Overcode visibility", () => {
     expect(p.shadow.querySelector<HTMLElement>(".surface-dock")!.hidden).toBe(false);
     expect(p.shadow.querySelector<HTMLElement>(".overcode-root")!.dataset.active).toBe("false");
     expect(p.window.document.activeElement).toBe(p.websiteControl);
-    p.emit("state.update", { ...idle, connection: "reconnecting", paired: true });
+    p.emit("state.update", { ...idle, connection: "reconnecting" });
     p.emit("state.update", connected);
     expect(p.host.hidden).toBe(false);
     expect(p.shadow.querySelector<HTMLElement>(".overcode-root")!.dataset.active).toBe("false");

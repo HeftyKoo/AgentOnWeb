@@ -1,10 +1,10 @@
 import type { NativeSurface, OvercodeMode } from "@overcode/shared-protocol";
 import { ConnectorClient, discoverRuntimes, isNativeSurface, type AvailableRuntime } from "./connector-client.js";
 import { DEFAULT_SURFACE_OPACITY, normalizeSurfaceOpacity } from "./interaction.js";
-import { CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, isContentRequest, type ContentRequest, type StateUpdate, type SurfaceCommand, type SurfaceViewState } from "./shared.js";
+import { COOKIE_SCOPES_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, isContentRequest, type ContentRequest, type StateUpdate, type SurfaceCommand, type SurfaceViewState } from "./shared.js";
 import { surfaceCookieDetails, topLevelSite } from "./surface-cookie.js";
 
-let state: SurfaceViewState = { mode: "chill", opacity: DEFAULT_SURFACE_OPACITY, connection: "disconnected", paired: false, endpoint: "" };
+let state: SurfaceViewState = { mode: "chill", opacity: DEFAULT_SURFACE_OPACITY, connection: "disconnected" };
 let credentials: Record<string, string> = {};
 let activeRuntimeId: string | undefined;
 let surface: NativeSurface | undefined;
@@ -13,7 +13,6 @@ let retry: ReturnType<typeof setTimeout> | undefined;
 let generation = 0;
 const frameNames = new Map<number, string>();
 const installedPartitions = new Map<string, { url: string; name: string; partitionKey: chrome.cookies.CookiePartitionKey }>();
-const COOKIE_SCOPES_KEY = "overcode.cookie-scopes.v3";
 type CookieScope = { runtimeId: string; url: string; name: string; partitionKey: chrome.cookies.CookiePartitionKey };
 const cookieScopes = new Map<string, CookieScope>();
 
@@ -27,7 +26,7 @@ const client = new ConnectorClient({
       credentials[activeRuntimeId] = credential;
       void chrome.storage.local.set({ [CREDENTIAL_STORAGE_KEY]: credentials });
     }
-    patch({ connection: "connected", paired: true, error: undefined, approvalUrl: undefined });
+    patch({ connection: "connected", error: undefined, approvalUrl: undefined });
     void refreshSurface();
   },
   rejected(code, message) {
@@ -37,7 +36,7 @@ const client = new ConnectorClient({
       void clearCookies();
     }
     surface = undefined;
-    patch({ error: message, paired: Boolean(activeRuntimeId && credentials[activeRuntimeId]), approvalUrl: undefined });
+    patch({ error: message, approvalUrl: undefined });
   },
   closed() {
     surface = undefined;
@@ -68,13 +67,13 @@ chrome.action.onClicked.addListener((tab) => { void initialized.then(() => prese
 chrome.tabs.onRemoved.addListener((id) => frameNames.delete(id));
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name !== "overcode-reconnect") return;
-  void initialized.then(() => { if (state.paired && state.connection === "reconnecting") void connect(false); });
+  void initialized.then(() => { if (activeRuntimeId && credentials[activeRuntimeId] && state.connection === "reconnecting") void connect(false); });
 });
 
 async function initialize(): Promise<void> {
   await chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
-  const stored = await chrome.storage.local.get([STATE_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, COOKIE_SCOPES_KEY]);
-  const scopes = stored[COOKIE_SCOPES_KEY] as CookieScope[] | undefined;
+  const stored = await chrome.storage.local.get([STATE_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, COOKIE_SCOPES_STORAGE_KEY]);
+  const scopes = stored[COOKIE_SCOPES_STORAGE_KEY] as CookieScope[] | undefined;
   for (const scope of Array.isArray(scopes) ? scopes : []) {
     if (typeof scope.runtimeId === "string" && typeof scope.url === "string" && typeof scope.name === "string" && typeof scope.partitionKey?.topLevelSite === "string") {
       cookieScopes.set(`${scope.name}\n${scope.partitionKey.topLevelSite}`, scope);
@@ -82,16 +81,16 @@ async function initialize(): Promise<void> {
   }
   // MV3 may suspend the worker while DSH is stopped. A timer alone cannot wake it.
   await chrome.alarms.create("overcode-reconnect", { periodInMinutes: 0.5 });
-  const previous = stored[STATE_STORAGE_KEY] as Partial<SurfaceViewState> | undefined;
+  const storedState = stored[STATE_STORAGE_KEY] as Partial<SurfaceViewState> | undefined;
   const saved: unknown = stored[CREDENTIAL_STORAGE_KEY];
   if (saved && typeof saved === "object" && !Array.isArray(saved)) {
     credentials = Object.fromEntries(Object.entries(saved).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
   }
-  activeRuntimeId = previous?.runtimeId;
-  state = { ...state, mode: previous?.mode === "focus" || previous?.mode === "watch" ? previous.mode : "chill",
-    opacity: normalizeSurfaceOpacity(previous?.opacity), ...(activeRuntimeId ? { runtimeId: activeRuntimeId } : {}), paired: Boolean(activeRuntimeId && credentials[activeRuntimeId]) };
+  activeRuntimeId = storedState?.runtimeId;
+  state = { ...state, mode: storedState?.mode === "focus" || storedState?.mode === "watch" ? storedState.mode : "chill",
+    opacity: normalizeSurfaceOpacity(storedState?.opacity), ...(activeRuntimeId ? { runtimeId: activeRuntimeId } : {}) };
   await broadcast();
-  if (state.paired) void connect(false);
+  if (activeRuntimeId && credentials[activeRuntimeId]) void connect(false);
 }
 
 async function handleRequest(request: ContentRequest, tab?: chrome.tabs.Tab): Promise<unknown> {
@@ -120,7 +119,7 @@ async function connect(requestApproval: boolean, selectedId?: string): Promise<v
     return;
   }
   activeRuntimeId = target.runtime.id;
-  patch({ runtimeId: activeRuntimeId, runtime: target.runtime, nativeUrl: target.approvalUrl, endpoint: target.endpoint, paired: Boolean(credentials[activeRuntimeId]) });
+  patch({ runtimeId: activeRuntimeId, runtime: target.runtime, nativeUrl: target.approvalUrl });
   client.connect(target.endpoint, credentials[activeRuntimeId]);
 }
 
@@ -173,7 +172,7 @@ async function viewForTab(tab?: chrome.tabs.Tab): Promise<SurfaceViewState> {
       if (surface !== currentSurface) { await chrome.cookies.remove(details); return state; }
       installedPartitions.set(key, { url: details.url, name: details.name, partitionKey: details.partitionKey });
       cookieScopes.set(key, { runtimeId: currentSurface.runtimeId, url: details.url, name: details.name, partitionKey: details.partitionKey });
-      await chrome.storage.local.set({ [COOKIE_SCOPES_KEY]: [...cookieScopes.values()] });
+      await chrome.storage.local.set({ [COOKIE_SCOPES_STORAGE_KEY]: [...cookieScopes.values()] });
     }
   }
   if (surface !== currentSurface) return state;
@@ -188,7 +187,7 @@ async function clearCookies(): Promise<void> {
     await chrome.cookies.remove(details); cookieScopes.delete(key);
   }));
   installedPartitions.clear();
-  await chrome.storage.local.set({ [COOKIE_SCOPES_KEY]: [...cookieScopes.values()] });
+  await chrome.storage.local.set({ [COOKIE_SCOPES_STORAGE_KEY]: [...cookieScopes.values()] });
 }
 
 async function refreshSurface(): Promise<void> {

@@ -1,57 +1,63 @@
-# DSH plugin connection acceptance
+# Runtime connection contract
 
-Date: 2026-08-31. Status: local plugin migration accepted; automated checks and the final live revoke/re-pair cycle passed. Not a store/registry release.
+## Release baseline
 
-## Scope and source of truth
+- Chromium extension: `0.1.0`
+- DSH surface plugin: `0.1.0`
+- Connector protocol: `v1`
 
-Current goal: “保留一键配对授权，其他的按照上面的讨论去做”. The requested distribution is a Chrome extension plus an Overcode plugin loaded by normal `dsh web`, retaining a first-time native authorization action.
+Package versions describe independently published artifacts. The handshake depends only on the connector protocol version.
 
-The original objective attachment and all nine turns of “DeepSeek Harness形态解释” were read. The enduring product requirements are “Your coding agent, everywhere”, a real underlying website, coding-first full-screen Chill, easy website interaction, and runtime independence. Later explicit instructions supersede the original custom-chat/ACP/runtime-manager design: use the agent's native interaction and plugins; make controls minimal and collapsible; double Option is specifically the website pass-through gesture, not every shortcut. The present change does not restore the rejected custom agent UI or a separately launched Bridge.
+## Components
 
-Local implementation is authoritative. DSH is pinned to `dsh-v0.1.2-alpha.1`, source commit `cd5ef8148158c3a752a658978873241fdf8e2bbc`. The extension is an unpacked local 0.3.0 build; the DSH plugin is a local 0.2.0 package. Neither has been published to a registry/store.
+- `apps/extension` discovers local runtime plugins, requests native authorization, installs partitioned runtime cookies, and presents the native surface above normal websites.
+- `packages/runtime-connector` owns loopback discovery, approval requests, credential authentication, revocation, and the two protocol commands: `surface.get` and `connection.ping`.
+- `packages/dsh-surface-plugin` runs inside `dsh web`, exposes the authenticated DSH surface, renders authorization controls in native DSH slots, and retains the bounded native-view bookmark.
+- `packages/shared-protocol` defines the complete protocol-v1 wire contract and runtime capabilities.
 
-## Requirement audit
+## Connection lifecycle
 
-| Requirement | Evidence | Result |
-| --- | --- | --- |
-| Normal DSH startup, no separate Bridge | `pnpm install:dsh-surface` uses DSH's plugin manager; the package declares `dsh.bundle`. Normal `dsh web` loaded the plugin without `--patch`. Native Web and connector listeners share one PID; after the latest restart PID 13555 owned loopback ports 3080 and 3847. | Verified |
-| No manual code, endpoint, or API key in the extension | Content setup contains Connect/approval actions and optional runtime selection, with no credential input. The local wrapper continues reading the existing Hermes key at DSH startup. | Verified |
-| Explicit first authorization in native DSH | Live first connection opened the native DSH page; Decline displayed a denial and issued no grant, and Allow connection enabled the iframe. Settings → Overcode currently lists the bound extension. Tests independently prove that discovery and pending requests cannot retrieve a surface. | Verified |
-| Native interactions and existing plugins | Real DSH sidebar, workspace selector, model/permission controls, chat, trajectory and settings are rendered by DSH. Its native tool flow ran `pwd` and returned `OVERCODE_PLUGIN_OK`. The plugin adds only authorization/settings slots, theme overrides in embedded mode, and a native-view bookmark. | Verified for the tested Web profile; not a certification of every third-party plugin |
-| Full-screen Chill, visible website, minimal collapsible controls | Real Chrome screenshot `artifacts/plugin-connection/chill.png`: full native workspace, underlying IANA content visible at the user's preserved 23% opacity, short icon dock. `focus.png`: opaque full-screen native workspace and collapsed logo. | Verified |
-| Ordinary per-mode shortcuts | Real `Control+Shift+1/2/3` switched Chill/Focus/Watch. Mode changes leave the same iframe/session in place; no runtime command creates/cancels a session. | Verified |
-| Double Option only for website pass-through | Latch tests cover paired timing, late taps and reset; native client test covers one event per press, repeat suppression and nonce/source validation. CSS switches pointer events only for the pass-through latch. | Automated path verified; physical modifier-only gesture not re-driven by Computer Use |
-| Real website interaction | In Watch, clicked IANA's own Reserved Domains link; the original page navigated normally. No site provider, proxy, replacement login or video implementation is used. | Verified on IANA/example sites; no universal DRM/fullscreen-site claim |
-| Reload/reconnect without another code | Reloaded the unpacked extension and restarted normal DSH; the existing authorization reconnected. The selected native test session and opacity remained available. Background tests cover cold-start saved credentials and the persistent reconnect alarm. | Verified; an actual Chrome process restart/long suspension was not forced |
-| Same native session after changing website | Initial live test found that a new Chrome storage partition selected New Session. Fixed in the DSH plugin using its public native selection Interface. Re-tested example.com → example.net: same `OVERCODE_PLUGIN_OK check pwd` session and tool result opened automatically. See `cross-site.png`. | Verified after fix |
-| Do not implement another agent manager | Generic protocol commands are only `surface.get` and `connection.ping`. DSH bookmark synchronization calls native selection/refresh, never create, prompt, approval, execution or cancellation. No transcripts are stored by Overcode. | Verified by active import/command inspection |
-| Future runtime extensibility | `SurfaceAdapter` declares runtime identity, Web surface capabilities, native authorization URL, and surface acquisition. Connector tests run a non-DSH test Adapter. DSH selection/auth integration stays entirely inside the DSH package. | Verified architecture; Codex/Claude adapters intentionally not implemented |
-| Strong local trust and secrets isolation | Loopback-only listeners, exact Host/extension-origin checks, versioned handshake, 2-minute pending expiry, bound random credentials, hash-only 0600 storage. DSH guards native routes. Background tests verify credential/cookie values never enter content-script state and cookies are HttpOnly/partitioned. | Verified automated checks and live unauthenticated 401/cross-origin 403 checks |
-| Revoke stops access and requires fresh authorization | After the user's explicit confirmation, native Revoke connection reduced grants from one to zero. The example.net iframe disappeared and displayed “Connection authorization was revoked in the runtime.” A page reload did not restore access. Connect reopened native DSH; Allow connection restored one grant and automatically reopened the original session and tool result. Tests additionally cover in-flight delivery and cold-start cookie cleanup. | Verified live and automated |
-| Documentation and clean output boundary | README describes installation, prerequisites, connection/revocation, limitations and runtime Interface. Generated builds, QA screenshots and runtime/environment state are ignored. No commit, push or publication was performed in this goal. | Verified |
+1. The extension probes the fixed loopback range `127.0.0.1:3847-3850` and validates the runtime descriptor and authorization URL.
+2. Discovery exposes runtime identity and capabilities only; it cannot return a session cookie or credential.
+3. A first connection creates a two-minute pending request and opens the native DSH page.
+4. Decline issues no credential. Allow creates a random credential bound to the extension origin and stores only its hash on disk.
+5. The authenticated extension requests `surface.get`, receives the clean DSH URL and delegated cookie, and installs that cookie in the current website's Chrome partition.
+6. Restart and reconnect reuse the stored installation credential. Revocation closes active sockets, clears delegated cookies, and requires a new native approval.
 
-## Checks
+The content script never receives the installation credential, delegated cookie, DSH launch token, arbitrary endpoint configuration, or session transcript.
 
-`pnpm check` runs TypeScript project checks, Vitest, and all workspace builds. The full command passed after the native-view fix and was rerun after the live authorization cycle: 11 files / 34 passing tests, typechecking and all workspace builds. `git diff --check` also passed. The live authorization result below is separate evidence, not an inference from these automated results.
+## Native surface behavior
 
-The DSH package was also packed with `pnpm --filter @overcode/dsh-surface pack` and extracted into a fresh directory outside the workspace. The archive contains exactly `package.json`, `cordis.patch.yml`, and `lib/{index,host,client}.js`. Importing its host entry from that isolated directory succeeded without workspace dependencies. The package retains its `dsh.bundle` automatic-activation declaration. This verifies the package payload/entrypoint, not a published-registry installation; the installed live profile still uses the local development package.
+- DSH owns sessions, tools, approvals, models, commands, settings, and installed Web-profile plugins.
+- Overcode owns Focus, Chill, Watch, opacity, the collapsible dock, and double-Option website pass-through.
+- Closing the panel does not disconnect or recreate the iframe.
+- A small `native-view.json` bookmark restores DSH's selected session or subagent across website storage partitions. It stores no transcript, credential, or execution state.
+- Authorization controls are available only in a top-level native DSH window, never inside the embedded website iframe.
 
-Relevant test files:
+## Security invariants
 
-- `packages/runtime-connector/src/authorization.test.ts`: durable origin-bound credentials, decline/cancel/shutdown, TTL expiry.
-- `packages/runtime-connector/src/server.test.ts`: non-DSH Adapter, discovery, authorization gate, protocol/origin rejection, reconnect/revoke and in-flight revoke race.
-- `apps/extension/src/background.test.ts`: privileged-message isolation, trusted-only storage, secret-free content state, cold-start cookie cleanup and reconnect alarm.
-- `packages/dsh-surface-plugin/src/host.test.ts`: DSH's actual `http://dsh.internal` Fetch bridge placeholder versus validated Host/Origin headers.
-- `packages/dsh-surface-plugin/client.test.ts`: native slots versus iframe isolation, presentation message authentication, cross-partition native selection and in-flight user-choice precedence.
-- `packages/dsh-surface-plugin/src/view-state.test.ts`: bounded native-only bookmark, private persistence, empty selection and subagent addresses.
-- Extension interaction/surface-cookie tests: double-Option latch, opacity clamps, isolated cookie details.
+- Loopback-only listener and fixed discovery ports
+- Exact Chrome extension Origin and connector Host validation
+- Exact protocol-v1 handshake with no alternate protocol parser
+- Five-second handshake timeout and bounded frame size
+- Two-minute approval expiry and duplicate-request limits
+- Origin-bound random credentials with hash-only mode-0600 persistence
+- DSH Host/Origin plus same-origin JSON validation for authorization mutations
+- HttpOnly, Secure, partitioned delegated cookies
+- Authorization recheck after asynchronous surface acquisition
 
-Screenshots are local-only ignored artifacts, not source or release assets. No API key, connection credential, signed cookie or DSH launch token is included in this document.
+## Verification
 
-## Final live gate and boundaries
+`pnpm check` must pass TypeScript project checks, all Vitest files, and every active workspace build. The plugin package must contain only:
 
-The user confirmed the temporary revocation/re-pair test. It passed in the existing visible Chrome session: revoke → zero grants and no website iframe → refresh still denied → Connect → native DSH Allow connection → one grant and the original `OVERCODE_PLUGIN_OK check pwd` session restored. No pairing code, port, API key or second Bridge startup was entered. Session/project files were not deleted. The browser is left authorized and usable.
+- `package.json`
+- `cordis.patch.yml`
+- `lib/index.js`
+- `lib/host.js`
+- `lib/client.js`
 
-Local screenshots: `artifacts/plugin-connection/revoked.png`, `reapproval.png`, and `reconnected.png`. When DSH Settings is open, its modal has the foreground Allow connection action; the duplicate shell-overlay card remains behind that modal. The successful reauthorization used the Settings action.
+Importing the extracted package from outside the workspace must succeed without workspace dependencies. End-to-end acceptance uses the unpacked extension on a normal HTTP(S) website with the pinned DSH runtime running.
 
-DSH must remain running; an extension alone cannot launch a stopped local process. Native Messaging is not included. DSH's own session-cookie lifetime is separate from Overcode authorization: clearing delegated browser cookies is not a promise to invalidate a separately copied native bearer cookie. Original top-level websites and unrelated browser tabs/configuration are not reset by this workflow.
+## Current boundary
+
+DSH must already be installed, configured, and running. The extension cannot start a stopped local process. Native Messaging, source-build onboarding, prompt translation, transcript storage, and an independent agent manager are outside the current product.

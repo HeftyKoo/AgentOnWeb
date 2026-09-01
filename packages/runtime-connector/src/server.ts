@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { WebSocketServer, WebSocket } from "ws";
 import { CONNECTOR_PORTS, PROTOCOL_VERSION, type SurfaceAdapter, type ServerFrame } from "@overcode/shared-protocol";
@@ -54,7 +53,7 @@ async function listen(port: number, adapter: SurfaceAdapter, authority: Authoriz
         if (!frame || typeof frame !== "object" || Array.isArray(frame)) throw new Error("Invalid frame.");
         const f = frame as Record<string, unknown>;
         if (phase === "hello") {
-          if (f.kind !== "hello" || f.protocolVersion !== PROTOCOL_VERSION || typeof f.clientNonce !== "string" || f.clientNonce.length < 8) throw new Error("Incompatible connector handshake.");
+          if (f.kind !== "hello" || f.protocolVersion !== PROTOCOL_VERSION) throw new Error("Connector protocol mismatch.");
           phase = "pending";
           clearTimeout(timeout);
           if (f.intent === "discover") {
@@ -68,8 +67,8 @@ async function listen(port: number, adapter: SurfaceAdapter, authority: Authoriz
           } else if (f.intent === "pair") {
             const pending = authority.request(origin);
             cancel = pending.cancel;
-            send(socket, { kind: "pending", requestId: pending.request.id, expiresAt: pending.request.expiresAt, approvalUrl: adapter.approvalUrl });
-            pendingHeartbeat = setInterval(() => send(socket, { kind: "pending", requestId: pending.request.id, expiresAt: pending.request.expiresAt, approvalUrl: adapter.approvalUrl }), 20_000);
+            send(socket, { kind: "pending", approvalUrl: adapter.approvalUrl });
+            pendingHeartbeat = setInterval(() => send(socket, { kind: "pending", approvalUrl: adapter.approvalUrl }), 20_000);
             const result = await pending.result;
             clearInterval(pendingHeartbeat);
             if (socket.readyState !== WebSocket.OPEN) { await authority.revoke(result.id); return; }
@@ -78,7 +77,7 @@ async function listen(port: number, adapter: SurfaceAdapter, authority: Authoriz
           } else throw new AuthorizationError("APPROVAL_REQUIRED", "Request approval in the native runtime first.");
           grants.set(socket, grantId);
           phase = "ready";
-          send(socket, { kind: "hello", protocolVersion: PROTOCOL_VERSION, connectionId: randomUUID(), paired: true, runtime: adapter.runtime,
+          send(socket, { kind: "hello", protocolVersion: PROTOCOL_VERSION, runtime: adapter.runtime,
             ...(f.intent === "pair" && credential ? { credential } : {}) });
           return;
         }

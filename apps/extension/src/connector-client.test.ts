@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { PROTOCOL_VERSION } from "@overcode/shared-protocol";
 import { discoverRuntimes, isLocalSurfaceUrl, isNativeSurface, isRuntimeDescriptor } from "./connector-client.js";
 import { isContentRequest } from "./shared.js";
 describe("native surface trust", () => {
@@ -13,9 +14,9 @@ describe("native surface trust", () => {
     expect(isNativeSurface({ ok: true })).toBe(false);
     for (const value of [null, undefined, [], 42, "surface", { cookie: null }]) expect(isNativeSurface(value)).toBe(false);
   });
-  it("validates privileged content messages and no longer accepts manual pairing", () => {
+  it("accepts only the current privileged content-message contract", () => {
     expect(isContentRequest({ source: "overcode-content", type: "runtime.connect" })).toBe(true);
-    for (const payload of [{ type: "bridge.pair" }, { type: "mode.set", mode: "evil" }, { type: "opacity.set", opacity: NaN }, { type: "runtime.connect", runtimeId: {} }]) expect(isContentRequest({ source: "overcode-content", ...payload })).toBe(false);
+    for (const payload of [{ type: "unknown" }, { type: "mode.set", mode: "evil" }, { type: "opacity.set", opacity: NaN }, { type: "runtime.connect", runtimeId: {} }]) expect(isContentRequest({ source: "overcode-content", ...payload })).toBe(false);
   });
   it("preflights loopback ports before creating WebSockets", async () => {
     const opened: string[] = [];
@@ -33,7 +34,7 @@ describe("native surface trust", () => {
       send(): void {
         this.onmessage?.({ data: JSON.stringify({
           kind: "available",
-          protocolVersion: 3,
+          protocolVersion: PROTOCOL_VERSION,
           runtime: { id: "deepseek-harness", displayName: "DeepSeek Harness", surfaceKind: "web", capabilities: { translucency: true, optionTap: true } },
           approvalUrl: "http://127.0.0.1:3080/",
         }) });

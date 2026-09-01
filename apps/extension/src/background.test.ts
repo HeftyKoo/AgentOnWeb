@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, type StateUpdate, type SurfaceCommand } from "./shared.js";
+import { PROTOCOL_VERSION } from "@overcode/shared-protocol";
+import { COOKIE_SCOPES_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, type StateUpdate, type SurfaceCommand } from "./shared.js";
 
 const transport = vi.hoisted(() => ({
   discover: vi.fn(), connect: vi.fn(), close: vi.fn(), request: vi.fn(),
@@ -18,7 +19,7 @@ vi.mock("./connector-client.js", async (original) => ({
 }));
 
 const runtime = { id: "native-test", displayName: "Native test", surfaceKind: "web", capabilities: { translucency: true, optionTap: true } };
-const available = { kind: "available", protocolVersion: 3, runtime, endpoint: "ws://127.0.0.1:3847", approvalUrl: "http://127.0.0.1:3080/" };
+const available = { kind: "available", protocolVersion: PROTOCOL_VERSION, runtime, endpoint: "ws://127.0.0.1:3847", approvalUrl: "http://127.0.0.1:3080/" };
 const nativeSurface = { runtimeId: runtime.id, displayName: runtime.displayName, url: "http://localhost:3080/",
   cookie: { name: "native-session", value: "private-session-cookie", maxAgeSeconds: 60 } };
 const tab = { id: 1, url: "https://example.org/", windowId: 1 };
@@ -125,21 +126,21 @@ describe("MV3 native connection lifecycle", () => {
     data = {
       [STATE_STORAGE_KEY]: { runtimeId: runtime.id, opacity: 0.23 },
       [CREDENTIAL_STORAGE_KEY]: { [runtime.id]: "saved-credential" },
-      "overcode.cookie-scopes.v3": [{ runtimeId: runtime.id, url: "https://localhost:3080/", name: "native-session", partitionKey: { topLevelSite: "https://previous.example" } }],
+      [COOKIE_SCOPES_STORAGE_KEY]: [{ runtimeId: runtime.id, url: "https://localhost:3080/", name: "native-session", partitionKey: { topLevelSite: "https://stored.example" } }],
     };
     await boot(); await vi.waitFor(() => expect(transport.connect).toHaveBeenCalledWith(available.endpoint, "saved-credential"));
     transport.callbacks!.ready();
     await vi.waitFor(() => expect(chromeMock.cookies.set).toHaveBeenCalled());
     transport.callbacks!.rejected("REVOKED", "Connection revoked."); transport.callbacks!.closed();
-    await vi.waitFor(() => expect(data["overcode.cookie-scopes.v3"]).toEqual([]));
-    expect(chromeMock.cookies.remove).toHaveBeenCalledWith(expect.objectContaining({ partitionKey: { topLevelSite: "https://previous.example" } }));
+    await vi.waitFor(() => expect(data[COOKIE_SCOPES_STORAGE_KEY]).toEqual([]));
+    expect(chromeMock.cookies.remove).toHaveBeenCalledWith(expect.objectContaining({ partitionKey: { topLevelSite: "https://stored.example" } }));
     expect(data[CREDENTIAL_STORAGE_KEY]).toEqual({});
     const response = await message("state.get");
-    expect(response.result).toMatchObject({ paired: false, connection: "disconnected", opacity: 0.23 });
+    expect(response.result).toMatchObject({ connection: "disconnected", opacity: 0.23 });
     expect(response.result.surface).toBeUndefined();
   });
 
-  it("registers a persistent alarm that retries a paired runtime when offline", async () => {
+  it("registers a persistent alarm that retries an authorized runtime when offline", async () => {
     data = { [STATE_STORAGE_KEY]: { runtimeId: runtime.id }, [CREDENTIAL_STORAGE_KEY]: { [runtime.id]: "saved-credential" } };
     transport.discover.mockResolvedValue([]);
     await boot(); await vi.waitFor(() => expect(transport.discover).toHaveBeenCalledOnce());

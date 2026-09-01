@@ -1,7 +1,8 @@
 import type { OvercodeMode, RuntimeDescriptor } from "@overcode/shared-protocol";
 
-export const STATE_STORAGE_KEY = "overcode.surface-state.v2";
-export const CREDENTIAL_STORAGE_KEY = "overcode.runtime-credentials.v3";
+export const STATE_STORAGE_KEY = "overcode.surface-state";
+export const CREDENTIAL_STORAGE_KEY = "overcode.runtime-credentials";
+export const COOKIE_SCOPES_STORAGE_KEY = "overcode.cookie-scopes";
 
 export type SurfaceConnection = "disconnected" | "connecting" | "awaiting-approval" | "connected" | "reconnecting";
 
@@ -16,8 +17,6 @@ export interface SurfaceViewState {
   readonly mode: OvercodeMode;
   readonly opacity: number;
   readonly connection: SurfaceConnection;
-  readonly paired: boolean;
-  readonly endpoint: string;
   readonly surface?: NativeSurfaceView;
   readonly runtimeId?: string;
   readonly runtime?: RuntimeDescriptor;

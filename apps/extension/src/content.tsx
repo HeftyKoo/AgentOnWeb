@@ -36,15 +36,13 @@ if (!document.getElementById(HOST_ID)) {
   let state: SurfaceViewState = {
     mode: "chill",
     connection: "disconnected",
-    paired: false,
-    endpoint: "",
     opacity: DEFAULT_SURFACE_OPACITY,
   };
   let surfaceOrigin: string | undefined;
   let frameNonce: string | undefined;
   let sitePassActive = false;
   // Each page starts open. Closing deactivates the panel/workspace while the
-  // original lower-right dock remains available as the in-page re-entry point.
+  // lower-right dock remains available as the in-page re-entry point.
   let visible = true;
   let receivedUpdate = false;
   let previousFocus = document.activeElement instanceof HTMLElement && document.activeElement !== host

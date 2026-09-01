@@ -20,7 +20,7 @@ await Promise.all([
     outfile: resolve(outdir, "background.js"),
     platform: "browser",
     sourcemap: true,
-    target: ["chrome116"],
+    target: ["chrome132"],
   }),
   build({
     absWorkingDir: root,
@@ -32,7 +32,7 @@ await Promise.all([
     outfile: resolve(outdir, "content.js"),
     platform: "browser",
     sourcemap: true,
-    target: ["chrome116"],
+    target: ["chrome132"],
   }),
   copyFile(resolve(app, "manifest.json"), resolve(outdir, "manifest.json")),
   cp(resolve(app, "icons"), resolve(outdir, "icons"), { recursive: true }),

@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = 3 as const;
+export const PROTOCOL_VERSION = 1 as const;
 /** Small loopback-only discovery range; no network or arbitrary-port scanning. */
 export const CONNECTOR_PORTS = [3847, 3848, 3849, 3850] as const;
 
@@ -36,16 +36,13 @@ export interface ClientHello {
   readonly protocolVersion: typeof PROTOCOL_VERSION;
   readonly credential?: string;
   readonly intent?: "discover" | "pair";
-  readonly clientNonce: string;
 }
 
 export interface ServerHello {
   readonly kind: "hello";
   readonly protocolVersion: typeof PROTOCOL_VERSION;
-  readonly connectionId: string;
   readonly credential?: string;
-  readonly paired: boolean;
-  readonly runtime?: RuntimeDescriptor;
+  readonly runtime: RuntimeDescriptor;
 }
 
 export interface ServerAvailable {
@@ -57,8 +54,6 @@ export interface ServerAvailable {
 
 export interface ServerPending {
   readonly kind: "pending";
-  readonly requestId: string;
-  readonly expiresAt: number;
   readonly approvalUrl: string;
 }
 

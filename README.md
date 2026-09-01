@@ -35,7 +35,7 @@ Real website
             └─ native DSH UI + existing Web-profile plugins
 
 MV3 background
-  └─ authenticated loopback connector protocol v3
+  └─ authenticated loopback connector protocol v1
        └─ Overcode DSH plugin, INSIDE the existing dsh web process
             ├─ native DSH authorization + Settings → Overcode
             └─ additive transparency and Option pass-through client
@@ -48,9 +48,7 @@ Active packages:
 - `apps/extension`: MV3 background, native-surface host, mode dock, and presentation CSS
 - `packages/runtime-connector`: runtime-independent discovery, expiring approval requests, credentials, revocation, and transport; no executable or agent supervisor
 - `packages/dsh-surface-plugin`: native DSH host Adapter, authorization/settings contribution, transparency, and Alt pass-through
-- `packages/shared-protocol`: versioned native-surface Interface and capability declarations
-
-The older ACP/custom-overlay packages remain as inactive prototype references. They are still covered by workspace checks, but not imported by the active extension or runtime connector. The standalone Bridge package and command have been removed.
+- `packages/shared-protocol`: native-surface Interface, current wire contract, and capability declarations
 
 Future runtimes implement `SurfaceAdapter`: a runtime descriptor, native authorization URL, and `getSurface()`. Native session management and tools never move into Overcode. Codex/Claude Code would each need their own native-surface Adapter (for example, an authenticated browser terminal for a CLI); they are not implemented or routed through DSH. A protocol version/capability change is required if a future surface cannot satisfy the existing Web contract.
 
@@ -73,7 +71,7 @@ pnpm check
 dsh web
 ```
 
-The install command adds the bundled plugin to DSH's Web profile using DSH's own plugin manager. Its `dsh.bundle` declaration activates the additive patch automatically: no manual configuration, extra `--patch`, or separate Bridge process.
+The install command adds the bundled plugin to DSH's Web profile using DSH's own plugin manager. Its `dsh.bundle` declaration activates the additive patch automatically: no manual configuration, extra `--patch`, or separately launched companion process.
 
 Build the extension:
 
@@ -89,11 +87,11 @@ Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and
 4. Return to your website. Subsequent connections reuse the installation credential, including after a DSH restart. No pairing code, port, or API key is entered in the extension.
 5. Revoke a browser from **DSH Settings → Overcode → Revoke connection**. Reconnecting then requires fresh approval.
 
-For this development build the extension is unpacked and the DSH package is local; neither has been published to a store/registry. The intended distribution is a Chrome extension plus the DSH plugin. Already-installed DSH, Node, and DSH's normal credentials remain prerequisites. Chrome cannot start a stopped DSH process by itself; that would require a separately installed Native Messaging host, which is outside this version.
+For this development build the extension is unpacked and the DSH package is local; neither has been published to a store/registry. The intended distribution is a Chrome extension plus the DSH plugin. Already-installed DSH, Node, and DSH's normal credentials remain prerequisites. Chrome cannot start a stopped DSH process by itself; that would require a separately installed Native Messaging host, which is outside the current product boundary.
 
 ## Modes and interaction
 
-- Overcode is **open by default** on each normal fresh page. When disconnected, it shows the connection panel together with the original 32 px Overcode dock in the lower-right corner.
+- Overcode is **open by default** on each normal fresh page. When disconnected, it shows the connection panel together with the collapsed 32 px Overcode dock in the lower-right corner.
 - Close or **Esc** dismisses the connection panel/workspace but keeps that lower-right dock available. Background reconnects preserve the dismissed state and do not take page focus.
 - Expand the lower-right dock and choose **Chill**, **Focus**, or **Watch** to reopen Overcode. While disconnected, every mode opens the same connection panel; the selected mode takes effect after a native surface is available.
 - Click the **Overcode toolbar icon** or press `Control+Shift+O` on macOS (`Alt+Shift+O` elsewhere) to toggle the connection panel/workspace on the current tab. The lower-right dock remains the consistent in-page entry point. The shortcut is customizable at `chrome://extensions/shortcuts`.
@@ -137,4 +135,4 @@ pnpm build:preview
 pnpm preview
 ```
 
-The real acceptance surface is the unpacked extension on a normal website with just the normal DSH Web process running. See `docs/verification/plugin-connection.md` for the requirement-by-requirement audit and `docs/verification/dsh-alpha3-compatibility.md` for the latest DSH architecture compatibility evidence.
+The real acceptance surface is the unpacked extension on a normal website with the normal DSH Web process running. See `docs/verification/plugin-connection.md` for the current connection contract and `docs/verification/dsh-alpha3-baseline.md` for the supported DSH boundary.

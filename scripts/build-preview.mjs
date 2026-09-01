@@ -12,6 +12,6 @@ await build({
   outfile: resolve(root, "apps/extension/preview/preview.js"),
   platform: "browser",
   sourcemap: true,
-  target: ["chrome116"],
+  target: ["chrome132"],
 });
 console.log("Built Overcode UI preview");

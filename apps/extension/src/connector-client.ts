@@ -38,7 +38,7 @@ export async function discoverRuntimes(): Promise<AvailableRuntime[]> {
       let finished = false;
       const finish = (result?: AvailableRuntime) => { if (finished) return; finished = true; clearTimeout(timer); resolve(result); socket.close(); };
       const timer = setTimeout(() => finish(), 1200);
-      socket.onopen = () => socket.send(JSON.stringify({ kind: "hello", protocolVersion: PROTOCOL_VERSION, clientNonce: crypto.randomUUID(), intent: "discover" }));
+      socket.onopen = () => socket.send(JSON.stringify({ kind: "hello", protocolVersion: PROTOCOL_VERSION, intent: "discover" }));
       socket.onerror = () => finish();
       socket.onclose = () => finish();
       socket.onmessage = ({ data }) => {
@@ -88,7 +88,7 @@ export class ConnectorClient {
     this.#socket = socket;
     let authorizationShown = false;
     socket.onopen = () => socket.send(JSON.stringify({ kind: "hello", protocolVersion: PROTOCOL_VERSION,
-      clientNonce: crypto.randomUUID(), ...(credential ? { credential } : { intent: "pair" }) }));
+      ...(credential ? { credential } : { intent: "pair" }) }));
     socket.onmessage = ({ data }) => {
       if (this.#socket !== socket) return;
       try {
@@ -97,7 +97,7 @@ export class ConnectorClient {
           if (!isLocalSurfaceUrl(frame.approvalUrl)) throw new Error("Invalid native authorization URL.");
           if (!authorizationShown) { authorizationShown = true; this.callbacks.pending(frame.approvalUrl); }
         } else if (frame.kind === "hello") {
-          if (frame.protocolVersion !== PROTOCOL_VERSION || !frame.paired) throw new Error("Incompatible runtime connector.");
+          if (frame.protocolVersion !== PROTOCOL_VERSION || !isRuntimeDescriptor(frame.runtime)) throw new Error("Runtime connector protocol mismatch.");
           this.callbacks.ready(frame.credential);
           this.#heartbeat = setInterval(() => { void this.request({ type: "connection.ping" }).catch(() => socket.close()); }, 20_000);
         } else if (frame.kind === "error") this.callbacks.rejected(frame.code, frame.message);

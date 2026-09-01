@@ -22,8 +22,6 @@ let state: SurfaceViewState = {
   mode: "chill",
   opacity: DEFAULT_SURFACE_OPACITY,
   connection: "connected",
-  paired: true,
-  endpoint: "ws://127.0.0.1:3847",
 };
 const render = () => {
   container.dataset.mode = state.mode;
