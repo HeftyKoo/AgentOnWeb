@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { isLocalSurfaceUrl, isNativeSurface, isRuntimeDescriptor } from "./connector-client.js";
+import { describe, expect, it, vi } from "vitest";
+import { discoverRuntimes, isLocalSurfaceUrl, isNativeSurface, isRuntimeDescriptor } from "./connector-client.js";
 import { isContentRequest } from "./shared.js";
 describe("native surface trust", () => {
   it("requires an explicit surface contract and declared capabilities", () => {
@@ -16,5 +16,40 @@ describe("native surface trust", () => {
   it("validates privileged content messages and no longer accepts manual pairing", () => {
     expect(isContentRequest({ source: "overcode-content", type: "runtime.connect" })).toBe(true);
     for (const payload of [{ type: "bridge.pair" }, { type: "mode.set", mode: "evil" }, { type: "opacity.set", opacity: NaN }, { type: "runtime.connect", runtimeId: {} }]) expect(isContentRequest({ source: "overcode-content", ...payload })).toBe(false);
+  });
+  it("preflights loopback ports before creating WebSockets", async () => {
+    const opened: string[] = [];
+    class TestSocket {
+      static readonly OPEN = 1;
+      readyState = 0;
+      onopen: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onmessage: ((event: { data: string }) => void) | null = null;
+      constructor(readonly url: string) {
+        opened.push(url);
+        queueMicrotask(() => { this.readyState = TestSocket.OPEN; this.onopen?.(); });
+      }
+      send(): void {
+        this.onmessage?.({ data: JSON.stringify({
+          kind: "available",
+          protocolVersion: 3,
+          runtime: { id: "deepseek-harness", displayName: "DeepSeek Harness", surfaceKind: "web", capabilities: { translucency: true, optionTap: true } },
+          approvalUrl: "http://127.0.0.1:3080/",
+        }) });
+      }
+      close(): void { this.readyState = 3; }
+    }
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      if (String(input) === "http://127.0.0.1:3849/") return new Response(null, { status: 426 });
+      throw new TypeError("Connection refused");
+    }));
+    vi.stubGlobal("WebSocket", TestSocket);
+    try {
+      await expect(discoverRuntimes()).resolves.toEqual([expect.objectContaining({ endpoint: "ws://127.0.0.1:3849" })]);
+      expect(opened).toEqual(["ws://127.0.0.1:3849"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

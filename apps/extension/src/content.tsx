@@ -139,7 +139,10 @@ if (!document.getElementById(HOST_ID)) {
       frame.src = nextSource.href;
     }
     frame.hidden = false;
-    postPresentation();
+    // Before the navigation loads, contentWindow still has the website's
+    // origin. Posting the localhost presentation target at that moment makes
+    // Chrome record a misleading origin-mismatch extension error.
+    if (!sourceChanged) postPresentation();
   };
 
   const setVisible = (next: boolean) => {

@@ -77,6 +77,16 @@ describe("page-local Overcode visibility", () => {
     expect(connectedPage.frame.src).toContain("http://localhost:3080/#overcode=test-nonce");
   });
 
+  it("waits for the native frame to load before posting presentation state", async () => {
+    const p = await page();
+    const postMessage = vi.fn();
+    Object.defineProperty(p.frame, "contentWindow", { configurable: true, value: { postMessage } });
+    p.emit("state.update", connected);
+    expect(postMessage).not.toHaveBeenCalled();
+    p.frame.dispatchEvent(new p.window.Event("load"));
+    expect(postMessage).toHaveBeenCalledTimes(2);
+  });
+
   it("closes only the setup while keeping the dock, and does not reopen during reconnect", async () => {
     const p = await page();
     p.shadow.querySelector<HTMLButtonElement>('[aria-label="Close Overcode"]')!.click();

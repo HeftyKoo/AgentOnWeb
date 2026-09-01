@@ -30,26 +30,43 @@ export function isNativeSurface(value: unknown): value is NativeSurface {
 }
 
 export async function discoverRuntimes(): Promise<AvailableRuntime[]> {
-  const found = await Promise.all(CONNECTOR_PORTS.map((port) => new Promise<AvailableRuntime | undefined>((resolve) => {
+  const found = await Promise.all(CONNECTOR_PORTS.map(async (port) => {
     const endpoint = `ws://127.0.0.1:${port}`;
-    const socket = new WebSocket(endpoint);
-    let finished = false;
-    const finish = (result?: AvailableRuntime) => { if (finished) return; finished = true; clearTimeout(timer); resolve(result); socket.close(); };
-    const timer = setTimeout(() => finish(), 1200);
-    socket.onopen = () => socket.send(JSON.stringify({ kind: "hello", protocolVersion: PROTOCOL_VERSION, clientNonce: crypto.randomUUID(), intent: "discover" }));
-    socket.onerror = () => finish();
-    socket.onclose = () => finish();
-    socket.onmessage = ({ data }) => {
-      try {
-        const frame = JSON.parse(String(data)) as ServerFrame;
-        if (frame.kind === "available" && frame.protocolVersion === PROTOCOL_VERSION
-          && isRuntimeDescriptor(frame.runtime) && isLocalSurfaceUrl(frame.approvalUrl)) {
-          finish({ ...frame, endpoint });
-        } else finish();
-      } catch { finish(); }
-    };
-  })));
+    if (!await isListening(endpoint)) return undefined;
+    return new Promise<AvailableRuntime | undefined>((resolve) => {
+      const socket = new WebSocket(endpoint);
+      let finished = false;
+      const finish = (result?: AvailableRuntime) => { if (finished) return; finished = true; clearTimeout(timer); resolve(result); socket.close(); };
+      const timer = setTimeout(() => finish(), 1200);
+      socket.onopen = () => socket.send(JSON.stringify({ kind: "hello", protocolVersion: PROTOCOL_VERSION, clientNonce: crypto.randomUUID(), intent: "discover" }));
+      socket.onerror = () => finish();
+      socket.onclose = () => finish();
+      socket.onmessage = ({ data }) => {
+        try {
+          const frame = JSON.parse(String(data)) as ServerFrame;
+          if (frame.kind === "available" && frame.protocolVersion === PROTOCOL_VERSION
+            && isRuntimeDescriptor(frame.runtime) && isLocalSurfaceUrl(frame.approvalUrl)) {
+            finish({ ...frame, endpoint });
+          } else finish();
+        } catch { finish(); }
+      };
+    });
+  }));
   return found.filter((item): item is AvailableRuntime => Boolean(item));
+}
+
+async function isListening(endpoint: string): Promise<boolean> {
+  const probe = new URL(endpoint);
+  probe.protocol = "http:";
+  try {
+    // A ws server answers an ordinary HTTP request with 426. Fetch failures can
+    // be handled quietly; constructing a WebSocket to every closed discovery
+    // port makes Chrome expose expected probe failures as extension errors.
+    await fetch(probe.href, { method: "HEAD", cache: "no-store", signal: AbortSignal.timeout(1_200) });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 interface Callbacks {
