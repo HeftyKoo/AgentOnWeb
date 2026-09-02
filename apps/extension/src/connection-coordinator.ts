@@ -55,10 +55,10 @@ export class ConnectionCoordinator {
     this.#effects = options.effects;
     this.#discover = options.discover ?? discoverRuntimes;
     const callbacks: ConnectorCallbacks = {
-      pending: (url) => { void this.#enqueue(() => this.#pending(url)); },
-      ready: (credential) => { void this.#enqueue(() => this.#ready(credential)); },
-      rejected: (code, message) => { void this.#enqueue(() => this.#rejected(code, message)); },
-      closed: () => { void this.#enqueue(() => this.#closed()); },
+      pending: (url) => { this.#enqueue(() => this.#pending(url)); },
+      ready: (credential) => { this.#enqueue(() => this.#ready(credential)); },
+      rejected: (code, message) => { this.#enqueue(() => this.#rejected(code, message)); },
+      closed: () => { this.#enqueue(() => this.#closed()); },
     };
     this.#transport = (options.createTransport ?? ((next) => new ConnectorClient(next)))(callbacks);
   }
@@ -119,7 +119,7 @@ export class ConnectionCoordinator {
           ? "Choose a runtime to connect."
           : "Start your runtime with the Overcode plugin enabled, then connect. For DeepSeek Harness, run dsh web.",
       });
-      if (!requestApproval) this.#retry = setTimeout(() => { void this.#enqueue(() => this.#connect(false)); }, 5000);
+      if (!requestApproval) this.#retry = setTimeout(() => { this.#enqueue(() => this.#connect(false)); }, 5000);
       return;
     }
     this.#activeRuntimeId = target.runtime.id;
@@ -167,7 +167,7 @@ export class ConnectionCoordinator {
     this.#setSurface(undefined);
     const reconnect = Boolean(this.#activeRuntimeId && this.#credentials[this.#activeRuntimeId]);
     this.#patch({ connection: reconnect ? "reconnecting" : "disconnected", approvalUrl: undefined });
-    if (reconnect) this.#retry = setTimeout(() => { void this.#enqueue(() => this.#connect(false)); }, 3000);
+    if (reconnect) this.#retry = setTimeout(() => { this.#enqueue(() => this.#connect(false)); }, 3000);
   }
 
   #setSurface(surface: NativeSurface | undefined): void {

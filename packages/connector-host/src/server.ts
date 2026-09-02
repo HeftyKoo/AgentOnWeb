@@ -47,7 +47,7 @@ async function listen(port: number, adapter: SurfaceAdapter, authority: Authoriz
     socket.on("error", () => {});
     socket.on("close", () => { phase = "closed"; clearTimeout(timeout); clearInterval(pendingHeartbeat); cancel(); grants.delete(socket); });
     socket.on("message", (raw, binary) => {
-      void (async () => {
+      (async () => {
         if (binary) throw new Error("Binary frames are not supported.");
         const frame = parseClientFrame(JSON.parse(raw.toString()));
         if (phase === "hello") {

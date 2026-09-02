@@ -59,7 +59,7 @@ const coordinator = new ConnectionCoordinator({
 const initialized = initialize();
 browser.runtime.onMessage.addListener((message: unknown, sender, respond) => {
   if (!isContentRequest(message) || sender.id !== browser.runtime.id || sender.frameId !== 0) return false;
-  void initialized.then(() => handleRequest(message, sender.tab)).then(
+  initialized.then(() => handleRequest(message, sender.tab)).then(
     (result) => respond({ ok: true, result }),
     (error: unknown) => {
       const text = error instanceof Error ? error.message : String(error);
@@ -70,7 +70,7 @@ browser.runtime.onMessage.addListener((message: unknown, sender, respond) => {
   return true;
 });
 browser.commands.onCommand.addListener((command, tab) => {
-  void initialized.then(async () => {
+  initialized.then(async () => {
     const mode = command === "mode-chill" ? "chill" : command === "mode-focus" ? "focus" : command === "mode-watch" ? "watch" : undefined;
     if (!mode) return;
     setMode(mode);
@@ -78,13 +78,13 @@ browser.commands.onCommand.addListener((command, tab) => {
   });
 });
 const toolbarAction = browser.action ?? browser.browserAction;
-toolbarAction.onClicked.addListener((tab) => { void initialized.then(() => presentInTab(tab, "surface.toggle")); });
+toolbarAction.onClicked.addListener((tab) => { initialized.then(() => presentInTab(tab, "surface.toggle")); });
 browser.tabs.onRemoved.addListener((id) => {
   frameNames.delete(id);
   if (targetBrowser === "safari") (sessionLeases as HeaderLeaseManager).removeTab(id);
 });
 browser.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "overcode-reconnect") void initialized.then(() => coordinator.reconnectIfNeeded());
+  if (alarm.name === "overcode-reconnect") initialized.then(() => coordinator.reconnectIfNeeded());
 });
 
 async function initialize(): Promise<void> {
@@ -162,7 +162,7 @@ function patch(next: StatePatch): void {
   for (const key of Object.keys(state) as (keyof SurfaceViewState)[]) {
     if (state[key] === undefined) delete (state as unknown as Record<string, unknown>)[key];
   }
-  void enqueueBroadcast();
+  enqueueBroadcast();
 }
 
 function enqueueBroadcast(): Promise<void> {

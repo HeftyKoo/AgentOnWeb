@@ -98,14 +98,14 @@ export class HeaderLeaseManager {
   invalidate(): void {
     const ruleIds = [...this.#leases.values()].map((lease) => lease.ruleId);
     this.#leases.clear();
-    void this.#remove(ruleIds);
+    this.#remove(ruleIds);
   }
 
   removeTab(tabId: number): void {
     const lease = this.#leases.get(tabId);
     if (!lease) return;
     this.#leases.delete(tabId);
-    void this.#remove([lease.ruleId]);
+    this.#remove([lease.ruleId]);
   }
 
   idle(): Promise<void> {
