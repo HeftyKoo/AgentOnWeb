@@ -51,7 +51,7 @@ if (!document.getElementById(HOST_ID)) {
   const optionLatch = new DoubleTapLatch();
 
   const send = (request: ContentRequest) => {
-    void browser.runtime.sendMessage(request).catch(() => undefined);
+    browser.runtime.sendMessage(request).catch(() => undefined);
   };
 
   setup.onConnect = (runtimeId) => {
@@ -224,7 +224,7 @@ if (!document.getElementById(HOST_ID)) {
     if (event.key === "Alt" && !event.repeat) handleOptionTap();
   }, true);
 
-  void browser.runtime.sendMessage({ source: "overcode-content", type: "state.get" } satisfies ContentRequest)
+  browser.runtime.sendMessage({ source: "overcode-content", type: "state.get" } satisfies ContentRequest)
     .then((response: { ok?: boolean; result?: SurfaceViewState } | undefined) => {
       // A slow initial snapshot must not overwrite a newer explicit open/update.
       if (response?.result && !receivedUpdate) render(response.result);

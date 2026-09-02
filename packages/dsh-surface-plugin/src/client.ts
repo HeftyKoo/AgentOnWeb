@@ -97,7 +97,7 @@ function syncNativeView(sessions: Sessions): Cleanup {
       });
       if (!response.ok) throw new Error("Unable to retain the native DSH view.");
     });
-    void writes.catch(() => {});
+    writes.catch(() => {});
   };
   const restore = async () => {
     const current = ++hydration;
@@ -129,12 +129,12 @@ function syncNativeView(sessions: Sessions): Cleanup {
     const key = JSON.stringify(value);
     if (key !== last) { last = key; save(value); }
   });
-  const onVisible = () => { if (document.visibilityState === "visible") void restore(); };
+  const onVisible = () => { if (document.visibilityState === "visible") restore(); };
   document.addEventListener("visibilitychange", onVisible);
   // Only the foreground website may reconcile the shared native bookmark.
   // On a runtime restart every partitioned iframe reloads at once; allowing
   // hidden tabs to restore would let stale per-site state win the race.
-  if (document.visibilityState === "visible") void restore();
+  if (document.visibilityState === "visible") restore();
   return () => {
     stopped = true;
     hydration++;
@@ -272,7 +272,7 @@ export function apply(ctx: ClientContext): void {
     Connections,
   ));
   ctx.effect(() => {
-    void refresh();
+    refresh();
     const timer = setInterval(refresh, 2000);
     return () => { stopped = true; clearInterval(timer); listeners.clear(); };
   }, "overcode: native connection approvals");

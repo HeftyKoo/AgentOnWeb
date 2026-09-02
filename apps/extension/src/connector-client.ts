@@ -82,7 +82,7 @@ export class ConnectorClient {
           if (!authorizationShown) { authorizationShown = true; this.callbacks.pending(frame.approvalUrl); }
         } else if (frame.kind === "hello") {
           this.callbacks.ready(frame.credential);
-          this.#heartbeat = setInterval(() => { void this.request({ type: "connection.ping" }).catch(() => socket.close()); }, 20_000);
+          this.#heartbeat = setInterval(() => { this.request({ type: "connection.ping" }).catch(() => socket.close()); }, 20_000);
         } else if (frame.kind === "error") this.callbacks.rejected(frame.code, frame.message);
         else if (frame.kind === "response") {
           const pending = this.#pending.get(frame.id);
