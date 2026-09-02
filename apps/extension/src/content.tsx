@@ -1,6 +1,7 @@
 import { createDock } from "./dock.js";
+import { browser } from "./browser-api.js";
 import { DEFAULT_SURFACE_OPACITY, DoubleTapLatch } from "./interaction.js";
-import styles from "./overlay.css";
+import styles from "./overlay.css?inline";
 import { isStateUpdate, isSurfaceCommand, type ContentRequest, type SurfaceViewState } from "./shared.js";
 
 const HOST_ID = "overcode-extension-root";
@@ -50,7 +51,7 @@ if (!document.getElementById(HOST_ID)) {
   const optionLatch = new DoubleTapLatch();
 
   const send = (request: ContentRequest) => {
-    void chrome.runtime.sendMessage(request).catch(() => undefined);
+    void browser.runtime.sendMessage(request).catch(() => undefined);
   };
 
   setup.onConnect = (runtimeId) => {
@@ -139,7 +140,7 @@ if (!document.getElementById(HOST_ID)) {
     frame.hidden = false;
     // Before the navigation loads, contentWindow still has the website's
     // origin. Posting the localhost presentation target at that moment makes
-    // Chrome record a misleading origin-mismatch extension error.
+    // the browser record a misleading origin-mismatch extension error.
     if (!sourceChanged) postPresentation();
   };
 
@@ -168,7 +169,7 @@ if (!document.getElementById(HOST_ID)) {
     }
   };
 
-  chrome.runtime.onMessage.addListener((message: unknown) => {
+  browser.runtime.onMessage.addListener((message: unknown) => {
     if (isStateUpdate(message)) {
       receivedUpdate = true;
       render(message.state);
@@ -223,7 +224,7 @@ if (!document.getElementById(HOST_ID)) {
     if (event.key === "Alt" && !event.repeat) handleOptionTap();
   }, true);
 
-  void chrome.runtime.sendMessage({ source: "overcode-content", type: "state.get" } satisfies ContentRequest)
+  void browser.runtime.sendMessage({ source: "overcode-content", type: "state.get" } satisfies ContentRequest)
     .then((response: { ok?: boolean; result?: SurfaceViewState } | undefined) => {
       // A slow initial snapshot must not overwrite a newer explicit open/update.
       if (response?.result && !receivedUpdate) render(response.result);

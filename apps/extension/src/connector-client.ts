@@ -46,7 +46,7 @@ async function isListening(endpoint: string): Promise<boolean> {
   try {
     // A ws server answers an ordinary HTTP request with 426. Fetch failures can
     // be handled quietly; constructing a WebSocket to every closed discovery
-    // port makes Chrome expose expected probe failures as extension errors.
+    // port makes browsers expose expected probe failures as extension errors.
     await fetch(probe.href, { method: "HEAD", cache: "no-store", signal: AbortSignal.timeout(1_200) });
     return true;
   } catch {

@@ -7,8 +7,10 @@
   "scripts": {
     "build": "pnpm -r build",
     "build:extension": "node scripts/build-extension.mjs",
+    "build:extension:firefox": "node scripts/build-extension.mjs --browser firefox",
+    "build:extension:safari": "node scripts/build-extension.mjs --browser safari",
     "build:preview": "node scripts/build-preview.mjs",
-    "check": "pnpm check:architecture && pnpm typecheck && pnpm test && pnpm build",
+    "check": "pnpm check:architecture && pnpm typecheck && pnpm test && pnpm build && pnpm build:extension:firefox && pnpm build:extension:safari && node scripts/check-extension-builds.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",
     "install:dsh-surface": "node scripts/install-dsh-surface.mjs",
     "package:extension": "node scripts/package-extension.mjs",

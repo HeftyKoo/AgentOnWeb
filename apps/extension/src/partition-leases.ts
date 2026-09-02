@@ -9,7 +9,7 @@ export interface PersistedCookieScope {
 }
 
 interface PartitionLeaseEffects {
-  partition(tabId: number): Promise<string | undefined>;
+  partition(tabId: number, pageUrl: string): Promise<string | undefined>;
   set(details: SurfaceCookieDetails): Promise<boolean>;
   remove(details: Omit<PersistedCookieScope, "runtimeId">): Promise<void>;
   persist(scopes: readonly PersistedCookieScope[]): Promise<void>;
@@ -47,13 +47,13 @@ export class PartitionLeaseManager {
     return this.#enqueue(async () => {
       const topLevel = topLevelSite(pageUrl);
       if (!topLevel || !isCurrent()) return false;
-      const partition = await this.#effects.partition(tabId);
+      const partition = await this.#effects.partition(tabId, pageUrl);
       if (!partition || !isCurrent()) return false;
       const details = surfaceCookieDetails(surface, partition);
       if (!details) return false;
       const key = this.#key(details.name, details.partitionKey.topLevelSite);
       if (!this.#installed.has(key)) {
-        if (!await this.#effects.set(details)) throw new Error("Chrome refused the isolated native runtime session.");
+        if (!await this.#effects.set(details)) throw new Error("The browser refused the isolated native runtime session.");
         if (!isCurrent()) {
           await this.#effects.remove({ url: details.url, name: details.name, partitionKey: details.partitionKey });
           return false;

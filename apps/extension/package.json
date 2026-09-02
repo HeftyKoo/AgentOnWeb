@@ -5,10 +5,20 @@
   "type": "module",
   "scripts": {
     "build": "node ../../scripts/build-extension.mjs",
+    "build:chrome": "wxt build -b chrome",
+    "build:firefox": "wxt build -b firefox",
+    "build:safari": "wxt build -b safari",
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "dev:safari": "wxt -b safari",
+    "postinstall": "wxt prepare",
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
     "@overcode/connector-contract": "workspace:*",
     "@phosphor-icons/core": "2.1.1"
+  },
+  "devDependencies": {
+    "wxt": "0.21.4"
   }
 }

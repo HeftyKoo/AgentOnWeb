@@ -63,7 +63,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-describe("MV3 native connection lifecycle", () => {
+describe("cross-browser native connection lifecycle", () => {
   it("toggles only the clicked tab without switching modes or connecting", async () => {
     data = { [STATE_STORAGE_KEY]: { mode: "focus" } };
     await boot();

@@ -1,4 +1,5 @@
 import type { NativeSurface, OvercodeMode } from "@overcode/connector-contract";
+import { browser, type Browser } from "./browser-api.js";
 import { ConnectionCoordinator, type ConnectionView } from "./connection-coordinator.js";
 import { DEFAULT_SURFACE_OPACITY, normalizeSurfaceOpacity } from "./interaction.js";
 import { PartitionLeaseManager } from "./partition-leases.js";
@@ -11,18 +12,19 @@ let publication: Promise<void> = Promise.resolve();
 const frameNames = new Map<number, string>();
 
 const leases = new PartitionLeaseManager({
-  async partition(tabId) {
-    const { partitionKey } = await chrome.cookies.getPartitionKey({ tabId, frameId: 0 });
+  async partition(tabId, pageUrl) {
+    if (typeof browser.cookies.getPartitionKey !== "function") return topLevelSite(pageUrl);
+    const { partitionKey } = await browser.cookies.getPartitionKey({ tabId, frameId: 0 });
     return partitionKey.topLevelSite;
   },
   async set(details) {
-    return Boolean(await chrome.cookies.set(details));
+    return Boolean(await browser.cookies.set(details));
   },
   async remove(details) {
-    await chrome.cookies.remove(details);
+    await browser.cookies.remove(details);
   },
   async persist(scopes) {
-    await chrome.storage.local.set({ [COOKIE_SCOPES_STORAGE_KEY]: scopes });
+    await browser.storage.local.set({ [COOKIE_SCOPES_STORAGE_KEY]: scopes });
   },
 });
 
@@ -35,7 +37,7 @@ const coordinator = new ConnectionCoordinator({
       applyConnectionView(snapshot.view);
     },
     async saveCredentials(credentials) {
-      await chrome.storage.local.set({ [CREDENTIAL_STORAGE_KEY]: credentials });
+      await browser.storage.local.set({ [CREDENTIAL_STORAGE_KEY]: credentials });
     },
     openApproval,
     revokeDelegation(runtimeId) {
@@ -45,8 +47,8 @@ const coordinator = new ConnectionCoordinator({
 });
 
 const initialized = initialize();
-chrome.runtime.onMessage.addListener((message: unknown, sender, respond) => {
-  if (!isContentRequest(message) || sender.id !== chrome.runtime.id || sender.frameId !== 0) return false;
+browser.runtime.onMessage.addListener((message: unknown, sender, respond) => {
+  if (!isContentRequest(message) || sender.id !== browser.runtime.id || sender.frameId !== 0) return false;
   void initialized.then(() => handleRequest(message, sender.tab)).then(
     (result) => respond({ ok: true, result }),
     (error: unknown) => {
@@ -57,7 +59,7 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, respond) => {
   );
   return true;
 });
-chrome.commands.onCommand.addListener((command, tab) => {
+browser.commands.onCommand.addListener((command, tab) => {
   void initialized.then(async () => {
     const mode = command === "mode-chill" ? "chill" : command === "mode-focus" ? "focus" : command === "mode-watch" ? "watch" : undefined;
     if (!mode) return;
@@ -65,17 +67,20 @@ chrome.commands.onCommand.addListener((command, tab) => {
     await presentInTab(tab, "surface.show");
   });
 });
-chrome.action.onClicked.addListener((tab) => { void initialized.then(() => presentInTab(tab, "surface.toggle")); });
-chrome.tabs.onRemoved.addListener((id) => frameNames.delete(id));
-chrome.alarms.onAlarm.addListener((alarm) => {
+const toolbarAction = browser.action ?? browser.browserAction;
+toolbarAction.onClicked.addListener((tab) => { void initialized.then(() => presentInTab(tab, "surface.toggle")); });
+browser.tabs.onRemoved.addListener((id) => frameNames.delete(id));
+browser.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "overcode-reconnect") void initialized.then(() => coordinator.reconnectIfNeeded());
 });
 
 async function initialize(): Promise<void> {
-  await chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
-  const stored = await chrome.storage.local.get([STATE_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, COOKIE_SCOPES_STORAGE_KEY]);
+  if (typeof browser.storage.local.setAccessLevel === "function") {
+    await browser.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
+  }
+  const stored = await browser.storage.local.get([STATE_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, COOKIE_SCOPES_STORAGE_KEY]);
   leases.restore(stored[COOKIE_SCOPES_STORAGE_KEY]);
-  await chrome.alarms.create("overcode-reconnect", { periodInMinutes: 0.5 });
+  await browser.alarms.create("overcode-reconnect", { periodInMinutes: 0.5 });
   const storedState = stored[STATE_STORAGE_KEY] as Partial<SurfaceViewState> | undefined;
   const saved: unknown = stored[CREDENTIAL_STORAGE_KEY];
   const credentials = saved && typeof saved === "object" && !Array.isArray(saved)
@@ -91,7 +96,7 @@ async function initialize(): Promise<void> {
   await publication;
 }
 
-async function handleRequest(request: ContentRequest, tab?: chrome.tabs.Tab): Promise<unknown> {
+async function handleRequest(request: ContentRequest, tab?: Browser.tabs.Tab): Promise<unknown> {
   switch (request.type) {
     case "state.get": return viewForTab(tab);
     case "mode.set": setMode(request.mode); return viewForTab(tab);
@@ -102,13 +107,13 @@ async function handleRequest(request: ContentRequest, tab?: chrome.tabs.Tab): Pr
 }
 
 async function openApproval(url: string): Promise<void> {
-  const tabs = await chrome.tabs.query({});
+  const tabs = await browser.tabs.query({});
   const found = tabs.find((tab) => tab.url?.startsWith(url));
   if (found?.id !== undefined) {
-    await chrome.tabs.update(found.id, { active: true });
-    if (found.windowId) await chrome.windows.update(found.windowId, { focused: true });
+    await browser.tabs.update(found.id, { active: true });
+    if (found.windowId) await browser.windows.update(found.windowId, { focused: true });
   } else {
-    await chrome.tabs.create({ url });
+    await browser.tabs.create({ url });
   }
 }
 
@@ -116,11 +121,11 @@ function setMode(mode: OvercodeMode): void {
   patch({ mode });
 }
 
-async function presentInTab(tab: chrome.tabs.Tab | undefined, type: SurfaceCommand["type"]): Promise<void> {
-  const target = tab ?? (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0];
+async function presentInTab(tab: Browser.tabs.Tab | undefined, type: SurfaceCommand["type"]): Promise<void> {
+  const target = tab ?? (await browser.tabs.query({ active: true, lastFocusedWindow: true }))[0];
   if (target?.id === undefined || !target.url || !topLevelSite(target.url)) return;
   try {
-    await chrome.tabs.sendMessage(target.id, { source: "overcode-background", type, state: await viewForTab(target) } satisfies SurfaceCommand);
+    await browser.tabs.sendMessage(target.id, { source: "overcode-background", type, state: await viewForTab(target) } satisfies SurfaceCommand);
   } catch {
     // Restricted pages and tabs without a content script cannot host Overcode.
   }
@@ -156,11 +161,11 @@ function enqueueBroadcast(): Promise<void> {
 }
 
 async function broadcast(stateSnapshot: SurfaceViewState, surfaceSnapshot?: NativeSurface): Promise<void> {
-  await chrome.storage.local.set({ [STATE_STORAGE_KEY]: stateSnapshot });
-  const tabs = await chrome.tabs.query({});
+  await browser.storage.local.set({ [STATE_STORAGE_KEY]: stateSnapshot });
+  const tabs = await browser.tabs.query({});
   await Promise.allSettled(tabs.map(async (tab) => {
     if (tab.id === undefined) return;
-    await chrome.tabs.sendMessage(tab.id, {
+    await browser.tabs.sendMessage(tab.id, {
       source: "overcode-background",
       type: "state.update",
       state: await viewForTab(tab, stateSnapshot, surfaceSnapshot),
@@ -169,7 +174,7 @@ async function broadcast(stateSnapshot: SurfaceViewState, surfaceSnapshot?: Nati
 }
 
 async function viewForTab(
-  tab?: chrome.tabs.Tab,
+  tab?: Browser.tabs.Tab,
   stateSnapshot: SurfaceViewState = state,
   surfaceSnapshot: NativeSurface | undefined = surface,
 ): Promise<SurfaceViewState> {

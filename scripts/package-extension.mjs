@@ -9,12 +9,12 @@ const execute = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const releaseDirectory = resolve(root, "release");
 const unpackedDirectory = resolve(releaseDirectory, "extension-unpacked");
-const manifest = JSON.parse(await readFile(resolve(root, "apps/extension/manifest.json"), "utf8"));
-const archive = resolve(releaseDirectory, `overcode-extension-${manifest.version}.zip`);
+const extensionPackage = JSON.parse(await readFile(resolve(root, "apps/extension/package.json"), "utf8"));
+const archive = resolve(releaseDirectory, `overcode-extension-${extensionPackage.version}.zip`);
 
 await mkdir(releaseDirectory, { recursive: true });
 await rm(archive, { force: true });
-await buildExtension({ release: true, outdir: unpackedDirectory });
+await buildExtension({ browser: "chrome", outdir: unpackedDirectory });
 
 async function archiveFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
