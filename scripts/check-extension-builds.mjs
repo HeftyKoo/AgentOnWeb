@@ -33,8 +33,15 @@ for (const [browser, expected] of Object.entries(variants)) {
   if (browser === "firefox" && manifest.browser_specific_settings?.gecko?.data_collection_permissions?.required?.[0] !== "none") {
     throw new Error("Firefox data-collection declaration is missing.");
   }
-  if (browser === "safari" && manifest.browser_specific_settings?.safari?.strict_min_version !== "18.4") {
-    throw new Error("Safari minimum version is incorrect.");
+  if (browser === "safari") {
+    if (!permissions.has("declarativeNetRequestWithHostAccess")) throw new Error("Safari declarative header-lease permission is missing.");
+    if (permissions.has("webRequestBlocking")) throw new Error("Safari included its unsupported webRequestBlocking permission.");
+    if (manifest.browser_specific_settings?.safari?.strict_min_version !== "18.4") throw new Error("Safari minimum version is incorrect.");
+    if (!backgroundSource.includes("updateSessionRules") || !backgroundSource.includes("tabIds")) {
+      throw new Error("Safari declarative header lease was not bundled.");
+    }
+  } else if (backgroundSource.includes("updateSessionRules")) {
+    throw new Error(`${browser} unexpectedly bundled the Safari header lease.`);
   }
   if (!contentSource.includes("overcode-extension-root")) throw new Error(`${browser} content surface was not bundled.`);
 }

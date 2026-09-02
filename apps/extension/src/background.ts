@@ -1,6 +1,7 @@
 import type { NativeSurface, OvercodeMode } from "@overcode/connector-contract";
 import { browser, type Browser } from "./browser-api.js";
 import { ConnectionCoordinator, type ConnectionView } from "./connection-coordinator.js";
+import { HeaderLeaseManager } from "./header-leases.js";
 import { DEFAULT_SURFACE_OPACITY, normalizeSurfaceOpacity } from "./interaction.js";
 import { PartitionLeaseManager } from "./partition-leases.js";
 import { COOKIE_SCOPES_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, isContentRequest, type ContentRequest, type StateUpdate, type SurfaceCommand, type SurfaceViewState } from "./shared.js";
@@ -10,6 +11,7 @@ let state: SurfaceViewState = { mode: "chill", opacity: DEFAULT_SURFACE_OPACITY,
 let surface: NativeSurface | undefined;
 let publication: Promise<void> = Promise.resolve();
 const frameNames = new Map<number, string>();
+const targetBrowser = import.meta.env.BROWSER ?? "chrome";
 
 const leases = new PartitionLeaseManager({
   async partition(tabId, pageUrl) {
@@ -27,13 +29,21 @@ const leases = new PartitionLeaseManager({
     await browser.storage.local.set({ [COOKIE_SCOPES_STORAGE_KEY]: scopes });
   },
 });
+const sessionLeases = targetBrowser === "safari"
+  ? new HeaderLeaseManager({
+      updateSessionRules(update) {
+        type SessionRuleUpdate = Parameters<typeof browser.declarativeNetRequest.updateSessionRules>[0];
+        return browser.declarativeNetRequest.updateSessionRules(update as unknown as SessionRuleUpdate);
+      },
+    })
+  : leases;
 
 const coordinator = new ConnectionCoordinator({
   effects: {
     changed(snapshot) {
       const previous = surface;
       surface = snapshot.surface;
-      if (surface !== previous) leases.invalidate();
+      if (surface !== previous) sessionLeases.invalidate();
       applyConnectionView(snapshot.view);
     },
     async saveCredentials(credentials) {
@@ -41,7 +51,7 @@ const coordinator = new ConnectionCoordinator({
     },
     openApproval,
     revokeDelegation(runtimeId) {
-      return leases.revoke(runtimeId);
+      return sessionLeases.revoke(runtimeId);
     },
   },
 });
@@ -69,7 +79,10 @@ browser.commands.onCommand.addListener((command, tab) => {
 });
 const toolbarAction = browser.action ?? browser.browserAction;
 toolbarAction.onClicked.addListener((tab) => { void initialized.then(() => presentInTab(tab, "surface.toggle")); });
-browser.tabs.onRemoved.addListener((id) => frameNames.delete(id));
+browser.tabs.onRemoved.addListener((id) => {
+  frameNames.delete(id);
+  if (targetBrowser === "safari") (sessionLeases as HeaderLeaseManager).removeTab(id);
+});
 browser.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "overcode-reconnect") void initialized.then(() => coordinator.reconnectIfNeeded());
 });
@@ -179,7 +192,7 @@ async function viewForTab(
   surfaceSnapshot: NativeSurface | undefined = surface,
 ): Promise<SurfaceViewState> {
   if (!surfaceSnapshot || tab?.id === undefined || !tab.url || !topLevelSite(tab.url)) return stateSnapshot;
-  if (!await leases.ensure(tab.id, tab.url, surfaceSnapshot, () => surface === surfaceSnapshot)) return stateSnapshot;
+  if (!await sessionLeases.ensure(tab.id, tab.url, surfaceSnapshot, () => surface === surfaceSnapshot)) return stateSnapshot;
   if (surface !== surfaceSnapshot) return stateSnapshot;
   let frameName = frameNames.get(tab.id);
   if (!frameName) {

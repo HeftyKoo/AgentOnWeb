@@ -51,6 +51,7 @@ export default defineConfig({
       "storage",
       "tabs",
       ...(manifestVersion === 2 ? ["http://*/*", "https://*/*"] : []),
+      ...(browser === "safari" ? ["declarativeNetRequestWithHostAccess"] : []),
     ],
     host_permissions: manifestVersion === 3 ? ["http://*/*", "https://*/*"] : undefined,
     commands,

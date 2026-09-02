@@ -43,6 +43,7 @@ function createChrome() {
       getPartitionKey: vi.fn(async () => ({ partitionKey: { topLevelSite: "https://example.org" } })),
       set: vi.fn(async () => ({ name: "native-session" })), remove: vi.fn(async () => ({})),
     },
+    declarativeNetRequest: { updateSessionRules: vi.fn(async (_update: { addRules?: unknown[]; removeRuleIds?: number[] }) => {}) },
   };
 }
 async function boot() {
@@ -61,7 +62,7 @@ beforeEach(() => {
   vi.stubGlobal("chrome", chromeMock);
   transport.discover.mockResolvedValue([available]); transport.request.mockResolvedValue(nativeSurface);
 });
-afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("cross-browser native connection lifecycle", () => {
   it("toggles only the clicked tab without switching modes or connecting", async () => {
@@ -120,6 +121,24 @@ describe("cross-browser native connection lifecycle", () => {
       expect(JSON.stringify(exposed)).not.toContain("private-session-cookie");
     }
     expect(chromeMock.cookies.set).toHaveBeenCalledWith(expect.objectContaining({ httpOnly: true, secure: true, partitionKey: { topLevelSite: "https://example.org" } }));
+  });
+
+  it("uses a tab-bound declarative header lease for Safari instead of partition cookies", async () => {
+    vi.stubEnv("BROWSER", "safari");
+    await boot();
+    await message("runtime.connect");
+    transport.callbacks!.ready("private-safari-credential");
+    await vi.waitFor(() => expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(tab.id, expect.objectContaining({
+      state: expect.objectContaining({ surface: expect.objectContaining({ runtimeId: runtime.id }) }),
+    })));
+    expect(chromeMock.cookies.set).not.toHaveBeenCalled();
+    const update = chromeMock.declarativeNetRequest.updateSessionRules.mock.calls
+      .map(([value]) => value)
+      .find((value) => value.addRules?.length);
+    expect(update).toMatchObject({ addRules: [{
+      action: { type: "modifyHeaders", requestHeaders: [{ header: "Cookie", operation: "set", value: "native-session=private-session-cookie" }] },
+      condition: { regexFilter: "^http://localhost:3080/", tabIds: [tab.id] },
+    }] });
   });
 
   it("cleans persisted cookie scopes after a cold start and revoked authorization", async () => {
