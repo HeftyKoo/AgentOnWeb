@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypt
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-export const EXTENSION_ORIGIN = /^chrome-extension:\/\/[a-p]{32}$/u;
+export const EXTENSION_ORIGIN = /^(?:chrome-extension:\/\/[a-p]{32}|moz-extension:\/\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|safari-web-extension:\/\/[a-z0-9][a-z0-9.-]{0,254})$/iu;
 const TTL = 120_000;
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 
@@ -55,7 +55,7 @@ export class Authorization {
   }
 
   request(origin: string): { request: Pending; result: Promise<{ id: string; credential: string }>; cancel: () => void } {
-    if (!EXTENSION_ORIGIN.test(origin)) throw new AuthorizationError("INVALID_ORIGIN", "Only a Chromium extension may connect.");
+    if (!EXTENSION_ORIGIN.test(origin)) throw new AuthorizationError("INVALID_ORIGIN", "Only a supported browser extension may connect.");
     if (this.#waiting.size >= 8 || [...this.#waiting.values()].some((p) => p.origin === origin)) {
       throw new AuthorizationError("REQUEST_PENDING", "A connection request is already pending. Approve it in the runtime or wait for it to expire.");
     }

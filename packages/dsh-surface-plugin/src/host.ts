@@ -24,7 +24,7 @@ export async function apply(ctx: DshContext): Promise<void> {
     runtime: { id: "deepseek-harness", displayName: "DeepSeek Harness", surfaceKind: "web", capabilities: { translucency: true, optionTap: true } },
     approvalUrl: `http://127.0.0.1:${ctx.webServer.port}/`,
     async getSurface(): Promise<NativeSurface> {
-      // localhost is a Chrome trustworthy origin for Secure partitioned cookies.
+      // localhost is a trustworthy browser origin for delegated native sessions.
       // The launch token and signed cookie never pass through page JavaScript.
       const base = `http://localhost:${ctx.webServer.port}/`;
       const response = await fetch(ctx.connection.authenticatedUrl(base), { redirect: "manual", signal: AbortSignal.timeout(5_000) });
@@ -39,7 +39,7 @@ export async function apply(ctx: DshContext): Promise<void> {
   const connector = await startConnector(adapter, authority);
   ctx.effect(() => () => connector.close(), "overcode: runtime connector lifecycle");
 
-  // Chrome partitions iframe storage by website. Keep only DSH's native view
+  // Browsers partition iframe storage by website. Keep only DSH's native view
   // selection here so a different website can restore that view through DSH.
   // This route stays inside native authentication; no bookmark enters Overcode's protocol.
   ctx.connection.fetch.register({

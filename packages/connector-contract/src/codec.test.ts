@@ -22,7 +22,7 @@ describe("connector contract codec", () => {
     expect(() => parseServerFrame({ kind: "pending", approvalUrl: "https://example.com/" })).toThrow();
   });
 
-  it("validates native surfaces before credentials reach Chrome cookies", () => {
+  it("validates native surfaces before credentials reach browser session leases", () => {
     const surface = { runtimeId: "dsh", displayName: "DSH", url: "http://localhost:3080/",
       cookie: { name: "session", value: "private", maxAgeSeconds: 60 } };
     expect(parseNativeSurface(surface)).toEqual(surface);

@@ -253,7 +253,7 @@ export function apply(ctx: ClientContext): void {
     const data = useConnections();
     return h("section", { style: { display: "grid", gap: 16, padding: 20 } },
       h("h3", null, "Overcode"),
-      h("p", null, "Your coding agent, everywhere. Start a connection from the Chrome extension, then approve it here."),
+      h("p", null, "Your coding agent, everywhere. Start a connection from the Overcode browser extension, then approve it here."),
       data.error ? h("p", { role: "alert" }, data.error) : null,
       ...data.pending.map((request) => h(Pending, { request, key: request.id })),
       data.grants.length ? null : h("p", null, "No authorized browser connections."),

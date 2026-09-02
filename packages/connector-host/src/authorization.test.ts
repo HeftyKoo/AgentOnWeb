@@ -52,6 +52,25 @@ describe("connector host authorization", () => {
     expect(() => authority.request(origin)).toThrow("already pending");
     authority.close(); await rejected;
   });
+  it("accepts exact Chrome, Firefox, and Safari extension origins", async () => {
+    const authority = await open();
+    const origins = [
+      `chrome-extension://${"p".repeat(32)}`,
+      "moz-extension://123e4567-e89b-42d3-a456-426614174000",
+      "safari-web-extension://com.overcode.extension",
+    ];
+    for (const candidate of origins) {
+      const pending = authority.request(candidate);
+      pending.cancel();
+      await expect(pending.result).rejects.toThrow("cancelled");
+    }
+    for (const candidate of [
+      "https://example.org",
+      "moz-extension://not-a-uuid",
+      "safari-web-extension://com.overcode.extension/path",
+      `chrome-extension://${"z".repeat(32)}`,
+    ]) expect(() => authority.request(candidate)).toThrow("supported browser extension");
+  });
   it("expires pending requests without any client or UI action", async () => {
     const authority = await open();
     vi.useFakeTimers();
