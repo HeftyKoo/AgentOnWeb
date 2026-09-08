@@ -5,11 +5,38 @@ import { tmpdir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 const execute = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const releaseDirectory = resolve(root, "release");
 const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
+
+// pnpm resolves workspace dependencies concurrently, so their order in the
+// packed manifest can vary. Canonicalize those maps in the actual release tar.
+async function normalizePackedDependencyOrder(archive) {
+  const tar = gunzipSync(await readFile(archive));
+  for (let offset = 0; offset + 512 <= tar.length;) {
+    const name = tar.subarray(offset, offset + 100).toString().replace(/\0.*$/s, "");
+    if (!name) break;
+    const size = Number.parseInt(tar.subarray(offset + 124, offset + 136).toString().replace(/\0.*$/s, "").trim(), 8);
+    if (name === "package/package.json") {
+      const start = offset + 512;
+      const original = tar.subarray(start, start + size).toString();
+      const manifest = JSON.parse(original);
+      for (const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
+        if (manifest[field]) manifest[field] = Object.fromEntries(Object.entries(manifest[field]).sort(([a], [b]) => a.localeCompare(b)));
+      }
+      const normalized = Buffer.from(JSON.stringify(manifest, null, 2) + (original.endsWith("\n") ? "\n" : ""));
+      if (normalized.length !== size) throw new Error("Packed manifest normalization unexpectedly changed its size.");
+      normalized.copy(tar, start);
+      await writeFile(archive, gzipSync(tar, { level: 9 }));
+      return;
+    }
+    offset += 512 + Math.ceil(size / 512) * 512;
+  }
+  throw new Error("Packed plugin manifest is missing.");
+}
 const contract = await readJson(resolve(root, "release-contract.json"));
 const rootPackage = await readJson(resolve(root, "package.json"));
 const extensionPackage = await readJson(resolve(root, "apps/extension/package.json"));
@@ -38,6 +65,7 @@ if (generatedManifest.version !== contract.version || generatedManifest.manifest
 
 const pluginArchive = resolve(releaseDirectory, `agentonweb-dsh-surface-${contract.version}.tgz`);
 const extensionArchive = resolve(releaseDirectory, `agentonweb-extension-${contract.version}.zip`);
+await normalizePackedDependencyOrder(pluginArchive);
 const temporary = await mkdtemp(resolve(tmpdir(), "agentonweb-release-audit-"));
 try {
   const firstPluginDigest = createHash("sha256").update(await readFile(pluginArchive)).digest("hex");
@@ -47,6 +75,7 @@ try {
   await execute("pnpm", ["--filter", "@agentonweb/dsh-surface", "pack", "--pack-destination", reproductionDirectory], { cwd: root });
   await execute("node", [resolve(root, "scripts/package-extension.mjs")], { cwd: root });
   const reproducedPlugin = resolve(reproductionDirectory, basename(pluginArchive));
+  await normalizePackedDependencyOrder(reproducedPlugin);
   const reproducedPluginDigest = createHash("sha256").update(await readFile(reproducedPlugin)).digest("hex");
   const reproducedExtensionDigest = createHash("sha256").update(await readFile(extensionArchive)).digest("hex");
   const drift = [];
