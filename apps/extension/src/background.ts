@@ -7,7 +7,7 @@ import { PartitionLeaseManager } from "./partition-leases.js";
 import { COOKIE_SCOPES_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, isContentRequest, type ContentRequest, type StateUpdate, type SurfaceCommand, type SurfaceViewState } from "./shared.js";
 import { topLevelSite } from "./surface-cookie.js";
 
-let state: SurfaceViewState = { mode: "chill", opacity: DEFAULT_SURFACE_OPACITY, connection: "disconnected" };
+let state: SurfaceViewState = { mode: "watch", opacity: DEFAULT_SURFACE_OPACITY, connection: "disconnected" };
 let surface: NativeSurface | undefined;
 let publication: Promise<void> = Promise.resolve();
 const frameNames = new Map<number, string>();
@@ -101,7 +101,7 @@ async function initialize(): Promise<void> {
     : {};
   state = {
     ...state,
-    mode: storedState?.mode === "focus" || storedState?.mode === "watch" ? storedState.mode : "chill",
+    mode: storedState?.mode === "chill" || storedState?.mode === "focus" ? storedState.mode : "watch",
     opacity: normalizeSurfaceOpacity(storedState?.opacity),
   };
   await coordinator.restore(storedState?.runtimeId, credentials);
