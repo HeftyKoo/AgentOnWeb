@@ -35,7 +35,7 @@ if (!document.getElementById(HOST_ID)) {
   document.documentElement.append(host);
 
   let state: SurfaceViewState = {
-    mode: "chill",
+    mode: "watch",
     connection: "disconnected",
     opacity: DEFAULT_SURFACE_OPACITY,
   };
