@@ -2,6 +2,7 @@
 node_modules/
 
 # Build and test output
+output/
 dist/
 dist-types/
 coverage/
