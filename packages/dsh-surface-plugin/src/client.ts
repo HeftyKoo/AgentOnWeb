@@ -1,4 +1,4 @@
-import type { OvercodeMode } from "@overcode/connector-contract";
+import type { AgentOnWebMode } from "@agentonweb/connector-contract";
 
 type ThemeTokens = Record<string, { light: string; dark: string }>;
 type Cleanup = () => void;
@@ -68,7 +68,7 @@ export const inject = ["theme", "slots", "sessions"];
 const clampOpacity = (value: unknown) => Math.min(0.9, Math.max(0.2,
   typeof value === "number" && Number.isFinite(value) ? value : 0.6));
 const alpha = (value: number) => Math.round(Math.min(0.98, value) * 100) / 100;
-const errorMessage = (error: unknown) => error instanceof Error ? error.message : "Unexpected Overcode error.";
+const errorMessage = (error: unknown) => error instanceof Error ? error.message : "Unexpected AgentOnWeb error.";
 
 const chillTokens = (opacity: number): ThemeTokens => ({
   "--dsw-alias-bg-base": { light: `rgba(245, 247, 250, ${alpha(opacity)})`, dark: `rgba(9, 12, 16, ${alpha(opacity)})` },
@@ -92,7 +92,7 @@ function syncNativeView(sessions: Sessions): Cleanup {
   };
   const save = (value: ReturnType<typeof selection>) => {
     writes = writes.catch(() => {}).then(async () => {
-      const response = await fetch("/api/overcode/native-view", {
+      const response = await fetch("/api/agentonweb/native-view", {
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(value), keepalive: true,
       });
       if (!response.ok) throw new Error("Unable to retain the native DSH view.");
@@ -106,7 +106,7 @@ function syncNativeView(sessions: Sessions): Cleanup {
       await writes.catch(() => {});
       await sessions.refresh();
       const before = JSON.stringify(selection());
-      const response = await fetch("/api/overcode/native-view", { cache: "no-store" });
+      const response = await fetch("/api/agentonweb/native-view", { cache: "no-store" });
       if (!response.ok) throw new Error("Unable to restore the native DSH view.");
       const body = await response.json() as { selection: { sessionId?: string; subagentAddress?: SessionAddress } | null };
       const bookmark = body.selection;
@@ -145,18 +145,18 @@ function syncNativeView(sessions: Sessions): Cleanup {
 
 export function apply(ctx: ClientContext): void {
   let disposeTheme: Cleanup = () => {};
-  let mode: OvercodeMode = "chill";
+  let mode: AgentOnWebMode = "chill";
   let opacity = 0.6;
-  const fragmentNonce = new URLSearchParams(window.location.hash.slice(1)).get("overcode");
-  const nonce = fragmentNonce || (typeof window.name === "string" && window.name.startsWith("overcode:")
-    ? window.name.slice("overcode:".length)
+  const fragmentNonce = new URLSearchParams(window.location.hash.slice(1)).get("agentonweb");
+  const nonce = fragmentNonce || (typeof window.name === "string" && window.name.startsWith("agentonweb:")
+    ? window.name.slice("agentonweb:".length)
     : undefined);
 
   const applyMode = (nextMode: unknown) => {
     if (nextMode !== "chill" && nextMode !== "focus" && nextMode !== "watch") return;
     mode = nextMode;
     disposeTheme();
-    disposeTheme = mode === "focus" ? () => {} : ctx.theme.overrideTokens("overcode-surface", chillTokens(opacity));
+    disposeTheme = mode === "focus" ? () => {} : ctx.theme.overrideTokens("agentonweb-surface", chillTokens(opacity));
   };
   const applyOpacity = (nextOpacity: unknown) => {
     opacity = clampOpacity(nextOpacity);
@@ -164,12 +164,12 @@ export function apply(ctx: ClientContext): void {
   };
   const notifyOptionTap = () => {
     if (!nonce || window.parent === window) return;
-    window.parent.postMessage({ source: "overcode-surface", type: "site-pass.option-tap", nonce }, "*");
+    window.parent.postMessage({ source: "agentonweb-surface", type: "site-pass.option-tap", nonce }, "*");
   };
   const onMessage = (event: MessageEvent<unknown>) => {
     if (!nonce || event.source !== window.parent || !event.data || typeof event.data !== "object") return;
     const message = event.data as { source?: unknown; nonce?: unknown; type?: unknown; mode?: unknown; opacity?: unknown };
-    if (message.source !== "overcode-extension" || message.nonce !== nonce) return;
+    if (message.source !== "agentonweb-extension" || message.nonce !== nonce) return;
     if (message.type === "mode.set") applyMode(message.mode);
     if (message.type === "opacity.set") applyOpacity(message.opacity);
   };
@@ -184,10 +184,10 @@ export function apply(ctx: ClientContext): void {
       window.removeEventListener("message", onMessage);
       window.removeEventListener("keydown", onKeyDown, true);
     };
-  }, "overcode: transparent surface and double-Option website pass-through");
+  }, "agentonweb: transparent surface and double-Option website pass-through");
 
   if (nonce && window.parent !== window && ctx.sessions) {
-    ctx.effect(() => syncNativeView(ctx.sessions!), "overcode: native view continuity across websites");
+    ctx.effect(() => syncNativeView(ctx.sessions!), "agentonweb: native view continuity across websites");
   }
 
   // Additive native slots only. Authorization is unavailable in website iframes.
@@ -203,8 +203,8 @@ export function apply(ctx: ClientContext): void {
     if (stopped || inFlight) return;
     inFlight = true;
     try {
-      const response = await fetch("/api/overcode/connections", { cache: "no-store" });
-      if (!response.ok) throw new Error("Unable to read Overcode connections.");
+      const response = await fetch("/api/agentonweb/connections", { cache: "no-store" });
+      if (!response.ok) throw new Error("Unable to read AgentOnWeb connections.");
       const next = await response.json() as ConnectionsSnapshot;
       if (!stopped && JSON.stringify(next) !== JSON.stringify(snapshot)) publish(next);
     } catch (error) {
@@ -215,7 +215,7 @@ export function apply(ctx: ClientContext): void {
   };
   const act = async (action: "allow" | "deny" | "revoke", id: string) => {
     try {
-      const response = await fetch("/api/overcode/connections", {
+      const response = await fetch("/api/agentonweb/connections", {
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, id }),
       });
       const next = await response.json() as ConnectionsSnapshot & { error?: string };
@@ -231,7 +231,7 @@ export function apply(ctx: ClientContext): void {
   );
   const buttonStyle = { border: "1px solid var(--dsw-alias-border-l2)", borderRadius: 8, padding: "7px 12px", cursor: "pointer", background: "var(--dsw-alias-bg-layer-2)", color: "inherit" };
   const Pending = ({ request }: { request: ConnectionRequest }) => h("div", { style: { display: "grid", gap: 10 } },
-    h("strong", null, "Allow Overcode to connect?"),
+    h("strong", null, "Allow AgentOnWeb to connect?"),
     h("span", null, "This browser extension can use your native DSH workspace, including its coding tools. Only allow a request you initiated."),
     h("code", { style: { overflowWrap: "anywhere", fontSize: 11 } }, request.origin),
     h("div", { style: { display: "flex", gap: 8 } },
@@ -243,7 +243,7 @@ export function apply(ctx: ClientContext): void {
     const data = useConnections();
     const pending = data.pending[0];
     if (!pending) return null;
-    return h("section", { role: "region", "aria-label": "Overcode connection authorization", style: {
+    return h("section", { role: "region", "aria-label": "AgentOnWeb connection authorization", style: {
       pointerEvents: "auto", position: "fixed", right: 24, bottom: 24, width: "min(380px, calc(100vw - 48px))",
       padding: 20, borderRadius: 14, background: "var(--dsw-alias-bg-layer-1)", color: "var(--dsw-alias-text-primary)",
       border: "1px solid var(--dsw-alias-border-l2)", boxShadow: "0 12px 48px #0004", fontSize: 13,
@@ -252,8 +252,8 @@ export function apply(ctx: ClientContext): void {
   const Connections = () => {
     const data = useConnections();
     return h("section", { style: { display: "grid", gap: 16, padding: 20 } },
-      h("h3", null, "Overcode"),
-      h("p", null, "Your coding agent, everywhere. Start a connection from the Overcode browser extension, then approve it here."),
+      h("h3", null, "AgentOnWeb"),
+      h("p", null, "DSH On Web brings this native workspace onto your webpages. Connect from the AgentOnWeb browser extension, then approve it here."),
       data.error ? h("p", { role: "alert" }, data.error) : null,
       ...data.pending.map((request) => h(Pending, { request, key: request.id })),
       data.grants.length ? null : h("p", null, "No authorized browser connections."),
@@ -264,16 +264,16 @@ export function apply(ctx: ClientContext): void {
     );
   };
   ctx.slots.inject("shell.overlay", () => ctx.slots!.register(
-    { name: "shell.overlay", id: "overcode-authorization", order: 100 },
+    { name: "shell.overlay", id: "agentonweb-authorization", order: 100 },
     Approval,
   ));
   ctx.slots.inject("settings.section", () => ctx.slots!.register(
-    { name: "settings.section", id: "overcode", order: 90, label: "Overcode" },
+    { name: "settings.section", id: "agentonweb", order: 90, label: "AgentOnWeb" },
     Connections,
   ));
   ctx.effect(() => {
     refresh();
     const timer = setInterval(refresh, 2000);
     return () => { stopped = true; clearInterval(timer); listeners.clear(); };
-  }, "overcode: native connection approvals");
+  }, "agentonweb: native connection approvals");
 }

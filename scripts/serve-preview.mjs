@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../apps/extension/preview");
-const port = Number.parseInt(process.env.OVERCODE_PREVIEW_PORT ?? "4173", 10);
+const port = Number.parseInt(process.env.AGENTONWEB_PREVIEW_PORT ?? "4173", 10);
 const contentTypes = new Map([
   [".html", "text/html; charset=utf-8"],
   [".js", "text/javascript; charset=utf-8"],
@@ -27,5 +27,5 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(port, "127.0.0.1", () => {
-  console.log(`Overcode preview: http://127.0.0.1:${port}`);
+  console.log(`AgentOnWeb preview: http://127.0.0.1:${port}`);
 });

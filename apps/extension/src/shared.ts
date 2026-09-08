@@ -1,8 +1,8 @@
-import type { OvercodeMode, RuntimeDescriptor } from "@overcode/connector-contract";
+import type { AgentOnWebMode, RuntimeDescriptor } from "@agentonweb/connector-contract";
 
-export const STATE_STORAGE_KEY = "overcode.surface-state";
-export const CREDENTIAL_STORAGE_KEY = "overcode.runtime-credentials";
-export const COOKIE_SCOPES_STORAGE_KEY = "overcode.cookie-scopes";
+export const STATE_STORAGE_KEY = "agentonweb.surface-state";
+export const CREDENTIAL_STORAGE_KEY = "agentonweb.runtime-credentials";
+export const COOKIE_SCOPES_STORAGE_KEY = "agentonweb.cookie-scopes";
 
 export type SurfaceConnection = "disconnected" | "connecting" | "awaiting-approval" | "connected" | "reconnecting";
 
@@ -14,7 +14,7 @@ export interface NativeSurfaceView {
 }
 
 export interface SurfaceViewState {
-  readonly mode: OvercodeMode;
+  readonly mode: AgentOnWebMode;
   readonly opacity: number;
   readonly connection: SurfaceConnection;
   readonly surface?: NativeSurfaceView;
@@ -27,14 +27,14 @@ export interface SurfaceViewState {
 }
 
 export type ContentRequest =
-  | { readonly source: "overcode-content"; readonly type: "state.get" }
-  | { readonly source: "overcode-content"; readonly type: "mode.set"; readonly mode: OvercodeMode }
-  | { readonly source: "overcode-content"; readonly type: "opacity.set"; readonly opacity: number }
-  | { readonly source: "overcode-content"; readonly type: "runtime.connect"; readonly runtimeId?: string }
-  | { readonly source: "overcode-content"; readonly type: "runtime.approval" };
+  | { readonly source: "agentonweb-content"; readonly type: "state.get" }
+  | { readonly source: "agentonweb-content"; readonly type: "mode.set"; readonly mode: AgentOnWebMode }
+  | { readonly source: "agentonweb-content"; readonly type: "opacity.set"; readonly opacity: number }
+  | { readonly source: "agentonweb-content"; readonly type: "runtime.connect"; readonly runtimeId?: string }
+  | { readonly source: "agentonweb-content"; readonly type: "runtime.approval" };
 
 export interface StateUpdate {
-  readonly source: "overcode-background";
+  readonly source: "agentonweb-background";
   readonly type: "state.update";
   readonly state: SurfaceViewState;
 }
@@ -42,7 +42,7 @@ export interface StateUpdate {
 // Visibility belongs to each page, not to the shared runtime connection or mode.
 // Only an explicit toolbar/keyboard action sends one of these messages.
 export interface SurfaceCommand {
-  readonly source: "overcode-background";
+  readonly source: "agentonweb-background";
   readonly type: "surface.toggle" | "surface.show";
   readonly state: SurfaceViewState;
 }
@@ -50,14 +50,14 @@ export interface SurfaceCommand {
 export function isSurfaceCommand(value: unknown): value is SurfaceCommand {
   if (!value || typeof value !== "object") return false;
   const candidate = value as { source?: unknown; type?: unknown; state?: unknown };
-  return candidate.source === "overcode-background" &&
+  return candidate.source === "agentonweb-background" &&
     (candidate.type === "surface.toggle" || candidate.type === "surface.show") && Boolean(candidate.state);
 }
 
 export function isContentRequest(value: unknown): value is ContentRequest {
   if (!value || typeof value !== "object") return false;
   const candidate = value as { source?: unknown; type?: unknown; mode?: unknown; opacity?: unknown; runtimeId?: unknown };
-  if (candidate.source !== "overcode-content") return false;
+  if (candidate.source !== "agentonweb-content") return false;
   if (candidate.type === "state.get" || candidate.type === "runtime.approval") return true;
   if (candidate.type === "mode.set") return ["chill", "focus", "watch"].includes(String(candidate.mode));
   if (candidate.type === "opacity.set") return typeof candidate.opacity === "number" && Number.isFinite(candidate.opacity);
@@ -67,5 +67,5 @@ export function isContentRequest(value: unknown): value is ContentRequest {
 export function isStateUpdate(value: unknown): value is StateUpdate {
   if (!value || typeof value !== "object") return false;
   const candidate = value as { source?: unknown; type?: unknown; state?: unknown };
-  return candidate.source === "overcode-background" && candidate.type === "state.update" && Boolean(candidate.state);
+  return candidate.source === "agentonweb-background" && candidate.type === "state.update" && Boolean(candidate.state);
 }

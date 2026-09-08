@@ -14,21 +14,21 @@ const packages = {
 };
 
 const expectedNames = {
-  extension: "@overcode/extension",
-  contract: "@overcode/connector-contract",
-  host: "@overcode/connector-host",
-  surface: "@overcode/dsh-surface",
+  extension: "@agentonweb/extension",
+  contract: "@agentonweb/connector-contract",
+  host: "@agentonweb/connector-host",
+  surface: "@agentonweb/dsh-surface",
 };
 
 for (const [key, expected] of Object.entries(expectedNames)) {
   if (packages[key].name !== expected) throw new Error(`${key} must be named ${expected}.`);
 }
 
-const overcodeDependencies = (manifest) => Object.keys({
+const agentonwebDependencies = (manifest) => Object.keys({
   ...manifest.dependencies,
   ...manifest.optionalDependencies,
   ...manifest.peerDependencies,
-}).filter((name) => name.startsWith("@overcode/")).sort();
+}).filter((name) => name.startsWith("@agentonweb/")).sort();
 
 const expectedRuntimeEdges = {
   extension: [expectedNames.contract],
@@ -38,13 +38,13 @@ const expectedRuntimeEdges = {
 };
 
 for (const [key, expected] of Object.entries(expectedRuntimeEdges)) {
-  const actual = overcodeDependencies(packages[key]);
+  const actual = agentonwebDependencies(packages[key]);
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     throw new Error(`${packages[key].name} runtime edges must be [${expected.join(", ")}], got [${actual.join(", ")}].`);
   }
 }
 
-const surfaceBuildEdges = Object.keys(packages.surface.devDependencies ?? {}).filter((name) => name.startsWith("@overcode/")).sort();
+const surfaceBuildEdges = Object.keys(packages.surface.devDependencies ?? {}).filter((name) => name.startsWith("@agentonweb/")).sort();
 const expectedSurfaceBuildEdges = [expectedNames.contract, expectedNames.host].sort();
 if (JSON.stringify(surfaceBuildEdges) !== JSON.stringify(expectedSurfaceBuildEdges)) {
   throw new Error(`The DSH surface build edges must be [${expectedSurfaceBuildEdges.join(", ")}].`);
@@ -71,7 +71,7 @@ for (const directory of deprecatedDirectories) {
 
 const sourceRoots = ["apps", "packages", "scripts"];
 const checkedExtensions = new Set([".js", ".mjs", ".ts", ".tsx"]);
-const deprecatedNames = ["@overcode/runtime-connector", "@overcode/shared-protocol"];
+const deprecatedNames = ["@agentonweb/runtime-connector", "@agentonweb/shared-protocol"];
 
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -100,8 +100,8 @@ for (const sourceRoot of sourceRoots) {
 
 const contract = await readJson("release-contract.json");
 const expectedArtifacts = {
-  extension: `overcode-extension-${contract.version}.zip`,
-  dshPlugin: `overcode-dsh-surface-${contract.version}.tgz`,
+  extension: `agentonweb-extension-${contract.version}.zip`,
+  dshPlugin: `agentonweb-dsh-surface-${contract.version}.tgz`,
 };
 if (JSON.stringify(contract.artifacts) !== JSON.stringify(expectedArtifacts)) {
   throw new Error("release-contract.json artifact names must be derived from its version.");

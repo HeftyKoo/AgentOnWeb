@@ -8,7 +8,7 @@ const child = spawn("dsh", ["plugin", "--profile", "web", "add", packagePath], {
 });
 
 child.once("error", (error) => {
-  console.error(`Could not install the Overcode DeepSeek Harness client plugin: ${error.message}`);
+  console.error(`Could not install the AgentOnWeb DeepSeek Harness client plugin: ${error.message}`);
   process.exitCode = 1;
 });
 child.once("exit", (code, signal) => {

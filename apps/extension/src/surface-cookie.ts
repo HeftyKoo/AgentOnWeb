@@ -1,4 +1,4 @@
-import type { NativeSurface } from "@overcode/connector-contract";
+import type { NativeSurface } from "@agentonweb/connector-contract";
 
 export interface SurfaceCookieDetails {
   readonly url: string;

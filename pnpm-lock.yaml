@@ -32,7 +32,7 @@ importers:
 
   apps/extension:
     dependencies:
-      '@overcode/connector-contract':
+      '@agentonweb/connector-contract':
         specifier: workspace:*
         version: link:../../packages/connector-contract
       '@phosphor-icons/core':
@@ -47,7 +47,7 @@ importers:
 
   packages/connector-host:
     dependencies:
-      '@overcode/connector-contract':
+      '@agentonweb/connector-contract':
         specifier: workspace:*
         version: link:../connector-contract
       ws:
@@ -60,10 +60,10 @@ importers:
 
   packages/dsh-surface-plugin:
     devDependencies:
-      '@overcode/connector-contract':
+      '@agentonweb/connector-contract':
         specifier: workspace:*
         version: link:../connector-contract
-      '@overcode/connector-host':
+      '@agentonweb/connector-host':
         specifier: workspace:*
         version: link:../connector-host
 

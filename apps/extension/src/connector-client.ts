@@ -9,9 +9,9 @@ import {
   type RuntimeCommand,
   type RuntimeCommandResult,
   type ServerAvailable,
-} from "@overcode/connector-contract";
+} from "@agentonweb/connector-contract";
 
-export { isLocalSurfaceUrl, isNativeSurface, isRuntimeDescriptor } from "@overcode/connector-contract";
+export { isLocalSurfaceUrl, isNativeSurface, isRuntimeDescriptor } from "@agentonweb/connector-contract";
 
 export interface AvailableRuntime extends ServerAvailable { readonly endpoint: string }
 

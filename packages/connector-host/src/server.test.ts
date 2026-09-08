@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { once } from "node:events";
 import WebSocket from "ws";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PROTOCOL_VERSION, type ServerFrame, type SurfaceAdapter } from "@overcode/connector-contract";
+import { PROTOCOL_VERSION, type ServerFrame, type SurfaceAdapter } from "@agentonweb/connector-contract";
 import { Authorization, startConnector, type Connector } from "./server.js";
 const directories: string[] = [];
 const servers: Connector[] = [];
@@ -16,7 +16,7 @@ const adapter: SurfaceAdapter = {
   getSurface: vi.fn(async () => ({ runtimeId: "test-native-runtime", displayName: "Test native runtime", url: "http://localhost:3080/", cookie: { name: "native-test", value: "private-cookie", maxAgeSeconds: 60 } })),
 };
 async function setup() {
-  const dir = await mkdtemp(join(tmpdir(), "overcode-connector-")); directories.push(dir);
+  const dir = await mkdtemp(join(tmpdir(), "agentonweb-connector-")); directories.push(dir);
   const authority = await Authorization.open(dir);
   const server = await startConnector(adapter, authority, [0]); servers.push(server);
   return { authority, server };

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { PROTOCOL_VERSION } from "@overcode/connector-contract";
+import { PROTOCOL_VERSION } from "@agentonweb/connector-contract";
 import { ConnectionCoordinator } from "./connection-coordinator.js";
 import type { ConnectorCallbacks } from "./connector-client.js";
 

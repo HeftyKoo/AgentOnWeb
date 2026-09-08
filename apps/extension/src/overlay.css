@@ -10,7 +10,7 @@
 button, input, select { color: inherit; font: inherit; }
 button { cursor: pointer; }
 
-.overcode-root,
+.agentonweb-root,
 .surface-shell {
   position: fixed;
   inset: 0;
@@ -20,13 +20,13 @@ button { cursor: pointer; }
 .surface-shell { background: transparent; }
 
 :host([data-mode="focus"]) .surface-shell,
-.overcode-root[data-mode="focus"] .surface-shell {
+.agentonweb-root[data-mode="focus"] .surface-shell {
   background: #0b0e11;
 }
 
 /* Focus is opaque only while its workspace is actively presented. */
-.overcode-root[data-active="false"] .surface-shell { background: transparent; }
-.overcode-root[data-has-surface="false"] .surface-shell { background: transparent; }
+.agentonweb-root[data-active="false"] .surface-shell { background: transparent; }
+.agentonweb-root[data-has-surface="false"] .surface-shell { background: transparent; }
 
 .runtime-frame {
   position: absolute;
@@ -42,19 +42,19 @@ button { cursor: pointer; }
 }
 
 :host([data-mode="focus"]) .runtime-frame,
-.overcode-root[data-mode="focus"] .runtime-frame {
+.agentonweb-root[data-mode="focus"] .runtime-frame {
   opacity: 1;
 }
 
 :host([data-mode="watch"]) .runtime-frame,
-.overcode-root[data-mode="watch"] .runtime-frame {
+.agentonweb-root[data-mode="watch"] .runtime-frame {
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
 }
 
 :host([data-site-pass="true"]) .runtime-frame,
-.overcode-root[data-site-pass="true"] .runtime-frame {
+.agentonweb-root[data-site-pass="true"] .runtime-frame {
   opacity: 0.08;
   pointer-events: none;
 }
@@ -220,7 +220,7 @@ button { cursor: pointer; }
 }
 
 :host([data-site-pass="true"]) .surface-dock,
-.overcode-root[data-site-pass="true"] .surface-dock {
+.agentonweb-root[data-site-pass="true"] .surface-dock {
   opacity: 0.22;
   pointer-events: none;
 }
@@ -241,7 +241,7 @@ button { cursor: pointer; }
 }
 
 :host([data-site-pass="true"]) .site-pass-label,
-.overcode-root[data-site-pass="true"] .site-pass-label {
+.agentonweb-root[data-site-pass="true"] .site-pass-label {
   display: block;
 }
 

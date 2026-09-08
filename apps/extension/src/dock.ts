@@ -2,12 +2,12 @@ import chillIcon from "@phosphor-icons/core/regular/cloud-sun.svg?raw";
 import focusIcon from "@phosphor-icons/core/regular/crosshair-simple.svg?raw";
 import opacityIcon from "@phosphor-icons/core/regular/circle-half-tilt.svg?raw";
 import watchIcon from "@phosphor-icons/core/regular/eye.svg?raw";
-import type { OvercodeMode } from "@overcode/connector-contract";
-import logoDataUrl from "./assets/overcode-mark.png";
+import type { AgentOnWebMode } from "@agentonweb/connector-contract";
+import logoDataUrl from "./assets/agentonweb-mark.png";
 import type { SurfaceViewState } from "./shared.js";
 
 const MODE_META: ReadonlyArray<{
-  readonly mode: OvercodeMode;
+  readonly mode: AgentOnWebMode;
   readonly label: string;
   readonly shortcut: string;
   readonly icon: string;
@@ -19,7 +19,7 @@ const MODE_META: ReadonlyArray<{
 
 export interface SurfaceDock {
   readonly element: HTMLElement;
-  onMode: (mode: OvercodeMode) => void;
+  onMode: (mode: AgentOnWebMode) => void;
   onOpacityPreview: (opacity: number) => void;
   onOpacity: (opacity: number) => void;
   focus: () => void;
@@ -30,17 +30,17 @@ export interface SurfaceDock {
 export function createDock(): SurfaceDock {
   const element = document.createElement("nav");
   element.className = "surface-dock";
-  element.setAttribute("aria-label", "Overcode presentation controls");
+  element.setAttribute("aria-label", "AgentOnWeb presentation controls");
 
   const palette = document.createElement("div");
   palette.className = "surface-palette";
-  palette.id = "overcode-surface-palette";
+  palette.id = "agentonweb-surface-palette";
   palette.hidden = true;
 
-  const buttons = new Map<OvercodeMode, HTMLButtonElement>();
+  const buttons = new Map<AgentOnWebMode, HTMLButtonElement>();
   const api: SurfaceDock = {
     element,
-    onMode: (_mode: OvercodeMode) => {},
+    onMode: (_mode: AgentOnWebMode) => {},
     onOpacityPreview: (_opacity: number) => {},
     onOpacity: (_opacity: number) => {},
     focus: () => toggle.focus({ preventScroll: true }),
@@ -56,7 +56,7 @@ export function createDock(): SurfaceDock {
       element.dataset.expanded = String(expanded);
       palette.hidden = !expanded;
       toggle.setAttribute("aria-expanded", String(expanded));
-      toggle.setAttribute("aria-label", expanded ? "Collapse Overcode controls" : "Expand Overcode controls");
+      toggle.setAttribute("aria-label", expanded ? "Collapse AgentOnWeb controls" : "Expand AgentOnWeb controls");
     },
   };
 
@@ -98,10 +98,10 @@ export function createDock(): SurfaceDock {
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "surface-toggle";
-  toggle.dataset.tooltip = "OVERCODE";
+  toggle.dataset.tooltip = "AGENTONWEB";
   toggle.setAttribute("aria-controls", palette.id);
   toggle.setAttribute("aria-expanded", "false");
-  toggle.setAttribute("aria-label", "Expand Overcode controls");
+  toggle.setAttribute("aria-label", "Expand AgentOnWeb controls");
   const logo = document.createElement("img");
   logo.src = logoDataUrl;
   logo.alt = "";

@@ -25,11 +25,11 @@ Task { @MainActor in
       }
       exit(1)
     }
-    guard webExtension.displayName == "Overcode", webExtension.manifestVersion == 2 else {
+    guard webExtension.displayName == "AgentOnWeb", webExtension.manifestVersion == 2 else {
       print("Safari parsed unexpected extension metadata.")
       exit(1)
     }
-    print("Safari WKWebExtension validation passed for \\(webExtension.displayName ?? "Overcode") MV\\(webExtension.manifestVersion).")
+    print("Safari WKWebExtension validation passed for \\(webExtension.displayName ?? "AgentOnWeb") MV\\(webExtension.manifestVersion).")
     exit(0)
   } catch {
     print("Safari could not load the WXT output: \\(error)")

@@ -1,4 +1,4 @@
-import type { NativeSurface } from "@overcode/connector-contract";
+import type { NativeSurface } from "@agentonweb/connector-contract";
 import { surfaceCookieDetails, topLevelSite, type SurfaceCookieDetails } from "./surface-cookie.js";
 
 export interface PersistedCookieScope {
