@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Authorization } from "./authorization.js";
 const directories: string[] = [];
 const origin = `chrome-extension://${"a".repeat(32)}`;
-async function open() { const dir = await mkdtemp(join(tmpdir(), "overcode-auth-")); directories.push(dir); return Authorization.open(dir); }
+async function open() { const dir = await mkdtemp(join(tmpdir(), "agentonweb-auth-")); directories.push(dir); return Authorization.open(dir); }
 afterEach(async () => { vi.useRealTimers(); await Promise.all(directories.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))); });
 
 describe("connector host authorization", () => {
@@ -57,7 +57,7 @@ describe("connector host authorization", () => {
     const origins = [
       `chrome-extension://${"p".repeat(32)}`,
       "moz-extension://123e4567-e89b-42d3-a456-426614174000",
-      "safari-web-extension://com.overcode.extension",
+      "safari-web-extension://com.agentonweb.extension",
     ];
     for (const candidate of origins) {
       const pending = authority.request(candidate);
@@ -67,7 +67,7 @@ describe("connector host authorization", () => {
     for (const candidate of [
       "https://example.org",
       "moz-extension://not-a-uuid",
-      "safari-web-extension://com.overcode.extension/path",
+      "safari-web-extension://com.agentonweb.extension/path",
       `chrome-extension://${"z".repeat(32)}`,
     ]) expect(() => authority.request(candidate)).toThrow("supported browser extension");
   });

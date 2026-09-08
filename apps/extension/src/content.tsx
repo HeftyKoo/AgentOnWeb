@@ -4,7 +4,7 @@ import { DEFAULT_SURFACE_OPACITY, DoubleTapLatch } from "./interaction.js";
 import styles from "./overlay.css?inline";
 import { isStateUpdate, isSurfaceCommand, type ContentRequest, type SurfaceViewState } from "./shared.js";
 
-const HOST_ID = "overcode-extension-root";
+const HOST_ID = "agentonweb-extension-root";
 
 if (!document.getElementById(HOST_ID)) {
   const host = document.createElement("div");
@@ -15,10 +15,10 @@ if (!document.getElementById(HOST_ID)) {
   const style = document.createElement("style");
   style.textContent = styles;
   const root = document.createElement("div");
-  root.className = "overcode-root";
+  root.className = "agentonweb-root";
   const shell = document.createElement("section");
   shell.className = "surface-shell";
-  shell.setAttribute("aria-label", "Overcode native coding workspace");
+  shell.setAttribute("aria-label", "AgentOnWeb native coding workspace");
   const frame = document.createElement("iframe");
   frame.hidden = true;
   frame.className = "runtime-frame";
@@ -55,30 +55,30 @@ if (!document.getElementById(HOST_ID)) {
   };
 
   setup.onConnect = (runtimeId) => {
-    send({ source: "overcode-content", type: "runtime.connect", ...(runtimeId ? { runtimeId } : {}) });
+    send({ source: "agentonweb-content", type: "runtime.connect", ...(runtimeId ? { runtimeId } : {}) });
   };
-  setup.onApproval = () => send({ source: "overcode-content", type: "runtime.approval" });
+  setup.onApproval = () => send({ source: "agentonweb-content", type: "runtime.approval" });
   setup.onClose = () => setVisible(false);
   dock.onMode = (mode) => {
     setSitePass(false);
     optionLatch.reset();
     setVisible(true);
-    send({ source: "overcode-content", type: "mode.set", mode });
+    send({ source: "agentonweb-content", type: "mode.set", mode });
   };
   dock.onOpacity = (opacity) => {
-    host.style.setProperty("--overcode-surface-opacity", String(opacity));
+    host.style.setProperty("--agentonweb-surface-opacity", String(opacity));
     postOpacity(opacity);
-    send({ source: "overcode-content", type: "opacity.set", opacity });
+    send({ source: "agentonweb-content", type: "opacity.set", opacity });
   };
   dock.onOpacityPreview = (opacity) => {
-    host.style.setProperty("--overcode-surface-opacity", String(opacity));
+    host.style.setProperty("--agentonweb-surface-opacity", String(opacity));
     postOpacity(opacity);
   };
 
   const postToSurface = (message: Record<string, unknown>) => {
     if (!frame.contentWindow || !frameNonce || !surfaceOrigin) return;
     frame.contentWindow.postMessage({
-      source: "overcode-extension",
+      source: "agentonweb-extension",
       nonce: frameNonce,
       ...message,
     }, surfaceOrigin);
@@ -97,7 +97,7 @@ if (!document.getElementById(HOST_ID)) {
     state = next;
     host.dataset.mode = state.mode;
     root.dataset.mode = state.mode;
-    host.style.setProperty("--overcode-surface-opacity", String(state.opacity));
+    host.style.setProperty("--agentonweb-surface-opacity", String(state.opacity));
     if (state.mode !== "chill" && sitePassActive) {
       setSitePass(false);
       optionLatch.reset();
@@ -126,9 +126,9 @@ if (!document.getElementById(HOST_ID)) {
       frame.hidden = true;
       return;
     }
-    const nextNonce = state.surface.frameName.replace(/^overcode:/u, "");
+    const nextNonce = state.surface.frameName.replace(/^agentonweb:/u, "");
     const nextSource = new URL(state.surface.url);
-    nextSource.hash = new URLSearchParams({ overcode: nextNonce }).toString();
+    nextSource.hash = new URLSearchParams({ agentonweb: nextNonce }).toString();
     const sourceChanged = frame.src !== nextSource.href || frame.name !== state.surface.frameName;
     surfaceOrigin = new URL(state.surface.url).origin;
     frameNonce = nextNonce;
@@ -215,7 +215,7 @@ if (!document.getElementById(HOST_ID)) {
   window.addEventListener("message", (event) => {
     if (!frame.contentWindow || event.source !== frame.contentWindow || event.origin !== surfaceOrigin) return;
     const message = event.data as { source?: unknown; type?: unknown; nonce?: unknown } | null;
-    if (!message || message.source !== "overcode-surface" || message.type !== "site-pass.option-tap") return;
+    if (!message || message.source !== "agentonweb-surface" || message.type !== "site-pass.option-tap") return;
     if (message.nonce !== frameNonce) return;
     if (state.runtime?.capabilities.optionTap !== false) handleOptionTap();
   });
@@ -224,7 +224,7 @@ if (!document.getElementById(HOST_ID)) {
     if (event.key === "Alt" && !event.repeat) handleOptionTap();
   }, true);
 
-  browser.runtime.sendMessage({ source: "overcode-content", type: "state.get" } satisfies ContentRequest)
+  browser.runtime.sendMessage({ source: "agentonweb-content", type: "state.get" } satisfies ContentRequest)
     .then((response: { ok?: boolean; result?: SurfaceViewState } | undefined) => {
       // A slow initial snapshot must not overwrite a newer explicit open/update.
       if (response?.result && !receivedUpdate) render(response.result);
@@ -242,20 +242,20 @@ function createSetup(): {
   element.className = "surface-setup";
   element.tabIndex = -1;
   element.setAttribute("role", "dialog");
-  element.setAttribute("aria-labelledby", "overcode-setup-title");
+  element.setAttribute("aria-labelledby", "agentonweb-setup-title");
   const header = document.createElement("div");
   header.className = "surface-setup-header";
   const title = document.createElement("strong");
-  title.id = "overcode-setup-title";
-  title.textContent = "Your coding agent, everywhere.";
+  title.id = "agentonweb-setup-title";
+  title.textContent = "AgentOnWeb · DSH On Web";
   const close = document.createElement("button");
   close.type = "button";
   close.className = "surface-setup-close";
   close.textContent = "Close";
-  close.setAttribute("aria-label", "Close Overcode");
+  close.setAttribute("aria-label", "Close AgentOnWeb");
   header.append(title, close);
   const copy = document.createElement("p");
-  copy.textContent = "Start your coding runtime with its Overcode plugin. Approve this browser once in the native workspace.";
+  copy.textContent = "Bring DeepSeek Harness onto this page. Start dsh web with the AgentOnWeb plugin, then approve this browser in the native workspace.";
   const form = document.createElement("form");
   const runtimes = document.createElement("select");
   runtimes.setAttribute("aria-label", "Coding runtime");
@@ -267,7 +267,7 @@ function createSetup(): {
   status.setAttribute("role", "status");
   const hint = document.createElement("p");
   hint.className = "surface-setup-hint";
-  hint.textContent = "Open again from the Overcode toolbar icon or your extension shortcut. Esc closes this panel.";
+  hint.textContent = "Open again from the AgentOnWeb toolbar icon or your extension shortcut. Esc closes this panel.";
   form.append(runtimes, submit);
   element.append(header, copy, form, status, hint);
   const api = {

@@ -1,4 +1,4 @@
-import { isNativeSurface, type NativeSurface, type RuntimeDescriptor } from "@overcode/connector-contract";
+import { isNativeSurface, type NativeSurface, type RuntimeDescriptor } from "@agentonweb/connector-contract";
 import { ConnectorClient, discoverRuntimes, type AvailableRuntime, type ConnectorCallbacks } from "./connector-client.js";
 import type { SurfaceConnection } from "./shared.js";
 
@@ -117,7 +117,7 @@ export class ConnectionCoordinator {
         connection: requestApproval ? "disconnected" : "reconnecting",
         error: this.#available.length
           ? "Choose a runtime to connect."
-          : "Start your runtime with the Overcode plugin enabled, then connect. For DeepSeek Harness, run dsh web.",
+          : "Start your runtime with the AgentOnWeb plugin enabled, then connect. For DeepSeek Harness, run dsh web.",
       });
       if (!requestApproval) this.#retry = setTimeout(() => { this.#enqueue(() => this.#connect(false)); }, 5000);
       return;

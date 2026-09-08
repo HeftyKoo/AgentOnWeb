@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { PROTOCOL_VERSION } from "@overcode/connector-contract";
+import { PROTOCOL_VERSION } from "@agentonweb/connector-contract";
 import { discoverRuntimes, isLocalSurfaceUrl, isNativeSurface, isRuntimeDescriptor } from "./connector-client.js";
 import { isContentRequest } from "./shared.js";
 describe("native surface trust", () => {
@@ -15,8 +15,8 @@ describe("native surface trust", () => {
     for (const value of [null, undefined, [], 42, "surface", { cookie: null }]) expect(isNativeSurface(value)).toBe(false);
   });
   it("accepts only the current privileged content-message contract", () => {
-    expect(isContentRequest({ source: "overcode-content", type: "runtime.connect" })).toBe(true);
-    for (const payload of [{ type: "unknown" }, { type: "mode.set", mode: "evil" }, { type: "opacity.set", opacity: NaN }, { type: "runtime.connect", runtimeId: {} }]) expect(isContentRequest({ source: "overcode-content", ...payload })).toBe(false);
+    expect(isContentRequest({ source: "agentonweb-content", type: "runtime.connect" })).toBe(true);
+    for (const payload of [{ type: "unknown" }, { type: "mode.set", mode: "evil" }, { type: "opacity.set", opacity: NaN }, { type: "runtime.connect", runtimeId: {} }]) expect(isContentRequest({ source: "agentonweb-content", ...payload })).toBe(false);
   });
   it("preflights loopback ports before creating WebSockets", async () => {
     const opened: string[] = [];

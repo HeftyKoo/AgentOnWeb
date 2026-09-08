@@ -34,7 +34,7 @@ export class Authorization {
       if (!Array.isArray(data) || !data.every((g: Partial<Grant>) => g && typeof g.id === "string"
         && typeof g.origin === "string" && EXTENSION_ORIGIN.test(g.origin)
         && typeof g.hash === "string" && /^[a-f0-9]{64}$/u.test(g.hash)
-        && typeof g.createdAt === "number")) throw new Error("Invalid Overcode connections file.");
+        && typeof g.createdAt === "number")) throw new Error("Invalid AgentOnWeb connections file.");
       grants = data as Grant[];
     } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
     return new Authorization(directory, grants);

@@ -7,10 +7,10 @@ const style = document.createElement("style");
 style.textContent = styles;
 document.head.append(style);
 
-const container = document.getElementById("overcode-preview");
+const container = document.getElementById("agentonweb-preview");
 if (!container) throw new Error("Missing preview container");
 
-container.className = "overcode-root";
+container.className = "agentonweb-root";
 const shell = document.createElement("section");
 shell.className = "surface-shell";
 const frame = document.createElement("iframe");
@@ -25,7 +25,7 @@ let state: SurfaceViewState = {
 };
 const render = () => {
   container.dataset.mode = state.mode;
-  container.style.setProperty("--overcode-surface-opacity", String(state.opacity));
+  container.style.setProperty("--agentonweb-surface-opacity", String(state.opacity));
   dock.render(state);
 };
 dock.onMode = (mode) => {
@@ -37,7 +37,7 @@ dock.onOpacity = (opacity) => {
   render();
 };
 dock.onOpacityPreview = (opacity) => {
-  container.style.setProperty("--overcode-surface-opacity", String(opacity));
+  container.style.setProperty("--agentonweb-surface-opacity", String(opacity));
 };
 dock.setExpanded(true);
 shell.append(frame, dock.element);

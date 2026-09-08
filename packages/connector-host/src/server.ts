@@ -1,6 +1,6 @@
 import type { AddressInfo } from "node:net";
 import { WebSocketServer, WebSocket } from "ws";
-import { CONNECTOR_PORTS, PROTOCOL_VERSION, encodeFrame, parseClientFrame, type SurfaceAdapter, type ServerFrame } from "@overcode/connector-contract";
+import { CONNECTOR_PORTS, PROTOCOL_VERSION, encodeFrame, parseClientFrame, type SurfaceAdapter, type ServerFrame } from "@agentonweb/connector-contract";
 import { Authorization, AuthorizationError, EXTENSION_ORIGIN } from "./authorization.js";
 export { Authorization } from "./authorization.js";
 
@@ -12,7 +12,7 @@ export async function startConnector(adapter: SurfaceAdapter, authority: Authori
     try { return await listen(port, adapter, authority); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE") throw error; }
   }
-  throw new Error("All Overcode connector ports are busy. Close an unused runtime and retry.");
+  throw new Error("All AgentOnWeb connector ports are busy. Close an unused runtime and retry.");
 }
 
 async function listen(port: number, adapter: SurfaceAdapter, authority: Authorization): Promise<Connector> {

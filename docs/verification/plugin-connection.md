@@ -29,7 +29,7 @@ The content script never receives the installation credential, delegated cookie,
 ## Native surface behavior
 
 - DSH owns sessions, tools, approvals, models, commands, settings, and installed Web-profile plugins.
-- Overcode owns Focus, Chill, Watch, opacity, the collapsible dock, and double-Option website pass-through.
+- AgentOnWeb owns Focus, Chill, Watch, opacity, the collapsible dock, and double-Option website pass-through.
 - Closing the panel does not disconnect or recreate the iframe.
 - A small `native-view.json` bookmark restores DSH's selected session or subagent across website storage partitions. It stores no transcript, credential, or execution state.
 - Authorization controls are available only in a top-level native DSH window, never inside the embedded website iframe.

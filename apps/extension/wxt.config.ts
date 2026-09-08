@@ -6,7 +6,7 @@ const commands = {
       default: "Alt+Shift+O",
       mac: "MacCtrl+Shift+O",
     },
-    description: "Show or hide Overcode",
+    description: "Show or hide AgentOnWeb",
   },
   "mode-chill": {
     suggested_key: {
@@ -35,15 +35,15 @@ export default defineConfig({
   targetBrowsers: ["chrome", "firefox", "safari"],
   publicDir: "icons",
   manifest: ({ browser, manifestVersion }) => ({
-    name: "Overcode",
-    description: "Your coding agent, everywhere.",
+    name: "AgentOnWeb",
+    description: "Agent On Web. Bring your native coding agent onto any website. This edition: DSH On Web.",
     version: "0.1.0",
     ...(browser === "chrome" ? { minimum_chrome_version: "132" } : {}),
     icons: {
-      16: "overcode-16.png",
-      32: "overcode-32.png",
-      48: "overcode-48.png",
-      128: "overcode-128.png",
+      16: "agentonweb-16.png",
+      32: "agentonweb-32.png",
+      48: "agentonweb-48.png",
+      128: "agentonweb-128.png",
     },
     permissions: [
       "alarms",
@@ -57,14 +57,14 @@ export default defineConfig({
     commands,
     action: manifestVersion === 3
       ? {
-          default_title: "Show / hide Overcode",
-          default_icon: { 16: "overcode-16.png", 32: "overcode-32.png" },
+          default_title: "Show / hide AgentOnWeb",
+          default_icon: { 16: "agentonweb-16.png", 32: "agentonweb-32.png" },
         }
       : undefined,
     browser_action: manifestVersion === 2
       ? {
-          default_title: "Show / hide Overcode",
-          default_icon: { 16: "overcode-16.png", 32: "overcode-32.png" },
+          default_title: "Show / hide AgentOnWeb",
+          default_icon: { 16: "agentonweb-16.png", 32: "agentonweb-32.png" },
         }
       : undefined,
     background: browser === "safari" && manifestVersion === 2 ? { persistent: true } : undefined,

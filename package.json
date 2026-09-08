@@ -1,5 +1,6 @@
 {
-  "name": "overcode",
+  "name": "agentonweb",
+  "description": "Agent On Web: native coding agents on real websites. Current edition: DSH On Web.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,7 +18,7 @@
     "package:extension": "node scripts/package-extension.mjs",
     "preview": "node scripts/serve-preview.mjs",
     "release:audit": "pnpm check && node scripts/release-audit.mjs",
-    "test": "pnpm --filter @overcode/dsh-surface build && vitest run",
+    "test": "pnpm --filter @agentonweb/dsh-surface build && vitest run",
     "typecheck": "tsc -b --pretty false"
   },
   "devDependencies": {

@@ -17,7 +17,7 @@ describe("DeepSeek Harness surface client", () => {
           plugin = entry.factory();
         },
       },
-      location: { hash: "#overcode=frame-nonce" },
+      location: { hash: "#agentonweb=frame-nonce" },
       name: "",
       parent,
       addEventListener(type: string, listener: (event: any) => void) {
@@ -40,7 +40,7 @@ describe("DeepSeek Harness surface client", () => {
     listeners.get("keydown")?.({ key: "Alt", repeat: false });
     expect(parent.postMessage).toHaveBeenCalledOnce();
     expect(parent.postMessage).toHaveBeenCalledWith({
-      source: "overcode-surface",
+      source: "agentonweb-surface",
       type: "site-pass.option-tap",
       nonce: "frame-nonce",
     }, "*");
@@ -49,7 +49,7 @@ describe("DeepSeek Harness surface client", () => {
     expect(parent.postMessage).toHaveBeenCalledOnce();
     expect(listeners.has("keyup")).toBe(false);
 
-    const forgedMessage = { source: "overcode-extension", type: "opacity.set", nonce: "frame-nonce", opacity: 0.2 };
+    const forgedMessage = { source: "agentonweb-extension", type: "opacity.set", nonce: "frame-nonce", opacity: 0.2 };
     listeners.get("message")?.({ source: {}, data: forgedMessage });
     listeners.get("message")?.({ source: parent, data: { ...forgedMessage, nonce: "wrong-frame" } });
     expect(overrideTokens).toHaveBeenCalledOnce();
@@ -57,14 +57,14 @@ describe("DeepSeek Harness surface client", () => {
     listeners.get("message")?.({
       source: parent,
       data: {
-        source: "overcode-extension",
+        source: "agentonweb-extension",
         type: "opacity.set",
         nonce: "frame-nonce",
         opacity: 0.72,
       },
     });
     expect(disposeTheme).toHaveBeenCalledOnce();
-    expect(overrideTokens).toHaveBeenLastCalledWith("overcode-surface", expect.objectContaining({
+    expect(overrideTokens).toHaveBeenLastCalledWith("agentonweb-surface", expect.objectContaining({
       "--dsw-alias-bg-base": {
         light: "rgba(245, 247, 250, 0.72)",
         dark: "rgba(9, 12, 16, 0.72)",
@@ -99,10 +99,10 @@ describe("DeepSeek Harness surface client", () => {
     expect(require).toHaveBeenCalledWith("react");
     expect(register.mock.calls.map(([entry]) => entry.name)).toEqual(["shell.overlay", "settings.section"]);
     expect(register.mock.calls).toEqual([
-      [expect.objectContaining({ name: "shell.overlay", id: "overcode-authorization" }), expect.any(Function)],
-      [expect.objectContaining({ name: "settings.section", id: "overcode", label: "Overcode" }), expect.any(Function)],
+      [expect.objectContaining({ name: "shell.overlay", id: "agentonweb-authorization" }), expect.any(Function)],
+      [expect.objectContaining({ name: "settings.section", id: "agentonweb", label: "AgentOnWeb" }), expect.any(Function)],
     ]);
-    expect(fetch).toHaveBeenCalledWith("/api/overcode/connections", { cache: "no-store" });
+    expect(fetch).toHaveBeenCalledWith("/api/agentonweb/connections", { cache: "no-store" });
     expect(register.mock.calls.some(([entry]) => /session|conversation|tool/.test(entry.name))).toBe(false);
     for (const cleanup of cleanups) cleanup();
     expect(clearInterval).toHaveBeenCalledWith(1);
@@ -115,7 +115,7 @@ describe("DeepSeek Harness surface client", () => {
     expect(harness.fetch.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
     harness.select("another-session");
     await vi.waitFor(() => expect(harness.bookmark()).toEqual({ sessionId: "another-session" }));
-    expect(harness.fetch).toHaveBeenCalledWith("/api/overcode/native-view", expect.objectContaining({ keepalive: true }));
+    expect(harness.fetch).toHaveBeenCalledWith("/api/agentonweb/native-view", expect.objectContaining({ keepalive: true }));
     harness.stop();
     harness.fetch.mockClear(); harness.select("saved-session");
     expect(harness.fetch).not.toHaveBeenCalled();
@@ -167,7 +167,7 @@ async function nativeViewHarness(initialVisibility: DocumentVisibilityState = "v
   });
   const window = {
     __ModuleLoader__: { load(entry: { factory(): typeof plugin }) { plugin = entry.factory(); } },
-    location: { hash: "#overcode=frame-nonce" }, name: "", parent: { postMessage: vi.fn() },
+    location: { hash: "#agentonweb=frame-nonce" }, name: "", parent: { postMessage: vi.fn() },
     addEventListener: vi.fn(), removeEventListener: vi.fn(),
   };
   let visibilityState = initialVisibility;

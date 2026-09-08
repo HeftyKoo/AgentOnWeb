@@ -23,7 +23,7 @@ apps/extension/preview/preview.js.map
 .env.*
 !.env.example
 !.env.*.example
-.overcode/
+.agentonweb/
 .cache/
 .turbo/
 

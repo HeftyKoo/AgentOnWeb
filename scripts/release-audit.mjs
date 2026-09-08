@@ -22,29 +22,29 @@ if (pluginPackage.private !== false || pluginPackage.publishConfig?.access !== "
   throw new Error("The DSH plugin is not configured as a public npm package.");
 }
 if (pluginPackage.dsh?.bundle?.patch !== "./cordis.patch.yml") throw new Error("The DSH bundle patch is missing.");
-if (pluginPackage.overcode?.dsh !== contract.dsh || pluginPackage.overcode?.connectorProtocol !== contract.connectorProtocol) {
+if (pluginPackage.agentonweb?.dsh !== contract.dsh || pluginPackage.agentonweb?.connectorProtocol !== contract.connectorProtocol) {
   throw new Error("Plugin compatibility metadata differs from release-contract.json.");
 }
 if (protocol.PROTOCOL_VERSION !== contract.connectorProtocol) throw new Error("Connector protocol version differs from release-contract.json.");
 
 await rm(releaseDirectory, { recursive: true, force: true });
 await mkdir(releaseDirectory, { recursive: true });
-await execute("pnpm", ["--filter", "@overcode/dsh-surface", "pack", "--pack-destination", releaseDirectory], { cwd: root });
+await execute("pnpm", ["--filter", "@agentonweb/dsh-surface", "pack", "--pack-destination", releaseDirectory], { cwd: root });
 await execute("node", [resolve(root, "scripts/package-extension.mjs")], { cwd: root });
 const generatedManifest = await readJson(resolve(releaseDirectory, "extension-unpacked/manifest.json"));
 if (generatedManifest.version !== contract.version || generatedManifest.manifest_version !== 3) {
   throw new Error("The generated Chrome manifest differs from the release contract.");
 }
 
-const pluginArchive = resolve(releaseDirectory, `overcode-dsh-surface-${contract.version}.tgz`);
-const extensionArchive = resolve(releaseDirectory, `overcode-extension-${contract.version}.zip`);
-const temporary = await mkdtemp(resolve(tmpdir(), "overcode-release-audit-"));
+const pluginArchive = resolve(releaseDirectory, `agentonweb-dsh-surface-${contract.version}.tgz`);
+const extensionArchive = resolve(releaseDirectory, `agentonweb-extension-${contract.version}.zip`);
+const temporary = await mkdtemp(resolve(tmpdir(), "agentonweb-release-audit-"));
 try {
   const firstPluginDigest = createHash("sha256").update(await readFile(pluginArchive)).digest("hex");
   const firstExtensionDigest = createHash("sha256").update(await readFile(extensionArchive)).digest("hex");
   const reproductionDirectory = resolve(temporary, "reproduction");
   await mkdir(reproductionDirectory, { recursive: true });
-  await execute("pnpm", ["--filter", "@overcode/dsh-surface", "pack", "--pack-destination", reproductionDirectory], { cwd: root });
+  await execute("pnpm", ["--filter", "@agentonweb/dsh-surface", "pack", "--pack-destination", reproductionDirectory], { cwd: root });
   await execute("node", [resolve(root, "scripts/package-extension.mjs")], { cwd: root });
   const reproducedPlugin = resolve(reproductionDirectory, basename(pluginArchive));
   const reproducedPluginDigest = createHash("sha256").update(await readFile(reproducedPlugin)).digest("hex");
@@ -75,8 +75,8 @@ try {
     .filter((entry) => entry && !entry.endsWith("/"))
     .sort();
   const expectedZip = [
-    "background.js", "content-scripts/overcode.js", "manifest.json",
-    "overcode-16.png", "overcode-32.png", "overcode-48.png", "overcode-128.png",
+    "background.js", "content-scripts/agentonweb.js", "manifest.json",
+    "agentonweb-16.png", "agentonweb-32.png", "agentonweb-48.png", "agentonweb-128.png",
   ].sort();
   if (JSON.stringify(zipListing) !== JSON.stringify(expectedZip)) throw new Error(`Unexpected extension archive contents:\n${zipListing.join("\n")}`);
 } finally {

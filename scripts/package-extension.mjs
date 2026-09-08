@@ -10,7 +10,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const releaseDirectory = resolve(root, "release");
 const unpackedDirectory = resolve(releaseDirectory, "extension-unpacked");
 const extensionPackage = JSON.parse(await readFile(resolve(root, "apps/extension/package.json"), "utf8"));
-const archive = resolve(releaseDirectory, `overcode-extension-${extensionPackage.version}.zip`);
+const archive = resolve(releaseDirectory, `agentonweb-extension-${extensionPackage.version}.zip`);
 
 await mkdir(releaseDirectory, { recursive: true });
 await rm(archive, { force: true });

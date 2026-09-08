@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PROTOCOL_VERSION } from "@overcode/connector-contract";
+import { PROTOCOL_VERSION } from "@agentonweb/connector-contract";
 import { COOKIE_SCOPES_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, type StateUpdate, type SurfaceCommand } from "./shared.js";
 
 const transport = vi.hoisted(() => ({
@@ -53,7 +53,7 @@ async function boot() {
 async function message(type: string, sender = { id: "extension-test", frameId: 0, tab }) {
   const listener = chromeMock.runtime.onMessage.addListener.mock.calls[0]![0];
   return new Promise<any>((resolve) => {
-    if (!listener({ source: "overcode-content", type }, sender, resolve)) resolve(undefined);
+    if (!listener({ source: "agentonweb-content", type }, sender, resolve)) resolve(undefined);
   });
 }
 
@@ -72,7 +72,7 @@ describe("cross-browser native connection lifecycle", () => {
     const onClick = chromeMock.action.onClicked.addListener.mock.calls[0]![0];
     onClick(tab);
     await vi.waitFor(() => expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(tab.id, {
-      source: "overcode-background", type: "surface.toggle", state: expect.objectContaining({ mode: "focus" }),
+      source: "agentonweb-background", type: "surface.toggle", state: expect.objectContaining({ mode: "focus" }),
     }));
     expect(chromeMock.tabs.sendMessage).toHaveBeenCalledOnce();
     expect(transport.connect).not.toHaveBeenCalled();
@@ -87,7 +87,7 @@ describe("cross-browser native connection lifecycle", () => {
     const onCommand = chromeMock.commands.onCommand.addListener.mock.calls[0]![0];
     onCommand("mode-watch", otherTab);
     await vi.waitFor(() => expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(otherTab.id, {
-      source: "overcode-background", type: "surface.show", state: expect.objectContaining({ mode: "watch" }),
+      source: "agentonweb-background", type: "surface.show", state: expect.objectContaining({ mode: "watch" }),
     }));
     const commands = chromeMock.tabs.sendMessage.mock.calls.filter(([, message]) => message.type !== "state.update");
     expect(commands).toHaveLength(1);
@@ -163,10 +163,10 @@ describe("cross-browser native connection lifecycle", () => {
     data = { [STATE_STORAGE_KEY]: { runtimeId: runtime.id }, [CREDENTIAL_STORAGE_KEY]: { [runtime.id]: "saved-credential" } };
     transport.discover.mockResolvedValue([]);
     await boot(); await vi.waitFor(() => expect(transport.discover).toHaveBeenCalledOnce());
-    expect(chromeMock.alarms.create).toHaveBeenCalledWith("overcode-reconnect", { periodInMinutes: 0.5 });
+    expect(chromeMock.alarms.create).toHaveBeenCalledWith("agentonweb-reconnect", { periodInMinutes: 0.5 });
     const onAlarm = chromeMock.alarms.onAlarm.addListener.mock.calls[0]![0];
     transport.discover.mockResolvedValue([available]);
-    onAlarm({ name: "overcode-reconnect" });
+    onAlarm({ name: "agentonweb-reconnect" });
     await vi.waitFor(() => expect(transport.connect).toHaveBeenCalledWith(available.endpoint, "saved-credential"));
   });
 

@@ -1,8 +1,8 @@
 {
-  "name": "@overcode/dsh-surface",
+  "name": "@agentonweb/dsh-surface",
   "version": "0.1.0",
   "private": false,
-  "description": "Present DeepSeek Harness securely above any website through Overcode.",
+  "description": "DSH On Web: the native DeepSeek Harness integration for AgentOnWeb.",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
@@ -38,12 +38,12 @@
     "lib/client.js"
   ],
   "publishConfig": { "access": "public" },
-  "overcode": {
+  "agentonweb": {
     "dsh": "0.1.2-alpha.3",
     "connectorProtocol": 1
   },
   "devDependencies": {
-    "@overcode/connector-contract": "workspace:*",
-    "@overcode/connector-host": "workspace:*"
+    "@agentonweb/connector-contract": "workspace:*",
+    "@agentonweb/connector-host": "workspace:*"
   }
 }

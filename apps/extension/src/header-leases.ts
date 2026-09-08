@@ -1,4 +1,4 @@
-import type { NativeSurface } from "@overcode/connector-contract";
+import type { NativeSurface } from "@agentonweb/connector-contract";
 import { topLevelSite } from "./surface-cookie.js";
 
 const RULE_ID_BASE = 1_000_000;

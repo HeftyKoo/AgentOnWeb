@@ -14,4 +14,4 @@ await build({
   sourcemap: true,
   target: ["chrome132"],
 });
-console.log("Built Overcode UI preview");
+console.log("Built AgentOnWeb UI preview");

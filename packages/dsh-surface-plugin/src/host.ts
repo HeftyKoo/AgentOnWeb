@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { Authorization, startConnector } from "@overcode/connector-host";
-import type { NativeSurface, SurfaceAdapter } from "@overcode/connector-contract";
+import { Authorization, startConnector } from "@agentonweb/connector-host";
+import type { NativeSurface, SurfaceAdapter } from "@agentonweb/connector-contract";
 import { NativeViewState } from "./view-state.js";
 
 export const inject = ["webServer", "connection"];
@@ -17,8 +17,8 @@ interface DshContext {
 
 /** Uses DSH's existing Web process and auth contract; never spawns another agent. */
 export async function apply(ctx: DshContext): Promise<void> {
-  if (ctx.webServer.host !== "127.0.0.1") throw new Error("Overcode requires DSH's loopback-only Web server.");
-  const authority = await Authorization.open(join(homedir(), ".config", "overcode", "deepseek-harness"));
+  if (ctx.webServer.host !== "127.0.0.1") throw new Error("AgentOnWeb requires DSH's loopback-only Web server.");
+  const authority = await Authorization.open(join(homedir(), ".config", "agentonweb", "deepseek-harness"));
   const nativeView = await NativeViewState.open(authority.directory);
   const adapter: SurfaceAdapter = {
     runtime: { id: "deepseek-harness", displayName: "DeepSeek Harness", surfaceKind: "web", capabilities: { translucency: true, optionTap: true } },
@@ -37,13 +37,13 @@ export async function apply(ctx: DshContext): Promise<void> {
     },
   };
   const connector = await startConnector(adapter, authority);
-  ctx.effect(() => () => connector.close(), "overcode: runtime connector lifecycle");
+  ctx.effect(() => () => connector.close(), "agentonweb: runtime connector lifecycle");
 
   // Browsers partition iframe storage by website. Keep only DSH's native view
   // selection here so a different website can restore that view through DSH.
-  // This route stays inside native authentication; no bookmark enters Overcode's protocol.
+  // This route stays inside native authentication; no bookmark enters AgentOnWeb's protocol.
   ctx.connection.fetch.register({
-    path: "/api/overcode/native-view", methods: ["GET", "POST"],
+    path: "/api/agentonweb/native-view", methods: ["GET", "POST"],
     async fetch(request) {
       const headers = { "cache-control": "no-store" };
       if (request.method === "GET") return Response.json(nativeView.snapshot(), { headers });
@@ -56,7 +56,7 @@ export async function apply(ctx: DshContext): Promise<void> {
   // Registered below /api, so DSH enforces its native auth AND Host/Origin fence.
   // JSON + exact same-origin POST adds a CSRF guard; no CORS permission is granted.
   ctx.connection.fetch.register({
-    path: "/api/overcode/connections",
+    path: "/api/agentonweb/connections",
     methods: ["GET", "POST"],
     async fetch(request) {
       const headers = { "cache-control": "no-store" };

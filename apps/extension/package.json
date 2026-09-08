@@ -1,5 +1,5 @@
 {
-  "name": "@overcode/extension",
+  "name": "@agentonweb/extension",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
-    "@overcode/connector-contract": "workspace:*",
+    "@agentonweb/connector-contract": "workspace:*",
     "@phosphor-icons/core": "2.1.1"
   },
   "devDependencies": {

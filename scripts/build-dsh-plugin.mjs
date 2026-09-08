@@ -35,5 +35,5 @@ const clientBuild = await build({
 });
 const clientModule = clientBuild.outputFiles[0]?.text;
 if (!clientModule) throw new Error("DSH client build emitted no JavaScript.");
-const clientBundle = `window.__ModuleLoader__.load({\n  id: "@overcode/dsh-surface",\n  factory: (require) => {\n    const module = { exports: {} };\n    const exports = module.exports;\n${clientModule.split("\n").map((line) => `    ${line}`).join("\n")}\n    return module.exports;\n  }\n});\n`;
+const clientBundle = `window.__ModuleLoader__.load({\n  id: "@agentonweb/dsh-surface",\n  factory: (require) => {\n    const module = { exports: {} };\n    const exports = module.exports;\n${clientModule.split("\n").map((line) => `    ${line}`).join("\n")}\n    return module.exports;\n  }\n});\n`;
 await writeFile(resolve(outputDirectory, "client.js"), clientBundle);

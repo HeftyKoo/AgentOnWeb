@@ -1,4 +1,4 @@
-import type { NativeSurface, OvercodeMode } from "@overcode/connector-contract";
+import type { NativeSurface, AgentOnWebMode } from "@agentonweb/connector-contract";
 import { browser, type Browser } from "./browser-api.js";
 import { ConnectionCoordinator, type ConnectionView } from "./connection-coordinator.js";
 import { HeaderLeaseManager } from "./header-leases.js";
@@ -84,7 +84,7 @@ browser.tabs.onRemoved.addListener((id) => {
   if (targetBrowser === "safari") (sessionLeases as HeaderLeaseManager).removeTab(id);
 });
 browser.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "overcode-reconnect") initialized.then(() => coordinator.reconnectIfNeeded());
+  if (alarm.name === "agentonweb-reconnect") initialized.then(() => coordinator.reconnectIfNeeded());
 });
 
 async function initialize(): Promise<void> {
@@ -93,7 +93,7 @@ async function initialize(): Promise<void> {
   }
   const stored = await browser.storage.local.get([STATE_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, COOKIE_SCOPES_STORAGE_KEY]);
   leases.restore(stored[COOKIE_SCOPES_STORAGE_KEY]);
-  await browser.alarms.create("overcode-reconnect", { periodInMinutes: 0.5 });
+  await browser.alarms.create("agentonweb-reconnect", { periodInMinutes: 0.5 });
   const storedState = stored[STATE_STORAGE_KEY] as Partial<SurfaceViewState> | undefined;
   const saved: unknown = stored[CREDENTIAL_STORAGE_KEY];
   const credentials = saved && typeof saved === "object" && !Array.isArray(saved)
@@ -130,7 +130,7 @@ async function openApproval(url: string): Promise<void> {
   }
 }
 
-function setMode(mode: OvercodeMode): void {
+function setMode(mode: AgentOnWebMode): void {
   patch({ mode });
 }
 
@@ -138,9 +138,9 @@ async function presentInTab(tab: Browser.tabs.Tab | undefined, type: SurfaceComm
   const target = tab ?? (await browser.tabs.query({ active: true, lastFocusedWindow: true }))[0];
   if (target?.id === undefined || !target.url || !topLevelSite(target.url)) return;
   try {
-    await browser.tabs.sendMessage(target.id, { source: "overcode-background", type, state: await viewForTab(target) } satisfies SurfaceCommand);
+    await browser.tabs.sendMessage(target.id, { source: "agentonweb-background", type, state: await viewForTab(target) } satisfies SurfaceCommand);
   } catch {
-    // Restricted pages and tabs without a content script cannot host Overcode.
+    // Restricted pages and tabs without a content script cannot host AgentOnWeb.
   }
 }
 
@@ -179,7 +179,7 @@ async function broadcast(stateSnapshot: SurfaceViewState, surfaceSnapshot?: Nati
   await Promise.allSettled(tabs.map(async (tab) => {
     if (tab.id === undefined) return;
     await browser.tabs.sendMessage(tab.id, {
-      source: "overcode-background",
+      source: "agentonweb-background",
       type: "state.update",
       state: await viewForTab(tab, stateSnapshot, surfaceSnapshot),
     } satisfies StateUpdate);
@@ -196,7 +196,7 @@ async function viewForTab(
   if (surface !== surfaceSnapshot) return stateSnapshot;
   let frameName = frameNames.get(tab.id);
   if (!frameName) {
-    frameName = `overcode:${crypto.randomUUID()}`;
+    frameName = `agentonweb:${crypto.randomUUID()}`;
     frameNames.set(tab.id, frameName);
   }
   return { ...stateSnapshot, surface: {

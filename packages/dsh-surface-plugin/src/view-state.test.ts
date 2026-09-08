@@ -7,7 +7,7 @@ const directories: string[] = [];
 afterEach(async () => { await Promise.all(directories.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))); });
 describe("native DSH navigation bookmark", () => {
   it("retains only native selection across restart, including an explicitly empty view", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "overcode-native-view-")); directories.push(dir);
+    const dir = await mkdtemp(join(tmpdir(), "agentonweb-native-view-")); directories.push(dir);
     const view = await NativeViewState.open(dir);
     expect(view.snapshot()).toEqual({ selection: null });
     await view.set({ sessionId: "native-session", transcript: "never persist this", credential: "never persist this" });

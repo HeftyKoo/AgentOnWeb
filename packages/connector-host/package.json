@@ -1,10 +1,10 @@
 {
-  "name": "@overcode/connector-host",
+  "name": "@agentonweb/connector-host",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": "./src/server.ts",
   "scripts": { "build": "tsc -b", "typecheck": "tsc -b --pretty false" },
-  "dependencies": { "@overcode/connector-contract": "workspace:*", "ws": "^8.18.3" },
+  "dependencies": { "@agentonweb/connector-contract": "workspace:*", "ws": "^8.18.3" },
   "devDependencies": { "@types/ws": "^8.18.1" }
 }

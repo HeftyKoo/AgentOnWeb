@@ -7,7 +7,7 @@
 - source commit: [`dd6322d604e00eec1ba5e0c8541159906a21094a`](https://github.com/deepseek-ai/deepseek-harness/commit/dd6322d604e00eec1ba5e0c8541159906a21094a)
 - Node.js: 22.19.0 or newer
 
-Overcode targets this exact DSH preview. The repository contains no branches, adapters, or shims for another DSH release.
+AgentOnWeb targets this exact DSH preview. The repository contains no branches, adapters, or shims for another DSH release.
 
 ## Required DSH surfaces
 
@@ -23,11 +23,11 @@ Overcode targets this exact DSH preview. The repository contains no branches, ad
 The supported runtime must satisfy all of the following with the current source:
 
 1. The plugin builds and installs through the DSH Web-profile plugin manager.
-2. The generated profile activates `@overcode/dsh-surface` after the native Web bundle.
-3. One `dsh web` process owns both the Web listener and Overcode connector listener.
+2. The generated profile activates `@agentonweb/dsh-surface` after the native Web bundle.
+3. One `dsh web` process owns both the Web listener and AgentOnWeb connector listener.
 4. DSH's token-to-cookie exchange succeeds without exposing the launch token to the extension content script.
-5. Authenticated `GET /api/overcode/connections` and `GET /api/overcode/native-view` requests return successfully.
-6. The native workspace and Settings -> Overcode render without console errors.
+5. Authenticated `GET /api/agentonweb/connections` and `GET /api/agentonweb/native-view` requests return successfully.
+6. The native workspace and Settings -> AgentOnWeb render without console errors.
 7. `pnpm check`, isolated package archive inspection, extracted-package import, and `git diff --check` pass.
 
-This is the complete supported DSH host/client boundary for the initial Overcode release.
+This is the complete supported DSH host/client boundary for the initial AgentOnWeb release.

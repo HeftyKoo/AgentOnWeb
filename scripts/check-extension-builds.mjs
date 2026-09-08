@@ -12,11 +12,11 @@ const variants = {
 for (const [browser, expected] of Object.entries(variants)) {
   const manifest = JSON.parse(await readFile(resolve(output, expected.directory, "manifest.json"), "utf8"));
   const backgroundSource = await readFile(resolve(output, expected.directory, "background.js"), "utf8");
-  const contentSource = await readFile(resolve(output, expected.directory, "content-scripts/overcode.js"), "utf8");
+  const contentSource = await readFile(resolve(output, expected.directory, "content-scripts/agentonweb.js"), "utf8");
   if (manifest.manifest_version !== expected.manifestVersion) throw new Error(`${browser} manifest version is incorrect.`);
   const background = expected.manifestVersion === 3 ? manifest.background?.service_worker : manifest.background?.scripts?.[0];
   if (background !== "background.js") throw new Error(`${browser} background entry is incorrect.`);
-  if (manifest.content_scripts?.[0]?.js?.[0] !== "content-scripts/overcode.js") throw new Error(`${browser} content entry is incorrect.`);
+  if (manifest.content_scripts?.[0]?.js?.[0] !== "content-scripts/agentonweb.js") throw new Error(`${browser} content entry is incorrect.`);
   if (!manifest.commands?.["mode-chill"] || !manifest.commands?.["mode-focus"] || !manifest.commands?.["mode-watch"]) {
     throw new Error(`${browser} mode commands are incomplete.`);
   }
@@ -24,7 +24,7 @@ for (const [browser, expected] of Object.entries(variants)) {
     throw new Error("Safari toolbar command description is missing.");
   }
   for (const size of [16, 32, 48, 128]) {
-    if (manifest.icons?.[size] !== `overcode-${size}.png`) throw new Error(`${browser} icon ${size} is missing.`);
+    if (manifest.icons?.[size] !== `agentonweb-${size}.png`) throw new Error(`${browser} icon ${size} is missing.`);
   }
   const permissions = new Set(manifest.permissions ?? []);
   for (const permission of ["alarms", "cookies", "storage", "tabs"]) {
@@ -43,7 +43,7 @@ for (const [browser, expected] of Object.entries(variants)) {
   } else if (backgroundSource.includes("updateSessionRules")) {
     throw new Error(`${browser} unexpectedly bundled the Safari header lease.`);
   }
-  if (!contentSource.includes("overcode-extension-root")) throw new Error(`${browser} content surface was not bundled.`);
+  if (!contentSource.includes("agentonweb-extension-root")) throw new Error(`${browser} content surface was not bundled.`);
 }
 
 console.log("WXT browser manifests passed: Chrome MV3, Firefox MV2, Safari MV2.");
