@@ -33,20 +33,20 @@ The active V1 path deliberately has no AgentOnWeb API for sending prompts or tra
 Real website
   └─ closed AgentOnWeb Shadow DOM
        ├─ collapsible Pixel Seed icon controls
-       └─ full-screen DSH Web iframe
+       └─ extension-owned wrapper → native DSH Web iframe
             └─ native DSH UI + existing Web-profile plugins
 
 WXT browser background
   ├─ ConnectionCoordinator (connection state machine)
   ├─ Chrome/Firefox PartitionLeases (per-site cookie ownership)
-  ├─ Safari SessionLeases (tab-bound declarative header delivery)
+  ├─ Safari SessionLeases + local HttpOnly cookie / Storage Access
   └─ authenticated loopback connector protocol v1
        └─ AgentOnWeb DSH plugin, INSIDE the existing dsh web process
             ├─ native DSH authorization + Settings → AgentOnWeb
             └─ additive transparency and Option pass-through client
 ```
 
-The DSH plugin exchanges the runtime's launch token inside the local process and returns the clean surface URL plus its browser-session cookie only to the authenticated extension background. Chrome and Firefox install that HttpOnly cookie in a partition scoped to each top-level website. Safari, whose WebExtension cookies API does not expose the same partition key and whose blocking `webRequest` response is unsupported, installs a session-only `declarativeNetRequest` rule scoped to the mounted tab and exact localhost surface. Neither token nor signed cookie is sent to the content script, persisted by the Safari lease, or exposed to website JavaScript.
+The DSH plugin exchanges the runtime's launch token inside the local process and returns the clean surface URL plus its browser-session cookie only to the authenticated extension background. Chrome and Firefox install that HttpOnly cookie in a partition scoped to each top-level website. Safari uses a tab-scoped `declarativeNetRequest` rule for HTTP requests and a localhost-only HttpOnly cookie for WebSocket authentication, since Safari does not apply those header modifications to WebSocket handshakes. Safari asks the user to grant Storage Access for the local session on each website. The wrapper is an extension document, so HTTPS websites do not directly embed an insecure loopback frame. Neither token nor signed cookie is sent to content scripts or exposed to website JavaScript. Only cookie scope metadata is persisted by the Safari lease manager.
 
 Active packages:
 
@@ -102,7 +102,7 @@ Load the Chrome folder from `chrome://extensions`, the Firefox manifest from `ab
 4. Return to your website. Subsequent connections reuse the installation credential, including after a DSH restart. No pairing code, port, or API key is entered in the extension.
 5. Revoke a browser from **DSH Settings → AgentOnWeb → Revoke connection**. Reconnecting then requires fresh approval.
 
-For this development build the extension is unpacked and the DSH package is local; neither has been published to a store/registry. Chrome packaging remains the current audited release artifact; Firefox signing and Safari's containing-app/App Store packaging are separate distribution work. Already-installed DSH, Node, and DSH's normal credentials remain prerequisites. A browser extension cannot start a stopped DSH process by itself; that would require a separately installed native host, which is outside the current product boundary.
+The DSH plugin is available as `@agentonweb/dsh-surface@0.1.0`. Chrome and Firefox development builds load from the output folders above. The signed Safari containing app and App Store build instructions are in [apps/safari/README.md](apps/safari/README.md); an uploaded build is not yet an approved App Store release. Already-installed DSH, Node, and DSH's normal credentials remain prerequisites. A browser extension cannot start a stopped DSH process by itself; that would require a separately installed native host, which is outside the current product boundary.
 
 ## Modes and interaction
 
@@ -133,7 +133,7 @@ Browser extensions do not receive an API for replacing the browser's Touch Bar c
 - Initial authorization and revocation run through DSH's authenticated `/api` carrier, with its Host/Origin fence plus same-origin JSON POST validation. No wildcard CORS, auth bypass, or approval via DOM events.
 - Pending requests are bounded, expire after two minutes, and are cancelled on disconnect. Authorization controls are only rendered in a top-level native DSH window, not inside website frames.
 - DSH launch tokens are exchanged server-side and never reach the website.
-- Signed DSH cookies remain in extension memory plus Chrome/Firefox's HttpOnly partitioned cookie store; Safari's tab-bound declarative session rule is removed on tab close, surface change, or revocation and is never persisted.
+- Signed DSH cookies remain in extension memory and browser-managed HttpOnly storage. Safari also uses a localhost cookie with DSH's session expiry and per-site Storage Access; it removes that delegated cookie on revocation. Safari's tab-bound declarative rules are session-only and removed on tab close, surface change, or revocation.
 - Content scripts receive only presentation state, a clean local URL, and a per-tab frame nonce; no connector credential or DSH cookie crosses that boundary.
 - Tool approvals and plugin permissions stay inside the native DSH UI.
 
