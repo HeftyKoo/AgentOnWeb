@@ -2,7 +2,11 @@
   "name": "@agentonweb/dsh-surface",
   "version": "0.1.0",
   "private": false,
+  "license": "MIT",
   "description": "DSH On Web: the native DeepSeek Harness integration for AgentOnWeb.",
+  "repository": { "type": "git", "url": "git+https://github.com/HeftyKoo/AgentOnWeb.git" },
+  "bugs": { "url": "https://github.com/HeftyKoo/AgentOnWeb/issues" },
+  "homepage": "https://github.com/HeftyKoo/AgentOnWeb#readme",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"

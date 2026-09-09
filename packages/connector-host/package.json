@@ -2,6 +2,7 @@
   "name": "@agentonweb/connector-host",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "exports": "./src/server.ts",
   "scripts": { "build": "tsc -b", "typecheck": "tsc -b --pretty false" },
