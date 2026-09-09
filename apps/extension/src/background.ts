@@ -4,6 +4,7 @@ import { ConnectionCoordinator, type ConnectionView } from "./connection-coordin
 import { HeaderLeaseManager } from "./header-leases.js";
 import { DEFAULT_SURFACE_OPACITY, normalizeSurfaceOpacity } from "./interaction.js";
 import { PartitionLeaseManager } from "./partition-leases.js";
+import { SafariCookieLeaseManager } from "./safari-cookie-leases.js";
 import { COOKIE_SCOPES_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, isContentRequest, type ContentRequest, type StateUpdate, type SurfaceCommand, type SurfaceViewState } from "./shared.js";
 import { topLevelSite } from "./surface-cookie.js";
 
@@ -11,7 +12,14 @@ let state: SurfaceViewState = { mode: "watch", opacity: DEFAULT_SURFACE_OPACITY,
 let surface: NativeSurface | undefined;
 let publication: Promise<void> = Promise.resolve();
 const frameNames = new Map<number, string>();
+const safariSetupVisits = new Map<string, { returnTabId: number; visitTabId: number }>();
 const targetBrowser = import.meta.env.BROWSER ?? "chrome";
+const SAFARI_COOKIE_SCOPES = "agentonweb.safari-cookie-scopes";
+const safariCookies = new SafariCookieLeaseManager({
+  async set(details) { return Boolean(await browser.cookies.set(details)); },
+  async remove(details) { await browser.cookies.remove(details); },
+  async persist(scopes) { await browser.storage.local.set({ [SAFARI_COOKIE_SCOPES]: scopes }); },
+});
 
 const leases = new PartitionLeaseManager({
   async partition(tabId, pageUrl) {
@@ -43,23 +51,41 @@ const coordinator = new ConnectionCoordinator({
     changed(snapshot) {
       const previous = surface;
       surface = snapshot.surface;
-      if (surface !== previous) sessionLeases.invalidate();
+      if (surface !== previous) {
+        sessionLeases.invalidate();
+        if (targetBrowser === "safari") safariCookies.invalidate();
+      }
       applyConnectionView(snapshot.view);
     },
     async saveCredentials(credentials) {
       await browser.storage.local.set({ [CREDENTIAL_STORAGE_KEY]: credentials });
     },
     openApproval,
-    revokeDelegation(runtimeId) {
-      return sessionLeases.revoke(runtimeId);
+    async revokeDelegation(runtimeId) {
+      await sessionLeases.revoke(runtimeId);
+      if (targetBrowser === "safari") await safariCookies.revoke(runtimeId);
     },
   },
 });
 
 const initialized = initialize();
 browser.runtime.onMessage.addListener((message: unknown, sender, respond) => {
+  if (targetBrowser === "safari" && sender.id === browser.runtime.id
+    && message && typeof message === "object" && "source" in message && message.source === "agentonweb-safari-session") {
+    initialized.then(() => handleSafariSession(message, sender)).then(
+      (result) => respond({ ok: true, result }),
+      () => respond({ ok: false }),
+    );
+    return true;
+  }
   if (!isContentRequest(message) || sender.id !== browser.runtime.id || sender.frameId !== 0) return false;
-  initialized.then(() => handleRequest(message, sender.tab)).then(
+  const permission = targetBrowser === "safari" && message.type === "runtime.connect"
+    ? browser.permissions.contains({ origins: ["http://localhost/*", "http://127.0.0.1/*"] }) : Promise.resolve(true);
+  permission.then(async (allowed) => {
+    if (!allowed) throw new Error("Click the AgentOnWeb toolbar button and allow local workspace access, then connect again.");
+    await initialized;
+    return handleRequest(message, sender.tab);
+  }).then(
     (result) => respond({ ok: true, result }),
     (error: unknown) => {
       const text = error instanceof Error ? error.message : String(error);
@@ -78,7 +104,20 @@ browser.commands.onCommand.addListener((command, tab) => {
   });
 });
 const toolbarAction = browser.action ?? browser.browserAction;
-toolbarAction.onClicked.addListener((tab) => { initialized.then(() => presentInTab(tab, "surface.toggle")); });
+toolbarAction.onClicked.addListener((tab) => {
+  // Safari does not carry a content-script click through runtime.sendMessage.
+  // Its toolbar gesture is the supported place to request loopback access.
+  const permission = targetBrowser === "safari"
+    ? browser.permissions.request({ origins: ["http://localhost/*", "http://127.0.0.1/*"] }) : Promise.resolve(true);
+  permission.then(async (allowed) => {
+    await initialized;
+    if (!allowed) {
+      patch({ error: "Allow local workspace access from the AgentOnWeb toolbar to connect." });
+      return;
+    }
+    await presentInTab(tab, "surface.toggle");
+  }).catch((error: unknown) => patch({ error: error instanceof Error ? error.message : String(error) }));
+});
 browser.tabs.onRemoved.addListener((id) => {
   frameNames.delete(id);
   if (targetBrowser === "safari") (sessionLeases as HeaderLeaseManager).removeTab(id);
@@ -91,8 +130,9 @@ async function initialize(): Promise<void> {
   if (typeof browser.storage.local.setAccessLevel === "function") {
     await browser.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
   }
-  const stored = await browser.storage.local.get([STATE_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, COOKIE_SCOPES_STORAGE_KEY]);
+  const stored = await browser.storage.local.get([STATE_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, COOKIE_SCOPES_STORAGE_KEY, SAFARI_COOKIE_SCOPES]);
   leases.restore(stored[COOKIE_SCOPES_STORAGE_KEY]);
+  if (targetBrowser === "safari") safariCookies.restore(stored[SAFARI_COOKIE_SCOPES]);
   await browser.alarms.create("agentonweb-reconnect", { periodInMinutes: 0.5 });
   const storedState = stored[STATE_STORAGE_KEY] as Partial<SurfaceViewState> | undefined;
   const saved: unknown = stored[CREDENTIAL_STORAGE_KEY];
@@ -117,6 +157,38 @@ async function handleRequest(request: ContentRequest, tab?: Browser.tabs.Tab): P
     case "runtime.connect": await coordinator.connect(request.runtimeId); return { ok: true };
     case "runtime.approval": await coordinator.showApproval(); return { ok: true };
   }
+}
+
+async function handleSafariSession(message: object, sender: Browser.runtime.MessageSender): Promise<unknown> {
+  const request = message as { type?: unknown; nonce?: unknown };
+  if (typeof request.nonce !== "string" || !surface || sender.tab?.id === undefined || !sender.url) throw new Error("Invalid session.");
+  const url = new URL(sender.url);
+  const nativeUrl = new URL(surface.url);
+  if (url.origin !== nativeUrl.origin || url.pathname !== "/" || url.search) throw new Error("Invalid session origin.");
+  if (sender.frameId === 0) {
+    const visit = safariSetupVisits.get(request.nonce);
+    if (!visit || visit.visitTabId !== sender.tab.id
+      || new URLSearchParams(url.hash.slice(1)).get("agentonweb-safari-setup") !== request.nonce) throw new Error("Invalid setup visit.");
+    if (request.type === "session.is-visit") return true;
+    if (request.type === "session.return") {
+      safariSetupVisits.delete(request.nonce);
+      await browser.tabs.update(visit.returnTabId, { active: true });
+      return true;
+    }
+    throw new Error("Invalid setup request.");
+  }
+  if (frameNames.get(sender.tab.id) !== `agentonweb:${request.nonce}`
+    || new URLSearchParams(url.hash.slice(1)).get("agentonweb") !== request.nonce) throw new Error("Invalid frame.");
+  if (request.type === "session.prepare") return { nativeUrl: surface.url };
+  if (request.type === "session.visit") {
+    const visitUrl = new URL(surface.url);
+    visitUrl.hash = new URLSearchParams({ "agentonweb-safari-setup": request.nonce }).toString();
+    const tab = await browser.tabs.create({ url: visitUrl.href });
+    if (tab.id === undefined) throw new Error("Unable to open local workspace.");
+    safariSetupVisits.set(request.nonce, { returnTabId: sender.tab.id, visitTabId: tab.id });
+    return true;
+  }
+  throw new Error("Invalid session request.");
 }
 
 async function openApproval(url: string): Promise<void> {
@@ -192,6 +264,7 @@ async function viewForTab(
   surfaceSnapshot: NativeSurface | undefined = surface,
 ): Promise<SurfaceViewState> {
   if (!surfaceSnapshot || tab?.id === undefined || !tab.url || !topLevelSite(tab.url)) return stateSnapshot;
+  if (targetBrowser === "safari" && !await safariCookies.ensure(surfaceSnapshot, () => surface === surfaceSnapshot)) return stateSnapshot;
   if (!await sessionLeases.ensure(tab.id, tab.url, surfaceSnapshot, () => surface === surfaceSnapshot)) return stateSnapshot;
   if (surface !== surfaceSnapshot) return stateSnapshot;
   let frameName = frameNames.get(tab.id);

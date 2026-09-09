@@ -35,16 +35,19 @@ export interface SessionRuleUpdater {
 interface HeaderLease {
   readonly ruleId: number;
   readonly runtimeId: string;
+  readonly surface: NativeSurface;
+  ready: Promise<boolean>;
 }
 
 /**
  * Safari does not support blocking webRequest responses. Keep the delegated
- * cookie only inside a tab-scoped declarativeNetRequest session rule, so it is
- * neither persisted nor exposed to the content script or website JavaScript.
+ * HTTP cookie in a tab-scoped declarativeNetRequest session rule, so content
+ * scripts never receive it. SafariCookieLeaseManager separately owns the
+ * HttpOnly cookie required by Safari WebSocket handshakes.
  */
 export class HeaderLeaseManager {
   readonly #leases = new Map<number, HeaderLease>();
-  #updates: Promise<void> = Promise.resolve();
+  #updates: Promise<unknown> = Promise.resolve();
 
   constructor(readonly updater: SessionRuleUpdater) {}
 
@@ -56,7 +59,10 @@ export class HeaderLeaseManager {
     const surfaceOrigin = surfaceUrl.origin;
     if (surfaceOrigin !== `http://localhost:${surfaceUrl.port}`) return false;
 
-    const lease = { ruleId: ruleIdForTab(tabId), runtimeId: surface.runtimeId };
+    const existing = this.#leases.get(tabId);
+    if (existing?.surface === surface) return await existing.ready && isCurrent();
+    const lease: HeaderLease = { ruleId: ruleIdForTab(tabId), runtimeId: surface.runtimeId,
+      surface, ready: Promise.resolve(false) };
     this.#leases.set(tabId, lease);
     const rule: SessionRule = {
       id: lease.ruleId,
@@ -76,13 +82,25 @@ export class HeaderLeaseManager {
         tabIds: [tabId],
       },
     };
-    await this.#enqueue(() => this.updater.updateSessionRules({ removeRuleIds: [lease.ruleId], addRules: [rule] }));
-    if (this.#leases.get(tabId) !== lease || !isCurrent()) {
+    lease.ready = this.#enqueue(async () => {
+      if (this.#leases.get(tabId) !== lease || !isCurrent()) return false;
+      await this.updater.updateSessionRules({ removeRuleIds: [lease.ruleId], addRules: [rule] });
+      if (this.#leases.get(tabId) !== lease || !isCurrent()) {
+        // A newer lease replaces this rule, and revoke/removeTab already queues
+        // its removal. Never delete a successor's rule after it is installed.
+        if (this.#leases.get(tabId) === lease) {
+          this.#leases.delete(tabId);
+          await this.updater.updateSessionRules({ removeRuleIds: [lease.ruleId] });
+        }
+        return false;
+      }
+      return true;
+    });
+    try { return await lease.ready; }
+    catch (error) {
       if (this.#leases.get(tabId) === lease) this.#leases.delete(tabId);
-      await this.#remove([lease.ruleId]);
-      return false;
+      throw error;
     }
-    return true;
   }
 
   async revoke(runtimeId: string): Promise<void> {
@@ -108,16 +126,16 @@ export class HeaderLeaseManager {
     this.#remove([lease.ruleId]);
   }
 
-  idle(): Promise<void> {
+  idle(): Promise<unknown> {
     return this.#updates;
   }
 
   #remove(ruleIds: readonly number[]): Promise<void> {
-    if (ruleIds.length === 0) return this.#updates;
+    if (ruleIds.length === 0) return this.#updates.then(() => {});
     return this.#enqueue(() => this.updater.updateSessionRules({ removeRuleIds: ruleIds }));
   }
 
-  #enqueue(update: () => Promise<void>): Promise<void> {
+  #enqueue<T>(update: () => Promise<T>): Promise<T> {
     const next = this.#updates.catch(() => {}).then(update);
     this.#updates = next;
     return next;

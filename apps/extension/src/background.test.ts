@@ -30,6 +30,7 @@ function event() { return { addListener: vi.fn() }; }
 function createChrome() {
   return {
     runtime: { id: "extension-test", onMessage: event() },
+    permissions: { request: vi.fn(async () => true), contains: vi.fn(async () => true) },
     commands: { onCommand: event() }, action: { onClicked: event() },
     alarms: { create: vi.fn(async () => {}), onAlarm: event() },
     tabs: { query: vi.fn(async () => [tab]), sendMessage: vi.fn(async (_id: number, _message: StateUpdate | SurfaceCommand) => {}), onRemoved: event(),
@@ -41,7 +42,7 @@ function createChrome() {
     } },
     cookies: {
       getPartitionKey: vi.fn(async () => ({ partitionKey: { topLevelSite: "https://example.org" } })),
-      set: vi.fn(async () => ({ name: "native-session" })), remove: vi.fn(async () => ({})),
+      set: vi.fn(async (_details: unknown) => ({ name: "native-session" })), remove: vi.fn(async () => ({})),
     },
     declarativeNetRequest: { updateSessionRules: vi.fn(async (_update: { addRules?: unknown[]; removeRuleIds?: number[] }) => {}) },
   };
@@ -123,7 +124,7 @@ describe("cross-browser native connection lifecycle", () => {
     expect(chromeMock.cookies.set).toHaveBeenCalledWith(expect.objectContaining({ httpOnly: true, secure: true, partitionKey: { topLevelSite: "https://example.org" } }));
   });
 
-  it("uses a tab-bound declarative header lease for Safari instead of partition cookies", async () => {
+  it("uses a tab-bound HTTP lease and a local HttpOnly cookie for Safari WebSockets", async () => {
     vi.stubEnv("BROWSER", "safari");
     await boot();
     await message("runtime.connect");
@@ -131,7 +132,12 @@ describe("cross-browser native connection lifecycle", () => {
     await vi.waitFor(() => expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(tab.id, expect.objectContaining({
       state: expect.objectContaining({ surface: expect.objectContaining({ runtimeId: runtime.id }) }),
     })));
-    expect(chromeMock.cookies.set).not.toHaveBeenCalled();
+    expect(chromeMock.permissions.contains).toHaveBeenCalledOnce();
+    expect(chromeMock.permissions.request).not.toHaveBeenCalled();
+    expect(chromeMock.cookies.set).toHaveBeenCalledWith(expect.objectContaining({
+      url: nativeSurface.url, httpOnly: true, secure: false, sameSite: "no_restriction",
+    }));
+    expect(chromeMock.cookies.set.mock.calls[0]![0]).not.toHaveProperty("partitionKey");
     const update = chromeMock.declarativeNetRequest.updateSessionRules.mock.calls
       .map(([value]) => value)
       .find((value) => value.addRules?.length);
