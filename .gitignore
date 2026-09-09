@@ -40,6 +40,14 @@ yarn-error.log*
 # Extension packaging output and private keys
 *.crx
 *.pem
+*.p8
+*.p12
+*.pfx
+*.mobileprovision
+*.provisionprofile
+*.xcarchive/
+*.xcresult/
+*.pkg
 artifacts/
 release/
 
@@ -48,3 +56,12 @@ release/
 Thumbs.db
 .idea/
 .vscode/
+
+# Safari resources are synchronized from the audited WXT build.
+apps/safari/AgentOnWeb/AgentOnWeb Extension/Resources/
+**/*.xcodeproj/xcuserdata/
+**/*.xcworkspace/xcuserdata/
+
+# Private signing configuration and account-bound release identifiers.
+apps/safari/config/*.local.xcconfig
+docs/verification/local/

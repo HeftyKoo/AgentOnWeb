@@ -12,7 +12,8 @@
     "build:extension:firefox": "node scripts/build-extension.mjs --browser firefox",
     "build:extension:safari": "node scripts/build-extension.mjs --browser safari",
     "build:preview": "node scripts/build-preview.mjs",
-    "check": "pnpm check:architecture && pnpm typecheck && pnpm test && pnpm build && pnpm build:extension:firefox && pnpm build:extension:safari && node scripts/check-extension-builds.mjs && pnpm check:extension:safari-native",
+    "check": "pnpm check:privacy && pnpm check:architecture && pnpm typecheck && pnpm test && pnpm build && pnpm build:extension:firefox && pnpm build:extension:safari && node scripts/check-extension-builds.mjs && pnpm check:extension:safari-native",
+    "check:privacy": "node scripts/check-safari-privacy.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",
     "check:extension:safari-native": "node scripts/check-safari-native.mjs",
     "install:dsh-surface": "node scripts/install-dsh-surface.mjs",
@@ -20,7 +21,8 @@
     "preview": "node scripts/serve-preview.mjs",
     "release:audit": "pnpm check && node scripts/release-audit.mjs",
     "test": "pnpm --filter @agentonweb/dsh-surface build && vitest run",
-    "typecheck": "tsc -b --pretty false"
+    "typecheck": "tsc -b --pretty false",
+    "prepare:safari": "node scripts/prepare-safari.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.1.4",
