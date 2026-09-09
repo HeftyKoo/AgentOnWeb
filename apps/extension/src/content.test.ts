@@ -35,7 +35,7 @@ async function page(initial = idle, url = "https://example.org/", initialReply?:
   });
   let receive!: (message: StateUpdate | SurfaceCommand) => void;
   const sendMessage = vi.fn(async (_request: ContentRequest) => initialReply ?? { ok: true, result: initial });
-  Object.assign(window, { chrome: { runtime: { sendMessage, onMessage: { addListener(listener: typeof receive) { receive = listener; } } } } });
+  Object.assign(window, { chrome: { runtime: { getURL: (path: string) => `chrome-extension://test-extension${path}`, sendMessage, onMessage: { addListener(listener: typeof receive) { receive = listener; } } } } });
   window.eval(source);
   await Promise.resolve();
   const host = document.getElementById("agentonweb-extension-root")!;
@@ -50,6 +50,14 @@ async function page(initial = idle, url = "https://example.org/", initialReply?:
 }
 
 describe("page-local AgentOnWeb visibility", () => {
+  it("keeps the native workspace opaque when the website styles all divs", async () => {
+    const p = await page({ ...connected, mode: "focus" });
+    const style = p.window.document.createElement("style");
+    style.textContent = "div { opacity: 0.8; }";
+    p.window.document.head.append(style);
+    expect(p.window.getComputedStyle(p.host).opacity).toBe("1");
+  });
+
   it("does not replace an explicitly opened workspace with a delayed initial snapshot", async () => {
     let reply!: (response: { ok: boolean; result: SurfaceViewState }) => void;
     const initialReply = new Promise<{ ok: boolean; result: SurfaceViewState }>((resolve) => { reply = resolve; });
@@ -74,7 +82,8 @@ describe("page-local AgentOnWeb visibility", () => {
     const connectedPage = await page(connected);
     expect(connectedPage.host.hidden).toBe(false);
     expect(connectedPage.frame.hidden).toBe(false);
-    expect(connectedPage.frame.src).toContain("http://localhost:3080/#agentonweb=test-nonce");
+    expect(new URL(connectedPage.frame.src).hostname).toBe("test-extension");
+    expect(new URLSearchParams(new URL(connectedPage.frame.src).hash.slice(1)).get("url")).toBe("http://localhost:3080/");
   });
 
   it("waits for the native frame to load before posting presentation state", async () => {
@@ -85,6 +94,17 @@ describe("page-local AgentOnWeb visibility", () => {
     expect(postMessage).not.toHaveBeenCalled();
     p.frame.dispatchEvent(new p.window.Event("load"));
     expect(postMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it("hides the complete mounted frame in Watch while retaining its browsing context", async () => {
+    const p = await page(connected);
+    const src = p.frame.src;
+    p.emit("state.update", { ...connected, mode: "watch" });
+    expect(p.frame.hidden).toBe(true);
+    expect(p.frame.src).toBe(src);
+    p.emit("state.update", { ...connected, mode: "focus" });
+    expect(p.frame.hidden).toBe(false);
+    expect(p.frame.src).toBe(src);
   });
 
   it("closes only the setup while keeping the dock, and does not reopen during reconnect", async () => {
@@ -104,7 +124,7 @@ describe("page-local AgentOnWeb visibility", () => {
     expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["state.get"]);
     p.emit("surface.toggle", connected);
     expect(p.shadow.querySelector<HTMLElement>(".agentonweb-root")!.dataset.active).toBe("true");
-    expect(p.frame.src).toContain("http://localhost:3080/#agentonweb=test-nonce");
+    expect(p.frame.src).toContain("chrome-extension://test-extension/native-surface.html#");
   });
 
   it("toolbar hiding preserves a mounted workspace and keeps the dock", async () => {

@@ -26,6 +26,12 @@ for (const [browser, expected] of Object.entries(variants)) {
   for (const size of [16, 32, 48, 128]) {
     if (manifest.icons?.[size] !== `agentonweb-${size}.png`) throw new Error(`${browser} icon ${size} is missing.`);
   }
+  const surfaceHtml = await readFile(resolve(output, expected.directory, "native-surface.html"), "utf8");
+  if (!surfaceHtml.includes("<script")) throw new Error(`${browser} native workspace document is missing its entry.`);
+  const resources = manifest.web_accessible_resources ?? [];
+  if (!(expected.manifestVersion === 3 ? resources.some((entry) => entry.resources?.includes("native-surface.html"))
+    : resources.includes("native-surface.html"))) throw new Error(`${browser} native workspace document is inaccessible.`);
+  if (!contentSource.includes("/native-surface.html")) throw new Error(`${browser} does not use the shared workspace document.`);
   const permissions = new Set(manifest.permissions ?? []);
   for (const permission of ["alarms", "cookies", "storage", "tabs"]) {
     if (!permissions.has(permission)) throw new Error(`${browser} permission ${permission} is missing.`);
