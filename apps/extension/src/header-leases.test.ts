@@ -55,4 +55,36 @@ describe("Safari declarative header leases", () => {
     expect(await leases.ensure(7, "https://example.org/", surface, () => current)).toBe(false);
     expect(updateSessionRules).toHaveBeenLastCalledWith({ removeRuleIds: [1_000_007] });
   });
+
+  it("shares an in-flight rule between a mode broadcast and toolbar presentation", async () => {
+    const { leases, updateSessionRules } = setup();
+    let release!: () => void;
+    updateSessionRules.mockImplementationOnce(() => new Promise<void>((resolve) => { release = resolve; }));
+    const broadcast = leases.ensure(7, "https://example.org/", surface, () => true);
+    const presentation = leases.ensure(7, "https://example.org/", surface, () => true);
+    await vi.waitFor(() => expect(updateSessionRules).toHaveBeenCalledOnce());
+    release();
+    expect(await Promise.all([broadcast, presentation])).toEqual([true, true]);
+    expect(await leases.ensure(7, "https://example.org/", surface, () => true)).toBe(true);
+    expect(updateSessionRules).toHaveBeenCalledOnce();
+  });
+
+  it("does not remove a replacement rule after an obsolete install finishes", async () => {
+    const { leases, updateSessionRules } = setup();
+    let release!: () => void;
+    updateSessionRules.mockImplementationOnce(() => new Promise<void>((resolve) => { release = resolve; }));
+    const old = leases.ensure(7, "https://example.org/", surface, () => true);
+    await vi.waitFor(() => expect(updateSessionRules).toHaveBeenCalledOnce());
+    const replacement = { ...surface, cookie: { ...surface.cookie, value: "replacement" } };
+    const next = leases.ensure(7, "https://example.org/", replacement, () => true);
+    release();
+    expect(await Promise.all([old, next])).toEqual([false, true]);
+    expect(updateSessionRules).toHaveBeenCalledTimes(2);
+    expect(updateSessionRules).toHaveBeenLastCalledWith(expect.objectContaining({
+      addRules: [expect.objectContaining({ action: expect.objectContaining({
+        requestHeaders: [expect.objectContaining({ value: "native-session=replacement" })],
+      }) })],
+    }));
+  });
+
 });
