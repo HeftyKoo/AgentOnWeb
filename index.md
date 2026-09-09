@@ -29,7 +29,9 @@ The Safari extension does not include or start DSH, and does not include a model
 3. Start or restart DSH with `dsh web` and keep it running.
 4. Open the AgentOnWeb macOS app, then open Safari Settings → Extensions. Enable AgentOnWeb and allow access to the websites where you want to use it.
 5. Visit a normal HTTP or HTTPS website. Open AgentOnWeb from the toolbar or page dock, select **Connect**, and approve **Allow connection** in the native DSH window.
-6. Return to the website and choose Chill, Focus, or Watch from the dock.
+6. Allow AgentOnWeb access to `localhost` and `127.0.0.1` when Safari asks.
+7. Return to the website and choose Chill or Focus. If **Allow your local session** appears, choose **Open local workspace**, then **Continue to website**, then **Allow local session**. Accept Safari's local-session prompt for that website.
+8. Choose Chill, Focus, or Watch from the dock.
 
 You do not enter an API key into the browser extension. The first local connection requires your approval; later connections can reuse that authorization. Revoke it in DSH Settings → AgentOnWeb.
 
