@@ -11,6 +11,9 @@ if (!document.getElementById(HOST_ID)) {
   host.id = HOST_ID;
   host.hidden = true;
   host.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none;isolation:isolate;";
+  // Page selectors can style the shadow host (for example div { opacity: .8 }).
+  // Keep workspace opacity under AgentOnWeb's control, independent of the site.
+  host.style.setProperty("opacity", "1", "important");
   const shadow = host.attachShadow({ mode: "closed" });
   const style = document.createElement("style");
   style.textContent = styles;
@@ -127,17 +130,20 @@ if (!document.getElementById(HOST_ID)) {
       return;
     }
     const nextNonce = state.surface.frameName.replace(/^agentonweb:/u, "");
-    const nextSource = new URL(state.surface.url);
-    nextSource.hash = new URLSearchParams({ agentonweb: nextNonce }).toString();
+    const runtime = browser.runtime as typeof browser.runtime & { getURL(path: string): string };
+    const nextSource = new URL(runtime.getURL("/native-surface.html"));
+    nextSource.hash = new URLSearchParams({ url: state.surface.url, nonce: nextNonce, parent: location.origin }).toString();
     const sourceChanged = frame.src !== nextSource.href || frame.name !== state.surface.frameName;
-    surfaceOrigin = new URL(state.surface.url).origin;
+    surfaceOrigin = `${nextSource.protocol}//${nextSource.host}`;
     frameNonce = nextNonce;
     frame.title = state.surface.displayName;
     if (sourceChanged) {
       frame.name = state.surface.frameName;
       frame.src = nextSource.href;
     }
-    frame.hidden = false;
+    // Explicitly hide the frame in Watch. Safari can keep painting descendants
+    // of a cross-process extension frame when only CSS visibility is hidden.
+    frame.hidden = state.mode === "watch";
     // Before the navigation loads, contentWindow still has the website's
     // origin. Posting the localhost presentation target at that moment makes
     // the browser record a misleading origin-mismatch extension error.

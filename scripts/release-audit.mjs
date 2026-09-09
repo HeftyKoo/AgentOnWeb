@@ -104,7 +104,11 @@ try {
   const zipListing = (await execute("unzip", ["-Z1", extensionArchive])).stdout.trim().split("\n")
     .filter((entry) => entry && !entry.endsWith("/"))
     .sort();
+  const surfaceHtml = await readFile(resolve(root, "apps/extension/.output/chrome-mv3/native-surface.html"), "utf8");
+  const surfaceEntry = surfaceHtml.match(/src="\/(chunks\/native-surface-[a-zA-Z0-9_-]+\.js)"/u)?.[1];
+  if (!surfaceEntry) throw new Error("Native workspace document has no bundled entry.");
   const expectedZip = [
+    "native-surface.html", surfaceEntry,
     "background.js", "content-scripts/agentonweb.js", "manifest.json",
     "agentonweb-16.png", "agentonweb-32.png", "agentonweb-48.png", "agentonweb-128.png",
   ].sort();

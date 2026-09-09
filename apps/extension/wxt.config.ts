@@ -68,6 +68,9 @@ export default defineConfig({
         }
       : undefined,
     background: browser === "safari" && manifestVersion === 2 ? { persistent: true } : undefined,
+    web_accessible_resources: manifestVersion === 3
+      ? [{ resources: ["native-surface.html"], matches: ["http://*/*", "https://*/*"] }]
+      : ["native-surface.html"],
     browser_specific_settings: browser === "firefox"
       ? {
           gecko: {
