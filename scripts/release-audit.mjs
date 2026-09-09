@@ -89,6 +89,7 @@ try {
 
   const tarListing = (await execute("tar", ["-tf", pluginArchive])).stdout.trim().split("\n").sort();
   const expectedTar = [
+    "package/LICENSE",
     "package/cordis.patch.yml",
     "package/lib/client.js",
     "package/lib/host.js",
