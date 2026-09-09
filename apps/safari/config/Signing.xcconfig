@@ -1,0 +1,3 @@
+// GUI and CLI builds inherit the same optional, machine-local signing account.
+#include? "Signing.local.xcconfig"
+DEVELOPMENT_TEAM = $(AGENTONWEB_DEVELOPMENT_TEAM)

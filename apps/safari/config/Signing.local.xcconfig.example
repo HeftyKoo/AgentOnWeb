@@ -1,0 +1,2 @@
+// Copy to Signing.local.xcconfig and replace the placeholder locally.
+AGENTONWEB_DEVELOPMENT_TEAM = YOUR_TEAM_ID
