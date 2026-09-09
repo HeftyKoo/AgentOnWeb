@@ -3,6 +3,7 @@
   "description": "Agent On Web: native coding agents on real websites. Current edition: DSH On Web.",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@11.5.0",
   "scripts": {
