@@ -100,11 +100,11 @@ for (const sourceRoot of sourceRoots) {
 
 const contract = await readJson("release-contract.json");
 const expectedArtifacts = {
-  extension: `agentonweb-extension-${contract.version}.zip`,
-  dshPlugin: `agentonweb-dsh-surface-${contract.version}.tgz`,
+  extension: `agentonweb-extension-${contract.extensionVersion}.zip`,
+  dshPlugin: `agentonweb-dsh-surface-${contract.pluginVersion}.tgz`,
 };
 if (JSON.stringify(contract.artifacts) !== JSON.stringify(expectedArtifacts)) {
-  throw new Error("release-contract.json artifact names must be derived from its version.");
+  throw new Error("release-contract.json artifact names must be derived from their own release versions.");
 }
 
 console.log("Architecture contract passed: four packages, inward dependencies, no legacy seams.");
