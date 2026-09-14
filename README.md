@@ -26,13 +26,13 @@ See Chill, Focus, Watch, opacity adjustment, and website interaction during a re
 
 | Browser | Store installation |
 | --- | --- |
-| Chrome | Coming soon — Chrome Web Store link will be added after approval. |
-| Firefox | Coming soon — Firefox Add-ons link will be added after approval. |
+| Chrome | [Install from Chrome Web Store](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe) |
+| Firefox | [Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/agentonweb/) |
 | Safari | Coming soon — Mac App Store link will be added after approval. |
 
-<!-- Replace each placeholder with the verified public product URL when its store release is available. -->
+<!-- Replace the Safari placeholder with the verified public product URL when its store release is available. -->
 
-Public installation links will be added once each store release is available. To try AgentOnWeb from source now, follow [Development](#development).
+The Safari installation link will be added once the Mac App Store release is available. To try AgentOnWeb from source now, follow [Development](#development).
 
 ## Start using AgentOnWeb
 
