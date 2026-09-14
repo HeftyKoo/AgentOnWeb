@@ -38,13 +38,16 @@ async function normalizePackedDependencyOrder(archive) {
   throw new Error("Packed plugin manifest is missing.");
 }
 const contract = await readJson(resolve(root, "release-contract.json"));
-const rootPackage = await readJson(resolve(root, "package.json"));
 const extensionPackage = await readJson(resolve(root, "apps/extension/package.json"));
 const pluginPackage = await readJson(resolve(root, "packages/dsh-surface-plugin/package.json"));
 const protocol = await import(pathToFileURL(resolve(root, "packages/connector-contract/dist/index.js")));
 
-const versions = [rootPackage.version, extensionPackage.version, pluginPackage.version, contract.version];
-if (new Set(versions).size !== 1) throw new Error(`Release versions differ: ${versions.join(", ")}`);
+if (extensionPackage.version !== contract.extensionVersion) {
+  throw new Error(`Extension version ${extensionPackage.version} differs from release-contract.json extensionVersion ${contract.extensionVersion}.`);
+}
+if (pluginPackage.version !== contract.pluginVersion) {
+  throw new Error(`DSH plugin version ${pluginPackage.version} differs from release-contract.json pluginVersion ${contract.pluginVersion}.`);
+}
 if (pluginPackage.private !== false || pluginPackage.publishConfig?.access !== "public") {
   throw new Error("The DSH plugin is not configured as a public npm package.");
 }
@@ -59,12 +62,12 @@ await mkdir(releaseDirectory, { recursive: true });
 await execute("pnpm", ["--filter", "@agentonweb/dsh-surface", "pack", "--pack-destination", releaseDirectory], { cwd: root });
 await execute("node", [resolve(root, "scripts/package-extension.mjs")], { cwd: root });
 const generatedManifest = await readJson(resolve(releaseDirectory, "extension-unpacked/manifest.json"));
-if (generatedManifest.version !== contract.version || generatedManifest.manifest_version !== 3) {
+if (generatedManifest.version !== contract.extensionVersion || generatedManifest.manifest_version !== 3) {
   throw new Error("The generated Chrome manifest differs from the release contract.");
 }
 
-const pluginArchive = resolve(releaseDirectory, `agentonweb-dsh-surface-${contract.version}.tgz`);
-const extensionArchive = resolve(releaseDirectory, `agentonweb-extension-${contract.version}.zip`);
+const pluginArchive = resolve(releaseDirectory, `agentonweb-dsh-surface-${contract.pluginVersion}.tgz`);
+const extensionArchive = resolve(releaseDirectory, `agentonweb-extension-${contract.extensionVersion}.zip`);
 await normalizePackedDependencyOrder(pluginArchive);
 const temporary = await mkdtemp(resolve(tmpdir(), "agentonweb-release-audit-"));
 try {
@@ -127,4 +130,4 @@ for (const artifact of [pluginArchive, extensionArchive]) {
   hashes.push(`${digest}  ${basename(artifact)}`);
 }
 await writeFile(resolve(releaseDirectory, "SHA256SUMS"), `${hashes.join("\n")}\n`);
-console.log(`Release audit passed for ${contract.version}:\n${hashes.join("\n")}`);
+console.log(`Release audit passed for extension ${contract.extensionVersion} and DSH plugin ${contract.pluginVersion}:\n${hashes.join("\n")}`);

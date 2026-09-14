@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["ext-v*", "dsh-v*"]
 
 permissions:
   contents: write
@@ -22,17 +22,30 @@ jobs:
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
       - run: pnpm release:audit
-      - name: Verify tag version
-        run: |
-          expected="v$(node -p 'require("./release-contract.json").version')"
-          test "$GITHUB_REF_NAME" = "$expected"
+      - name: Verify extension tag version
+        if: startsWith(github.ref_name, 'ext-v')
+        run: test "$GITHUB_REF_NAME" = "ext-v$(node -p 'require("./release-contract.json").extensionVersion')"
+      - name: Verify DSH plugin tag version
+        if: startsWith(github.ref_name, 'dsh-v')
+        run: test "$GITHUB_REF_NAME" = "dsh-v$(node -p 'require("./release-contract.json").pluginVersion')"
       - name: Publish DSH plugin to npm
+        if: startsWith(github.ref_name, 'dsh-v')
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           test -n "$NODE_AUTH_TOKEN"
           pnpm --filter @agentonweb/dsh-surface publish --access public --no-git-checks
-      - name: Create GitHub release
+      - name: Create extension GitHub release
+        if: startsWith(github.ref_name, 'ext-v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" release/*.tgz release/*.zip release/SHA256SUMS --verify-tag --generate-notes
+        run: |
+          grep "agentonweb-extension-" release/SHA256SUMS > release/extension-SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" release/agentonweb-extension-*.zip release/extension-SHA256SUMS --verify-tag --generate-notes
+      - name: Create DSH plugin GitHub release
+        if: startsWith(github.ref_name, 'dsh-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          grep "agentonweb-dsh-surface-" release/SHA256SUMS > release/dsh-surface-SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" release/agentonweb-dsh-surface-*.tgz release/dsh-surface-SHA256SUMS --verify-tag --generate-notes
