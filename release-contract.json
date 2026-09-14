@@ -1,9 +1,9 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.1",
   "dsh": "0.1.2-alpha.3",
   "connectorProtocol": 1,
   "artifacts": {
-    "extension": "agentonweb-extension-0.1.0.zip",
-    "dshPlugin": "agentonweb-dsh-surface-0.1.0.tgz"
+    "extension": "agentonweb-extension-0.1.1.zip",
+    "dshPlugin": "agentonweb-dsh-surface-0.1.1.tgz"
   }
 }

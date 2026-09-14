@@ -42,7 +42,7 @@ npm install -g @deepseek-ai/dsh@0.1.2-alpha.3
 Install through DSH's plugin manager so the integration is enabled in your Web profile:
 
 ```sh
-dsh plugin --profile web add @agentonweb/dsh-surface@0.1.0
+dsh plugin --profile web add @agentonweb/dsh-surface@0.1.1
 dsh web
 ```
 
