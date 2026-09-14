@@ -18,3 +18,7 @@ export const browser = new Proxy({} as BrowserApi, {
 });
 
 export type { Browser };
+
+export function extensionURL(path: string): string {
+  return (browser.runtime as typeof browser.runtime & { getURL(path: string): string }).getURL(path);
+}
