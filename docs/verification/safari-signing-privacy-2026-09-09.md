@@ -9,6 +9,6 @@
 - Four regression tests passed, including quoted/conditional Xcode values, account URLs, private artifact paths, a sensitive staged copy hidden by a cleaned working tree, and a force-added local signing file.
 - `pnpm prepare:safari` and `git diff --check` passed.
 - Known account identifiers from local release notes had no matches in 23 locally reachable main-repository commits or the two locally available published support-page commits. This is a bounded local-history check, not a scan of every remote ref or published binary.
-- No new build was uploaded or submitted for this configuration-only change. The previously submitted build 4 remains the review artifact. No source changes were committed or pushed.
+- This was a configuration-only change with no build or upload activity. No source changes were committed or pushed.
 
 This check targets Apple release metadata and private signing files. It does not replace review of arbitrary new secrets. Signed distribution artifacts contain signing identity metadata and remain outside Git.
