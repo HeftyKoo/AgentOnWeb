@@ -24,6 +24,12 @@ AgentOnWeb 将你的编程工作区带到你当前打开的页面上。一边看
 
 演示包含 Chill、Focus、Watch、透明度调节，以及在真实编程会话中与网页交互的过程。
 
+## 安装与使用教程
+
+**[中文教程](https://www.youtube.com/watch?v=kyeRpiG3asg)** · **[English tutorial](https://www.youtube.com/watch?v=CIfW76WAcwA)**
+
+100 秒演示 DSH 准备、Chrome 商店安装、Connect 连接授权、生成第一个代码文件，以及 Chill、Focus、Watch 的使用方式。两条视频均附字幕和章节时间点。
+
 ## 获取扩展
 
 | 浏览器 | 商店安装 |
