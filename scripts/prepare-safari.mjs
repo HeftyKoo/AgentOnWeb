@@ -14,7 +14,7 @@ const projectText = await readFile(project, "utf8");
 await checkSafariPrivacy(root);
 await execute(process.execPath, [resolve(root, "scripts/build-safari-demo.mjs")], { cwd: root });
 const versions = [...projectText.matchAll(/MARKETING_VERSION = ([^;]+);/g)].map((match) => match[1]);
-if (versions.length !== 4 || versions.some((version) => version !== contract.version)) {
+if (versions.length !== 4 || versions.some((version) => version !== contract.extensionVersion)) {
   throw new Error("Safari target versions must match release-contract.json before packaging.");
 }
 const built = await buildExtension({ browser: "safari" });
@@ -22,7 +22,7 @@ const resources = resolve(root, "apps/safari/AgentOnWeb/AgentOnWeb Extension/Res
 await rm(resources, { recursive: true, force: true });
 await cp(built, resources, { recursive: true });
 const manifest = JSON.parse(await readFile(resolve(resources, "manifest.json"), "utf8"));
-if (manifest.version !== contract.version || manifest.manifest_version !== 2) {
+if (manifest.version !== contract.extensionVersion || manifest.manifest_version !== 2) {
   throw new Error("Unexpected Safari manifest version.");
 }
 
@@ -39,7 +39,7 @@ async function listFiles(directory) {
 }
 const files = await listFiles(resources);
 if (files.some((file) => file.endsWith(".map"))) throw new Error("Safari release must not contain source maps.");
-const archive = resolve(root, `release/safari/agentonweb-safari-extension-${contract.version}.zip`);
+const archive = resolve(root, `release/safari/agentonweb-safari-extension-${contract.extensionVersion}.zip`);
 await mkdir(resolve(root, "release/safari"), { recursive: true });
 await rm(archive, { force: true });
 await Promise.all(files.map((file) => utimes(file, new Date("2000-01-01T00:00:00Z"), new Date("2000-01-01T00:00:00Z"))));
