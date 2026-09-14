@@ -1,153 +1,132 @@
 # AgentOnWeb
 
-**Agent On Web. Your native agent, on the page you're using.**
+**Your native coding agent, on the website you're using.**
 
-AgentOnWeb brings native coding agents onto real websites. The current edition is **DSH On Web**: a WXT browser extension for Chrome, Firefox, and Safari that presents the complete DeepSeek Harness Web workspace above the page you're using. Watch a video, write code in Chill, double-tap Option/Alt to interact with the page, then return to the same conversation.
+AgentOnWeb brings your coding workspace onto the page you already have open. Watch a video, browse documentation, or keep a website in view while working with your agent—then switch back to the page without leaving your conversation.
 
-DSH On Web keeps the native agent experience intact. AgentOnWeb does not rebuild the agent UI or manage Harness sessions, tools, approvals, models, commands, or plugins. Those remain owned by DSH, so existing habits and Web-profile plugins continue to work in their native surface. Other agent runtimes are a future integration direction, not a feature of this edition.
+The current edition, **DSH On Web**, brings the complete **DeepSeek Harness (DSH)** workspace into Chrome, Firefox, and Safari. Your conversations, tools, approvals, models, and DSH plugins remain available in their familiar interface. This release supports DSH only.
 
-The website also remains the real website: AgentOnWeb does not proxy, scrape, clone, or reimplement its login, cookies, playback, DRM, history, recommendations, or controls.
+| Mode | What it does |
+| --- | --- |
+| **Chill** | Work in a translucent workspace with the website visible behind it. Adjust opacity to suit the page. |
+| **Focus** | Give the same workspace an opaque background for focused coding. |
+| **Watch** | Hide the workspace and use the website normally, with a small dock ready to bring your agent back. |
 
-## Product boundary
+Switching modes keeps your session running. In Chill, double-tap **Option / Alt** to interact with the website; double-tap again to return to DSH.
 
-AgentOnWeb owns only:
+## Watch the demo
 
-- injection above normal HTTP(S) pages
-- Focus, Chill, and Watch presentation
-- transparency and one-gesture website pass-through
-- authenticated connection to a local runtime's AgentOnWeb plugin
-- secure delivery of the native Web surface (the runtime owns its process lifecycle)
+[![Watch the AgentOnWeb demo on YouTube](https://img.youtube.com/vi/s083RpD38HU/hqdefault.jpg)](https://www.youtube.com/watch?v=s083RpD38HU)
 
-DeepSeek Harness owns:
+**[English demo](https://www.youtube.com/watch?v=s083RpD38HU)** · **[中文演示](https://www.youtube.com/watch?v=DV8s9z-w4GE)**
 
-- its complete Web UI and navigation
-- session creation, history, resume, and cancellation
-- workspaces, models, agent presets, commands, and settings
-- tool rendering, approvals, plugins, and agent behavior
+See Chill, Focus, Watch, opacity adjustment, and website interaction during a real coding session.
 
-The active V1 path deliberately has no AgentOnWeb API for sending prompts or translating agent events.
+## Get the extension
 
-## Architecture
+| Browser | Store installation |
+| --- | --- |
+| Chrome | Coming soon — Chrome Web Store link will be added after approval. |
+| Firefox | Coming soon — Firefox Add-ons link will be added after approval. |
+| Safari | Coming soon — Mac App Store link will be added after approval. |
 
-```text
-Real website
-  └─ closed AgentOnWeb Shadow DOM
-       ├─ collapsible Pixel Seed icon controls
-       └─ extension-owned wrapper → native DSH Web iframe
-            └─ native DSH UI + existing Web-profile plugins
+<!-- Replace each placeholder with the verified public product URL when its store release is available. -->
 
-WXT browser background
-  ├─ ConnectionCoordinator (connection state machine)
-  ├─ Chrome/Firefox PartitionLeases (per-site cookie ownership)
-  ├─ Safari SessionLeases + local HttpOnly cookie / Storage Access
-  └─ authenticated loopback connector protocol v1
-       └─ AgentOnWeb DSH plugin, INSIDE the existing dsh web process
-            ├─ native DSH authorization + Settings → AgentOnWeb
-            └─ additive transparency and Option pass-through client
-```
+Public installation links will be added once each store release is available. To try AgentOnWeb from source now, follow [Development](#development).
 
-The DSH plugin exchanges the runtime's launch token inside the local process and returns the clean surface URL plus its browser-session cookie only to the authenticated extension background. Chrome and Firefox install that HttpOnly cookie in a partition scoped to each top-level website. Safari uses a tab-scoped `declarativeNetRequest` rule for HTTP requests and a localhost-only HttpOnly cookie for WebSocket authentication, since Safari does not apply those header modifications to WebSocket handshakes. Safari asks the user to grant Storage Access for the local session on each website. The wrapper is an extension document, so HTTPS websites do not directly embed an insecure loopback frame. Neither token nor signed cookie is sent to content scripts or exposed to website JavaScript. Only cookie scope metadata is persisted by the Safari lease manager.
+## Start using AgentOnWeb
 
-Active packages:
+### 1. Set up DSH
 
-- `apps/extension`: WXT Chrome MV3 plus Firefox/Safari MV2 builds, native-surface host, mode dock, and presentation CSS
-- `packages/connector-host`: runtime-independent discovery, expiring approval requests, credentials, revocation, and transport; no executable or agent supervisor
-- `packages/dsh-surface-plugin`: native DSH host Adapter, authorization/settings contribution, transparency, and Alt pass-through
-- `packages/connector-contract`: native-surface Interface, runtime codecs, current wire contract, and capability declarations
+You need **Node.js 22.19+**, **DeepSeek Harness 0.1.2-alpha.3**, and your own model-provider credentials configured in DSH. The browser extension connects to DSH running on your computer.
 
-Dependencies point inward: the extension and connector host depend on the contract; the DSH package composes the host only at build time. The WXT background is a browser composition root rather than the owner of connection or session-lifecycle rules. `pnpm check:architecture` enforces these package names, dependency edges, and source boundaries.
-
-Future runtimes implement `SurfaceAdapter`: a runtime descriptor, native authorization URL, and `getSurface()`. Native session management and tools never move into AgentOnWeb. Codex/Claude Code would each need their own native-surface Adapter (for example, an authenticated browser terminal for a CLI); they are not implemented or routed through DSH. A protocol version/capability change is required if a future surface cannot satisfy the existing Web contract.
-
-## Requirements
-
-- Node.js 22.19 or newer
-- pnpm 11.5 for this workspace
-- Chrome 132 or newer, Firefox with temporary add-on loading, or Safari 18.4 or newer with its developer features enabled
-- DeepSeek Harness `dsh-v0.1.2-alpha.3` (`@deepseek-ai/dsh@0.1.2-alpha.3`)
-- `DEEPSEEK_API_KEY` available to the `dsh` process
-
-The local `dsh` wrapper installed for this project reads `DEEPSEEK_API_KEY` from `~/.hermes/.env` at process start without copying the key into AgentOnWeb.
-
-## Develop and run
+If DSH is not installed yet:
 
 ```sh
-pnpm install
-pnpm install:dsh-surface
-pnpm check
+npm install -g @deepseek-ai/dsh@0.1.2-alpha.3
+```
+
+Configure your provider credentials in DSH, such as `DEEPSEEK_API_KEY`, then install the AgentOnWeb integration and start the workspace:
+
+```sh
+dsh plugin --profile web add @agentonweb/dsh-surface@0.1.0
 dsh web
 ```
 
-The install command adds the bundled plugin to DSH's Web profile using DSH's own plugin manager. Its `dsh.bundle` declaration activates the additive patch automatically: no manual configuration, extra `--patch`, or separately launched companion process.
+Keep `dsh web` running while using the extension. If DSH was already running when you installed the plugin, restart it. Model credentials stay in DSH; you do not enter an API key in the extension.
 
-Build all three browser targets:
+### 2. Connect your browser
+
+1. Install and enable the browser extension, then open a normal website.
+2. Click **Connect** in the AgentOnWeb panel. If the panel is hidden, click the extension's toolbar icon or the dock in the lower-right corner.
+3. In the DSH page that opens, click **Allow connection**.
+4. Return to your website and start working in the DSH workspace.
+
+Safari may also ask you to allow website access and local-session storage access. Follow those browser prompts to finish connecting.
+
+Once approved, the browser reconnects automatically while DSH is running. You can remove its access from **DSH Settings → AgentOnWeb → Revoke connection**.
+
+### 3. Choose how you work
+
+Use the lower-right dock to choose **Chill**, **Focus**, or **Watch**. Chill opens by default and includes an opacity slider. Close the panel or use the toolbar icon to hide it; the dock remains available to reopen it.
+
+| Action | macOS | Windows / Linux |
+| --- | --- | --- |
+| Show or hide AgentOnWeb | `Control+Shift+O` | `Alt+Shift+O` |
+| Chill / Focus / Watch | `Control+Shift+1 / 2 / 3` | `Alt+Shift+1 / 2 / 3` |
+| Switch interaction between DSH and the website in Chill | Double-tap `Option` | Double-tap `Alt` |
+
+Shortcut availability depends on the browser and existing key bindings. You can adjust them in your browser's extension-shortcut settings. AgentOnWeb works on normal HTTP(S) websites; protected browser pages such as extension settings cannot host the workspace.
+
+## Development
+
+### Set up the workspace
+
+Use **Node.js 22.19+** and **pnpm 11.5.0**, with DSH installed and configured as described above.
 
 ```sh
-pnpm build:extension
-pnpm build:extension:firefox
-pnpm build:extension:safari
+git clone https://github.com/HeftyKoo/AgentOnWeb.git
+cd AgentOnWeb
+pnpm install
+pnpm install:dsh-surface
+dsh web
 ```
 
-The unpacked outputs are:
+`pnpm install:dsh-surface` builds and installs the local integration into DSH's Web profile. Restart `dsh web` after updating the plugin.
 
-- Chrome: `apps/extension/.output/chrome-mv3`
-- Firefox: `apps/extension/.output/firefox-mv2`
-- Safari: `apps/extension/.output/safari-mv2`
+### Build and load the extension
 
-Load the Chrome folder from `chrome://extensions`, the Firefox manifest from `about:debugging#/runtime/this-firefox`, or the Safari folder with Safari's **Add Temporary Extension** developer command.
+In another terminal, run the build for your browser:
 
-1. Start DSH normally with `dsh web`; keep that process running. DSH opens its own authenticated native page.
-2. On a normal HTTP(S) website, AgentOnWeb opens its connection panel by default. Click **Connect** when you need it.
-3. AgentOnWeb discovers local runtime plugins and opens the native workspace. Click **Allow connection** in DSH. The request expires after two minutes; **Decline** grants no access.
-4. Return to your website. Subsequent connections reuse the installation credential, including after a DSH restart. No pairing code, port, or API key is entered in the extension.
-5. Revoke a browser from **DSH Settings → AgentOnWeb → Revoke connection**. Reconnecting then requires fresh approval.
+| Browser | Build command | Output folder |
+| --- | --- | --- |
+| Chrome 132+ | `pnpm build:extension` | `apps/extension/.output/chrome-mv3` |
+| Firefox 140+ | `pnpm build:extension:firefox` | `apps/extension/.output/firefox-mv2` |
+| Safari 18.4+ | `pnpm build:extension:safari` | `apps/extension/.output/safari-mv2` |
 
-The DSH plugin is available as `@agentonweb/dsh-surface@0.1.0`. Chrome and Firefox development builds load from the output folders above. The signed Safari containing app and App Store build instructions are in [apps/safari/README.md](apps/safari/README.md); an uploaded build is not yet an approved App Store release. Already-installed DSH, Node, and DSH's normal credentials remain prerequisites. A browser extension cannot start a stopped DSH process by itself; that would require a separately installed native host, which is outside the current product boundary.
+- **Chrome:** Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the output folder.
+- **Firefox:** Open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on**, and select `manifest.json` from the output folder.
+- **Safari:** Enable Safari's developer features and use **Add Temporary Extension** with the output folder. For the signed macOS app, see the [Safari build guide](apps/safari/README.md).
 
-## Modes and interaction
+Then follow [Connect your browser](#2-connect-your-browser) on a normal website.
 
-- AgentOnWeb is **open by default** on each normal fresh page. When disconnected, it shows the connection panel together with the collapsed 32 px AgentOnWeb dock in the lower-right corner.
-- Close or **Esc** dismisses the connection panel/workspace but keeps that lower-right dock available. Background reconnects preserve the dismissed state and do not take page focus.
-- Expand the lower-right dock and choose **Chill**, **Focus**, or **Watch** to reopen AgentOnWeb. While disconnected, every mode opens the same connection panel; the selected mode takes effect after a native surface is available.
-- Click the **AgentOnWeb toolbar icon** or press `Control+Shift+O` on macOS (`Alt+Shift+O` elsewhere) to toggle the connection panel/workspace on the current tab. The lower-right dock remains the consistent in-page entry point. Each browser exposes its own extension-shortcut settings.
-- Dismissing is independent of connection and mode: it keeps an already-mounted workspace and its native tasks alive. Reopening restores the selected mode. A workspace discovered while dismissed waits for an explicit toolbar or mode action before loading into that page.
-- **Chill** is the default mode when opened and remains full-screen. DSH's native layers become highly translucent so the website stays visible behind the coding workspace.
-- **Focus** keeps the same native DSH surface but places it over an opaque background.
-- **Watch** keeps DSH running and mounted while hiding it, leaving the website fully interactive and a small mode dock in the lower-right corner.
-- The presentation controls collapse to a single 32 px AgentOnWeb mark. Click the mark to reveal the three icon-only mode controls and Chill opacity slider.
-- Switch directly to **Chill**, **Focus**, or **Watch** with `Control+Shift+1`, `Control+Shift+2`, or `Control+Shift+3` on macOS. These shortcuts also reveal AgentOnWeb on the current tab; while disconnected, they reveal the connection panel. Other platforms request `Alt+Shift+1`, `Alt+Shift+2`, and `Alt+Shift+3`. Chrome may remap conflicts at `chrome://extensions/shortcuts`.
-- Double-tap **Option/Alt** in Chill to latch website click-through. Double-tap it again to return interaction to DSH. This gesture is separate from the three display-mode shortcuts.
-- Chill opacity is adjustable from 20–90% in the expanded icon controls and persists across tabs and browser restarts. Focus always remains opaque; Watch remains hidden.
+### Validate changes
 
-Mode changes are presentation-only. They do not recreate a DSH process or agent session.
+```sh
+pnpm check
+```
 
-Browsers isolate the native iframe's local storage for each website. The DSH plugin therefore retains a small native-view bookmark and restores it through DSH's own `sessions.open`/`openSubagent` selection Interface when entering another website or returning to a tab. It does not create sessions, send prompts, cache transcripts, or move session IDs into the extension protocol. The standalone native DSH tab keeps its own selection behavior.
+This runs the repository checks, typechecking, tests, and browser builds. Verify interaction changes with the real extension and a running DSH workspace.
 
-Browser extensions do not receive an API for replacing the browser's Touch Bar controls. The on-screen opacity slider therefore provides the complete supported interaction. A true Touch Bar slider would require a separately focused native AppKit companion and would disappear when the browser regains focus, which does not fit AgentOnWeb's in-browser workflow.
-
-## Security boundary
-
-- The plugin binds only to `127.0.0.1`, in the fixed discovery range 3847–3850; there is no arbitrary network scan. The DSH host must also be loopback-only.
-- Discovery reveals only runtime identity and its clean local authorization URL; no session, cookie, launch token, or API key.
-- Each connection needs a random installation credential bound to its exact `chrome-extension://…`, `moz-extension://…`, or `safari-web-extension://…` origin. Only hashes are stored on disk, in a mode-0600 file.
-- Initial authorization and revocation run through DSH's authenticated `/api` carrier, with its Host/Origin fence plus same-origin JSON POST validation. No wildcard CORS, auth bypass, or approval via DOM events.
-- Pending requests are bounded, expire after two minutes, and are cancelled on disconnect. Authorization controls are only rendered in a top-level native DSH window, not inside website frames.
-- DSH launch tokens are exchanged server-side and never reach the website.
-- Signed DSH cookies remain in extension memory and browser-managed HttpOnly storage. Safari also uses a localhost cookie with DSH's session expiry and per-site Storage Access; it removes that delegated cookie on revocation. Safari's tab-bound declarative rules are session-only and removed on tab close, surface change, or revocation.
-- Content scripts receive only presentation state, a clean local URL, and a per-tab frame nonce; no connector credential or DSH cookie crosses that boundary.
-- Tool approvals and plugin permissions stay inside the native DSH UI.
-
-Connection hashes are stored under `~/.config/agentonweb/deepseek-harness/connections.json`. Revocation closes connector sockets and causes the extension to drop its delegated cookies and iframe. DSH's native cookies are signed bearer sessions: a separately copied cookie remains governed by DSH's session lifetime; AgentOnWeb does not claim to revoke DSH's signing authority or unrelated native browser logins.
-
-The DSH-only navigation bookmark is stored alongside it in `native-view.json` (mode 0600). Its authenticated native endpoint stores only a selected session ID and, where needed, DSH's subagent navigation address. Unknown/deleted sessions are not recreated, and a selection made by the user while restoration is pending takes precedence.
-
-## Verification
-
-`pnpm check` runs typechecking, tests, and all builds. For a lightweight presentation preview:
+For a lightweight presentation preview:
 
 ```sh
 pnpm build:preview
 pnpm preview
 ```
 
-The real acceptance surface is the unpacked extension on a normal website with the normal DSH Web process running. See `docs/verification/plugin-connection.md` for the current connection contract and `docs/verification/dsh-alpha3-baseline.md` for the supported DSH boundary.
+See the [release guide](docs/releasing.md) for packaging and publishing.
+
+## Links
+
+[Report an issue](https://github.com/HeftyKoo/AgentOnWeb/issues) · [Privacy policy](https://heftykoo.github.io/AgentOnWeb/privacy.html)

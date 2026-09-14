@@ -1,11 +1,11 @@
 # AgentOnWeb Safari release
 
-The containing app is a macOS-only Safari Web Extension, built with Xcode. It gives users installation instructions and opens Safari's native extension settings. It does not bundle or start a DSH process.
+The containing app is a macOS-only Safari Web Extension, built with Xcode. It gives users installation instructions, opens Safari's native extension settings, and includes a populated offline interactive demo. It does not bundle or start a DSH process.
 
 - App Store Connect app ID: recorded in the gitignored `docs/verification/local/` notes and intentionally not published
 - App bundle ID: `dev.agentonweb.extension`
 - Extension bundle ID: `dev.agentonweb.extension.safari`
-- Version: `0.1.0`, build `4`
+- Version: `0.1.0`, build `5`
 - Minimum: macOS 15.4 and Safari 18.4
 - Architectures: Apple Silicon and Intel
 
@@ -50,7 +50,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
 
 ## Store materials
 
-- Public support: https://heftykoo.github.io/AgentOnWeb/
+- Public support: https://heftykoo.github.io/AgentOnWeb/support.html
 - Privacy policy: https://heftykoo.github.io/AgentOnWeb/privacy.html
 - Page source: `docs/store-site/`, deployed on the `gh-pages` branch.
 - Containing-app icon source and generation prompt: `assets/`.
