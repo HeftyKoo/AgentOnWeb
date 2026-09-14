@@ -19,7 +19,7 @@ frame.title = "DeepSeek Harness native surface preview";
 frame.src = new URL(location.href).searchParams.get("surface") ?? "about:blank";
 const dock = createDock();
 let state: SurfaceViewState = {
-  mode: "watch",
+  mode: "chill",
   opacity: DEFAULT_SURFACE_OPACITY,
   connection: "connected",
 };

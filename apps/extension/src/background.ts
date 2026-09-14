@@ -8,7 +8,7 @@ import { SafariCookieLeaseManager } from "./safari-cookie-leases.js";
 import { COOKIE_SCOPES_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, isContentRequest, type ContentRequest, type StateUpdate, type SurfaceCommand, type SurfaceViewState } from "./shared.js";
 import { topLevelSite } from "./surface-cookie.js";
 
-let state: SurfaceViewState = { mode: "watch", opacity: DEFAULT_SURFACE_OPACITY, connection: "disconnected" };
+let state: SurfaceViewState = { mode: "chill", opacity: DEFAULT_SURFACE_OPACITY, connection: "disconnected" };
 let surface: NativeSurface | undefined;
 let publication: Promise<void> = Promise.resolve();
 const frameNames = new Map<number, string>();
@@ -149,7 +149,8 @@ async function initialize(): Promise<void> {
     : {};
   state = {
     ...state,
-    mode: storedState?.mode === "chill" || storedState?.mode === "focus" ? storedState.mode : "watch",
+    mode: storedState?.mode === "watch" || storedState?.mode === "focus" ? storedState.mode : "chill",
+    dismissed: storedState?.dismissed === true,
     opacity: normalizeSurfaceOpacity(storedState?.opacity),
   };
   await coordinator.restore(storedState?.runtimeId, credentials);
@@ -160,6 +161,10 @@ async function initialize(): Promise<void> {
 async function handleRequest(request: ContentRequest, tab?: Browser.tabs.Tab): Promise<unknown> {
   switch (request.type) {
     case "state.get": return viewForTab(tab);
+    case "visibility.set":
+      patch({ dismissed: !request.visible });
+      await publication;
+      return { ok: true };
     case "mode.set": setMode(request.mode); return viewForTab(tab);
     case "opacity.set": patch({ opacity: normalizeSurfaceOpacity(request.opacity) }); return viewForTab(tab);
     case "runtime.connect": await coordinator.connect(request.runtimeId); return { ok: true };
