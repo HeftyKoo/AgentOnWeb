@@ -10,7 +10,7 @@ interface DshContext {
   webServer: { host: string; port: number };
   connection: {
     authenticatedUrl(base: string): string;
-    fetch: { register(route: { path: string; methods: string[]; fetch: (request: Request) => Promise<Response> }): unknown };
+    fetch: { register(route: { path: string; methods: string[]; requestBody: "buffered"; fetch: (request: Request) => Promise<Response> }): unknown };
   };
   effect(setup: () => (() => Promise<void>), label: string): unknown;
 }
@@ -44,6 +44,7 @@ export async function apply(ctx: DshContext): Promise<void> {
   // This route stays inside native authentication; no bookmark enters AgentOnWeb's protocol.
   ctx.connection.fetch.register({
     path: "/api/agentonweb/native-view", methods: ["GET", "POST"],
+    requestBody: "buffered",
     async fetch(request) {
       const headers = { "cache-control": "no-store" };
       if (request.method === "GET") return Response.json(nativeView.snapshot(), { headers });
@@ -58,6 +59,7 @@ export async function apply(ctx: DshContext): Promise<void> {
   ctx.connection.fetch.register({
     path: "/api/agentonweb/connections",
     methods: ["GET", "POST"],
+    requestBody: "buffered",
     async fetch(request) {
       const headers = { "cache-control": "no-store" };
       if (request.method === "GET") return Response.json(authority.snapshot(), { headers });
