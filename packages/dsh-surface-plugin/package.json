@@ -36,6 +36,7 @@
     }
   },
   "files": [
+    "README.md",
     "cordis.patch.yml",
     "lib/index.js",
     "lib/host.js",

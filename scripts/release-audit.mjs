@@ -90,6 +90,7 @@ try {
   const tarListing = (await execute("tar", ["-tf", pluginArchive])).stdout.trim().split("\n").sort();
   const expectedTar = [
     "package/LICENSE",
+    "package/README.md",
     "package/cordis.patch.yml",
     "package/lib/client.js",
     "package/lib/host.js",
@@ -98,6 +99,9 @@ try {
   ].sort();
   if (JSON.stringify(tarListing) !== JSON.stringify(expectedTar)) throw new Error(`Unexpected plugin archive contents:\n${tarListing.join("\n")}`);
   await execute("tar", ["-xf", pluginArchive, "-C", temporary]);
+  const packedReadme = await readFile(resolve(temporary, "package/README.md"), "utf8");
+  const sourceReadme = await readFile(resolve(root, "packages/dsh-surface-plugin/README.md"), "utf8");
+  if (!packedReadme.trim() || packedReadme !== sourceReadme) throw new Error("Packed DSH plugin README is empty or differs from the user guide.");
   const imported = await import(pathToFileURL(resolve(temporary, "package/lib/index.js")));
   if (typeof imported.apply !== "function" || !Array.isArray(imported.inject)) throw new Error("Packed DSH plugin entry is invalid.");
 
