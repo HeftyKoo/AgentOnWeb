@@ -1,5 +1,5 @@
 import type { NativeSurface, AgentOnWebMode } from "@agentonweb/connector-contract";
-import { browser, type Browser } from "./browser-api.js";
+import { browser, extensionURL, type Browser } from "./browser-api.js";
 import { ConnectionCoordinator, type ConnectionView } from "./connection-coordinator.js";
 import { HeaderLeaseManager } from "./header-leases.js";
 import { DEFAULT_SURFACE_OPACITY, normalizeSurfaceOpacity } from "./interaction.js";
@@ -70,6 +70,14 @@ const coordinator = new ConnectionCoordinator({
 
 const initialized = initialize();
 browser.runtime.onMessage.addListener((message: unknown, sender, respond) => {
+  if (sender.id === browser.runtime.id
+    && message && typeof message === "object" && "source" in message && message.source === "agentonweb-popup"
+    && "type" in message && message.type === "surface.toggle" && sender.url === extensionURL("/popup.html")) {
+    initialized.then(() => presentInTab(undefined, "surface.toggle")).then(
+      ok => respond({ ok }), () => respond({ ok: false }),
+    );
+    return true;
+  }
   if (targetBrowser === "safari" && sender.id === browser.runtime.id
     && message && typeof message === "object" && "source" in message && message.source === "agentonweb-safari-session") {
     initialized.then(() => handleSafariSession(message, sender)).then(
@@ -206,14 +214,18 @@ function setMode(mode: AgentOnWebMode): void {
   patch({ mode });
 }
 
-async function presentInTab(tab: Browser.tabs.Tab | undefined, type: SurfaceCommand["type"]): Promise<void> {
+async function presentInTab(tab: Browser.tabs.Tab | undefined, type: SurfaceCommand["type"]): Promise<boolean> {
   const target = tab ?? (await browser.tabs.query({ active: true, lastFocusedWindow: true }))[0];
-  if (target?.id === undefined || !target.url || !topLevelSite(target.url)) return;
-  try {
-    await browser.tabs.sendMessage(target.id, { source: "agentonweb-background", type, state: await viewForTab(target) } satisfies SurfaceCommand);
-  } catch {
-    // Restricted pages and tabs without a content script cannot host AgentOnWeb.
+  if (target?.id !== undefined && target.url && topLevelSite(target.url)) {
+    try {
+      await browser.tabs.sendMessage(target.id, { source: "agentonweb-background", type, state: await viewForTab(target) } satisfies SurfaceCommand);
+      return true;
+    } catch {
+      // Explain unavailable page access instead of silently swallowing the click.
+    }
   }
+  if (targetBrowser === "safari") await browser.tabs.create({ url: extensionURL("/demo.html") });
+  return false;
 }
 
 function applyConnectionView(view: ConnectionView): void {
