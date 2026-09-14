@@ -1,4 +1,10 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { defineConfig } from "wxt";
+
+// The release contract is the version authority; the generated manifests must
+// agree with it (see scripts/release-audit.mjs and docs/releasing.md).
+const releaseContract = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../release-contract.json"), "utf8")) as { version: string };
 
 const commands = {
   _execute_action: {
@@ -37,7 +43,7 @@ export default defineConfig({
   manifest: ({ browser, manifestVersion }) => ({
     name: "AgentOnWeb",
     description: "Agent On Web. Bring your native coding agent onto any website. This edition: DSH On Web.",
-    version: "0.1.0",
+    version: releaseContract.version,
     ...(browser === "chrome" ? { minimum_chrome_version: "132" } : {}),
     icons: {
       16: "agentonweb-16.png",
