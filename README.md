@@ -38,18 +38,18 @@ Public installation links will be added once each store release is available. To
 
 ### 1. Set up DSH
 
-You need **Node.js 22.19+**, **DeepSeek Harness 0.1.2-alpha.3**, and your own model-provider credentials configured in DSH. The browser extension connects to DSH running on your computer.
+You need **Node.js 22.19+**, **DeepSeek Harness**, and your own model-provider credentials configured in DSH. The browser extension connects to DSH running on your computer.
 
 If DSH is not installed yet:
 
 ```sh
-npm install -g @deepseek-ai/dsh@0.1.2-alpha.3
+npm install -g @deepseek-ai/dsh
 ```
 
 Configure your provider credentials in DSH, such as `DEEPSEEK_API_KEY`, then install the AgentOnWeb integration and start the workspace:
 
 ```sh
-dsh plugin --profile web add @agentonweb/dsh-surface@0.1.0
+dsh plugin --profile web add @agentonweb/dsh-surface
 dsh web
 ```
 
