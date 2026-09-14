@@ -1,82 +1,132 @@
-# AgentOnWeb for DeepSeek Harness
+# AgentOnWeb
 
-**Use your coding agent on the website you already have open.**
+**Your native coding agent, on the website you're using.**
 
-AgentOnWeb brings the complete DeepSeek Harness (DSH) workspace onto ordinary web pages. Keep a video or documentation visible while you code, use your existing DSH conversations and tools, and switch back to the website without leaving your session.
+AgentOnWeb brings your coding workspace onto the page you already have open. Watch a video, browse documentation, or keep a website in view while working with your agent—then switch back to the page without leaving your conversation.
 
-`@agentonweb/dsh-surface` connects your local DSH workspace to the **AgentOnWeb browser extension**. You need both this DSH plugin and the browser extension to use AgentOnWeb. The current edition supports DeepSeek Harness.
+The current edition, **DSH On Web**, brings the complete **DeepSeek Harness (DSH)** workspace into Chrome, Firefox, and Safari. Your conversations, tools, approvals, models, and DSH plugins remain available in their familiar interface. This release supports DSH only.
 
-## See it in action
-
-[English YouTube demo](https://www.youtube.com/watch?v=s083RpD38HU) · [中文 YouTube 演示](https://www.youtube.com/watch?v=DV8s9z-w4GE)
-
-## What you can do
-
-| Mode | Experience |
+| Mode | What it does |
 | --- | --- |
-| **Chill** | Code in a translucent workspace while the website stays visible behind it. Adjust opacity from the dock. |
-| **Focus** | Use an opaque workspace when you want to concentrate on coding. |
-| **Watch** | Hide the workspace and use the website normally. Reopen your agent from the small dock. |
+| **Chill** | Work in a translucent workspace with the website visible behind it. Adjust opacity to suit the page. |
+| **Focus** | Give the same workspace an opaque background for focused coding. |
+| **Watch** | Hide the workspace and use the website normally, with a small dock ready to bring your agent back. |
 
-Your DSH session keeps running when you change modes. In Chill, double-tap **Option** on macOS or **Alt** on Windows/Linux to interact with the website; double-tap again to return to DSH.
+Switching modes keeps your session running. In Chill, double-tap **Option / Alt** to interact with the website; double-tap again to return to DSH.
 
-## Get started
+## Watch the demo
 
-### 1. Prepare DSH
+[![Watch the AgentOnWeb demo on YouTube](https://img.youtube.com/vi/s083RpD38HU/hqdefault.jpg)](https://www.youtube.com/watch?v=s083RpD38HU)
 
-You need:
+**[English demo](https://www.youtube.com/watch?v=s083RpD38HU)** · **[中文演示](https://www.youtube.com/watch?v=DV8s9z-w4GE)**
 
-- **Node.js 22.19 or newer**.
-- **DeepSeek Harness 0.1.2-alpha.3** running on the same computer as your browser.
-- Your own model-provider credentials configured in DSH, such as `DEEPSEEK_API_KEY`. Model-service usage is billed by your provider.
-- The **AgentOnWeb browser extension** for Chrome, Firefox, or Safari. See the [extension installation page](https://github.com/HeftyKoo/AgentOnWeb#get-the-extension) for available store links and installation options.
+See Chill, Focus, Watch, opacity adjustment, and website interaction during a real coding session.
 
-If you have not installed DSH yet:
+## Get the extension
+
+| Browser | Store installation |
+| --- | --- |
+| Chrome | [Install from Chrome Web Store](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe) |
+| Firefox | [Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/agentonweb/) |
+| Safari | Coming soon — Mac App Store link will be added after approval. |
+
+<!-- Replace the Safari placeholder with the verified public product URL when its store release is available. -->
+
+The Safari installation link will be added once the Mac App Store release is available. To try AgentOnWeb from source now, follow [Development](#development).
+
+## Start using AgentOnWeb
+
+### 1. Set up DSH
+
+You need **Node.js 22.19+**, **DeepSeek Harness**, and your own model-provider credentials configured in DSH. The browser extension connects to DSH running on your computer.
+
+If DSH is not installed yet:
 
 ```sh
-npm install -g @deepseek-ai/dsh@0.1.2-alpha.3
+npm install -g @deepseek-ai/dsh
 ```
 
-### 2. Install this plugin and start DSH
-
-Install through DSH's plugin manager so the integration is enabled in your Web profile:
+Configure your provider credentials in DSH, such as `DEEPSEEK_API_KEY`, then install the AgentOnWeb integration and start the workspace:
 
 ```sh
-dsh plugin --profile web add @agentonweb/dsh-surface@0.1.1
+dsh plugin --profile web add @agentonweb/dsh-surface
 dsh web
 ```
 
-If DSH was already running, restart `dsh web` after installing the plugin. Keep it running while you use AgentOnWeb. No repository checkout or build step is needed for this npm package.
+Keep `dsh web` running while using the extension. If DSH was already running when you installed the plugin, restart it. Model credentials stay in DSH; you do not enter an API key in the extension.
 
-### 3. Connect the browser extension
+### 2. Connect your browser
 
-1. Enable AgentOnWeb in your browser and open a normal website.
-2. Click **Connect** in the AgentOnWeb panel. If it is hidden, use the extension's toolbar icon or the dock in the lower-right corner.
+1. Install and enable the browser extension, then open a normal website.
+2. Click **Connect** in the AgentOnWeb panel. If the panel is hidden, click the extension's toolbar icon or the dock in the lower-right corner.
 3. In the DSH page that opens, click **Allow connection**.
-4. Return to your website. Your DSH workspace is ready to use.
+4. Return to your website and start working in the DSH workspace.
 
-Safari may also ask for website access and local-session storage access. Complete those browser prompts to finish connecting.
+Safari may also ask you to allow website access and local-session storage access. Follow those browser prompts to finish connecting.
 
-Once approved, the browser can reconnect while DSH is running. You do not need to enter a pairing code, port, or API key in the extension.
+Once approved, the browser reconnects automatically while DSH is running. You can remove its access from **DSH Settings → AgentOnWeb → Revoke connection**.
 
-### 4. Work from the page
+### 3. Choose how you work
 
-Choose **Chill**, **Focus**, or **Watch** from the lower-right dock. Your existing DSH conversations, model settings, tools, approvals, and plugins remain available in the DSH interface.
+Use the lower-right dock to choose **Chill**, **Focus**, or **Watch**. Chill opens by default and includes an opacity slider. Close the panel or use the toolbar icon to hide it; the dock remains available to reopen it.
 
-Use the browser toolbar icon to show or hide AgentOnWeb. The default shortcut is **Control+Shift+O** on macOS or **Alt+Shift+O** elsewhere; you can adjust it in your browser's extension-shortcut settings.
+| Action | macOS | Windows / Linux |
+| --- | --- | --- |
+| Show or hide AgentOnWeb | `Control+Shift+O` | `Alt+Shift+O` |
+| Chill / Focus / Watch | `Control+Shift+1 / 2 / 3` | `Alt+Shift+1 / 2 / 3` |
+| Switch interaction between DSH and the website in Chill | Double-tap `Option` | Double-tap `Alt` |
 
-## Common questions
+Shortcut availability depends on the browser and existing key bindings. You can adjust them in your browser's extension-shortcut settings. AgentOnWeb works on normal HTTP(S) websites; protected browser pages such as extension settings cannot host the workspace.
 
-**The extension cannot find DSH.** Make sure this plugin is installed in the Web profile, then restart `dsh web` and leave it running on the same computer as the browser. Click **Connect** again. The extension cannot start a stopped DSH process.
+## Development
 
-**The connection approval expired.** Click **Connect** again and approve the new request in the DSH page. Approval requests expire after two minutes.
+### Set up the workspace
 
-**AgentOnWeb does not appear on a page.** Try a normal HTTP(S) website and check the extension's website permissions. Browser settings pages and other protected browser pages cannot host the workspace.
+Use **Node.js 22.19+** and **pnpm 11.5.0**, with DSH installed and configured as described above.
 
-**How do I disconnect a browser?** Open **DSH Settings → AgentOnWeb → Revoke connection**. Connecting that browser again requires your approval.
+```sh
+git clone https://github.com/HeftyKoo/AgentOnWeb.git
+cd AgentOnWeb
+pnpm install
+pnpm install:dsh-surface
+dsh web
+```
 
-**Where do I enter my model API key?** Configure it in DSH. The browser extension has no API-key setup and does not include a model-service subscription.
+`pnpm install:dsh-surface` builds and installs the local integration into DSH's Web profile. Restart `dsh web` after updating the plugin.
 
-## Help
+### Build and load the extension
 
-[AgentOnWeb setup guide](https://github.com/HeftyKoo/AgentOnWeb#readme) · [Report an issue](https://github.com/HeftyKoo/AgentOnWeb/issues) · [Privacy policy](https://heftykoo.github.io/AgentOnWeb/privacy.html)
+In another terminal, run the build for your browser:
+
+| Browser | Build command | Output folder |
+| --- | --- | --- |
+| Chrome 132+ | `pnpm build:extension` | `apps/extension/.output/chrome-mv3` |
+| Firefox 140+ | `pnpm build:extension:firefox` | `apps/extension/.output/firefox-mv2` |
+| Safari 18.4+ | `pnpm build:extension:safari` | `apps/extension/.output/safari-mv2` |
+
+- **Chrome:** Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the output folder.
+- **Firefox:** Open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on**, and select `manifest.json` from the output folder.
+- **Safari:** Enable Safari's developer features and use **Add Temporary Extension** with the output folder. For the signed macOS app, see the [Safari build guide](https://github.com/HeftyKoo/AgentOnWeb/blob/main/apps/safari/README.md).
+
+Then follow [Connect your browser](#2-connect-your-browser) on a normal website.
+
+### Validate changes
+
+```sh
+pnpm check
+```
+
+This runs the repository checks, typechecking, tests, and browser builds. Verify interaction changes with the real extension and a running DSH workspace.
+
+For a lightweight presentation preview:
+
+```sh
+pnpm build:preview
+pnpm preview
+```
+
+See the [release guide](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/releasing.md) for packaging and publishing.
+
+## Links
+
+[Report an issue](https://github.com/HeftyKoo/AgentOnWeb/issues) · [Privacy policy](https://heftykoo.github.io/AgentOnWeb/privacy.html)
