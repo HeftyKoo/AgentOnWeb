@@ -1,11 +1,18 @@
 # Release AgentOnWeb
 
-AgentOnWeb ships two independently installable artifacts at the same product version:
+AgentOnWeb ships two independently versioned artifacts:
 
-- `agentonweb-extension-<version>.zip` for the Chrome Web Store;
-- `@agentonweb/dsh-surface@<version>` for npm, with the matching TGZ attached to the GitHub release.
+- `agentonweb-extension-<extensionVersion>.zip` for the Chrome Web Store;
+- `@agentonweb/dsh-surface@<pluginVersion>` for npm, with the matching TGZ attached to the GitHub release.
 
-`release-contract.json` is the compatibility authority. The WXT-generated Chrome manifest, workspace packages, DSH plugin metadata, and connector protocol must agree with it.
+The two versions move independently. An extension release does not require (or imply) an npm release, and vice versa. Cross-artifact compatibility is not carried by these versions — it is carried by `connectorProtocol` (the extension/plugin wire protocol) and `dsh` (the DSH harness compatibility) in `release-contract.json`.
+
+`release-contract.json` is the version and compatibility authority:
+
+- `extensionVersion` must match `apps/extension/package.json` and the generated Chrome/Safari manifests;
+- `pluginVersion` must match `packages/dsh-surface-plugin/package.json`.
+
+To release one side, bump only that side's version (in the contract and the matching `package.json`); the other side stays put.
 
 ## Build and audit
 
@@ -19,14 +26,19 @@ The DSH package contains prebuilt `lib/` output. Installing it never needs a `pr
 
 ## Publish
 
-Create and push a tag matching `v<version>`. The release workflow reruns the complete audit, publishes `@agentonweb/dsh-surface` to npm, and attaches the extension ZIP, plugin TGZ, and checksums to a GitHub release. Configure `NPM_TOKEN` before tagging.
+Each artifact has its own tag prefix, so releases are cut independently:
+
+- Extension release: push a tag matching `ext-v<extensionVersion>`. The workflow attaches the extension ZIP and its checksum to a GitHub release.
+- DSH plugin release: push a tag matching `dsh-v<pluginVersion>`. The workflow publishes `@agentonweb/dsh-surface` to npm (configure `NPM_TOKEN` before tagging) and attaches the plugin TGZ and its checksum to a GitHub release.
+
+Both tag kinds rerun the complete audit, so every release proves the whole workspace is reproducible even when only one artifact ships.
 
 The Chrome Web Store upload remains an explicit store action using the exact audited ZIP. Store review and publication are not inferred from the GitHub release. Firefox signing and Safari containing-app packaging are not part of this Chrome release artifact.
 
 Users install the DSH half with:
 
 ```sh
-dsh plugin --profile web add @agentonweb/dsh-surface@<version>
+dsh plugin --profile web add @agentonweb/dsh-surface@<pluginVersion>
 ```
 
 Restart `dsh web` after installation or upgrade.
