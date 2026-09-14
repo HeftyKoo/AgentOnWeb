@@ -4,11 +4,23 @@ title: AgentOnWeb Support
 ---
 # AgentOnWeb for Safari
 
+## Get help
+
+**Need help or have a question? [Open a support request](https://github.com/HeftyKoo/AgentOnWeb/issues/new).** The developer responds through GitHub Issues. A free GitHub account is required to submit a request. You can [read existing support requests](https://github.com/HeftyKoo/AgentOnWeb/issues) without signing in.
+
+Include your macOS and Safari versions, the AgentOnWeb version, what you expected, and what happened. Never post API keys, tokens, private code, or personal information.
+
+See the [dedicated support page](support.html) for troubleshooting and contact instructions.
+
 Your native coding agent, on the page you are using. Current edition: DSH On Web.
 
 AgentOnWeb displays the complete DeepSeek Harness workspace over normal websites. Use **Chill** for a translucent workspace, **Focus** for an opaque workspace, or **Watch** to keep the website fully interactive with a small mode dock. Conversations, models, tools, approvals, and plugins stay in DSH's native interface.
 
-## Requirements
+## Try the included demo
+
+In build 5 or later, open the AgentOnWeb macOS app and choose **Try Interactive Demo**, or open the Safari toolbar menu and choose **Try interactive demo**. The populated offline demo needs no account, API key, or DSH installation. Explore example conversations and tool results, edit the scratchpad, and try the real Chill, Focus, Watch, and opacity controls. Sample responses are labeled and do not run AI or commands.
+
+## Requirements for a live DSH workspace
 
 - macOS 15.4 or later with Safari 18.4 or later.
 - Node.js 22.19 or later.
@@ -37,7 +49,8 @@ You do not enter an API key into the browser extension. The first local connecti
 
 ## Everyday controls
 
-- Click the Safari toolbar button to show or hide AgentOnWeb.
+- Open the Safari toolbar menu, then choose **Show / hide on this website**.
+- Use **Allow local workspace access** in that menu before connecting to DSH.
 - Click the small page dock to reveal mode controls.
 - In Chill, double-tap Option to switch interaction between the website and DSH.
 - Adjust the Chill opacity slider to keep the underlying page visible.
