@@ -5,6 +5,7 @@ import WebKit
 private let extensionBundleIdentifier = "dev.agentonweb.extension.safari"
 
 class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHandler {
+    private var demoWindow: NSWindow?
     @IBOutlet var webView: WKWebView!
 
     override func viewDidLoad() {
@@ -23,9 +24,31 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
         }
     }
 
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if let url = navigationAction.request.url, ["https", "http"].contains(url.scheme ?? "") {
+            NSWorkspace.shared.open(url)
+            decisionHandler(.cancel)
+        } else { decisionHandler(.allow) }
+    }
+
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.frameInfo.isMainFrame, message.frameInfo.request.url?.isFileURL == true,
               let action = message.body as? String else { return }
+        if action == "demo" {
+            if let existing = demoWindow { existing.makeKeyAndOrderFront(nil); return }
+            guard let resources = Bundle.main.resourceURL else { return }
+            let demoView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1100, height: 760))
+            demoView.navigationDelegate = self
+            demoView.loadFileURL(resources.appendingPathComponent("Demo/index.html"), allowingReadAccessTo: resources)
+            let window = NSWindow(contentRect: demoView.frame, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+            window.title = "AgentOnWeb Interactive Demo"
+            window.contentView = demoView
+            window.isReleasedWhenClosed = false
+            window.center()
+            window.makeKeyAndOrderFront(nil)
+            demoWindow = window
+            return
+        }
         let links = [
             "support": "https://heftykoo.github.io/AgentOnWeb/",
             "privacy": "https://heftykoo.github.io/AgentOnWeb/privacy.html"

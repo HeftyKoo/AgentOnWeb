@@ -26,6 +26,10 @@
 		9BFCE806305115EF00A0E456 /* agentonweb-16.png in Resources */ = {isa = PBXBuildFile; fileRef = 9BFCE7FF305115EF00A0E456 /* agentonweb-16.png */; };
 		B00000000000000000000001 /* native-surface.html in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000001 /* native-surface.html */; };
 		B00000000000000000000002 /* chunks in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000002 /* chunks */; };
+		B00000000000000000000004 /* demo.html in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000004 /* demo.html */; };
+		B00000000000000000000005 /* popup.html in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000005 /* popup.html */; };
+		B00000000000000000000006 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000006 /* assets */; };
+		B00000000000000000000007 /* Demo in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000007 /* Demo */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -76,6 +80,10 @@
 		A00000000000000000000001 /* native-surface.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = "native-surface.html"; path = "Resources/native-surface.html"; sourceTree = "<group>"; };
 		A00000000000000000000002 /* chunks */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "chunks"; path = "Resources/chunks"; sourceTree = "<group>"; };
 		A00000000000000000000003 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = ../config/Signing.xcconfig; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000004 /* demo.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = "demo.html"; path = "Resources/demo.html"; sourceTree = "<group>"; };
+		A00000000000000000000005 /* popup.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = "popup.html"; path = "Resources/popup.html"; sourceTree = "<group>"; };
+		A00000000000000000000006 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "assets"; path = "Resources/assets"; sourceTree = "<group>"; };
+		A00000000000000000000007 /* Demo */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Demo; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -135,6 +143,7 @@
 				9BFCE7D5305115EE00A0E456 /* Icon.png */,
 				9BFCE7D7305115EE00A0E456 /* Style.css */,
 				9BFCE7D9305115EE00A0E456 /* Script.js */,
+				A00000000000000000000007 /* Demo */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -152,6 +161,9 @@
 		9BFCE7F8305115EF00A0E456 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				A00000000000000000000004 /* demo.html */,
+				A00000000000000000000005 /* popup.html */,
+				A00000000000000000000006 /* assets */,
 				A00000000000000000000002 /* chunks */,
 				A00000000000000000000001 /* native-surface.html */,
 				9BFCE7F9305115EF00A0E456 /* agentonweb-32.png */,
@@ -255,6 +267,7 @@
 				9BFCE7D6305115EE00A0E456 /* Icon.png in Resources */,
 				9BFCE7DF305115EE00A0E456 /* Main.storyboard in Resources */,
 				9BFCE7DA305115EE00A0E456 /* Script.js in Resources */,
+				B00000000000000000000007 /* Demo in Resources */,
 				9BFCE7D4305115EE00A0E456 /* Main.html in Resources */,
 				9BFCE7E1305115EF00A0E456 /* Assets.xcassets in Resources */,
 				9BFCE7D8305115EE00A0E456 /* Style.css in Resources */,
@@ -266,6 +279,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				B00000000000000000000001 /* native-surface.html in Resources */,
+				B00000000000000000000004 /* demo.html in Resources */,
+				B00000000000000000000005 /* popup.html in Resources */,
+				B00000000000000000000006 /* assets in Resources */,
 				B00000000000000000000002 /* chunks in Resources */,
 				9BFCE806305115EF00A0E456 /* agentonweb-16.png in Resources */,
 				9BFCE800305115EF00A0E456 /* agentonweb-32.png in Resources */,
@@ -451,7 +467,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -485,7 +501,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -522,7 +538,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -563,7 +579,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;

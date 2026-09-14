@@ -65,3 +65,6 @@ apps/safari/AgentOnWeb/AgentOnWeb Extension/Resources/
 # Private signing configuration and account-bound release identifiers.
 apps/safari/config/*.local.xcconfig
 docs/verification/local/
+
+# Generated offline demo shared with the extension.
+apps/safari/AgentOnWeb/AgentOnWeb/Resources/Demo/
