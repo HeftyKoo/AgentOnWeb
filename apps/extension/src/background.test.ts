@@ -51,10 +51,10 @@ async function boot() {
   await import("./background.js");
   await vi.waitFor(() => expect(chromeMock.tabs.sendMessage).toHaveBeenCalled());
 }
-async function message(type: string, sender = { id: "extension-test", frameId: 0, tab }) {
+async function message(type: string, sender = { id: "extension-test", frameId: 0, tab }, fields: Record<string, unknown> = {}) {
   const listener = chromeMock.runtime.onMessage.addListener.mock.calls[0]![0];
   return new Promise<any>((resolve) => {
-    if (!listener({ source: "agentonweb-content", type }, sender, resolve)) resolve(undefined);
+    if (!listener({ source: "agentonweb-content", type, ...fields }, sender, resolve)) resolve(undefined);
   });
 }
 
@@ -66,6 +66,30 @@ beforeEach(() => {
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("cross-browser native connection lifecycle", () => {
+  it.each([undefined, "invalid", "chill", "focus", "watch"])("defaults to Chill and preserves saved mode %s", async (mode) => {
+    data = { [STATE_STORAGE_KEY]: { mode } };
+    await boot();
+    expect((await message("state.get")).result).toMatchObject({
+      mode: mode === "focus" || mode === "watch" ? mode : "chill", opacity: 0.6,
+    });
+  });
+
+  it("persists dismissal through background restart and clears it only on explicit visibility changes", async () => {
+    await boot();
+    await message("visibility.set", undefined, { visible: false });
+    expect(data[STATE_STORAGE_KEY]).toMatchObject({ dismissed: true });
+    vi.resetModules();
+    chromeMock = createChrome();
+    vi.stubGlobal("chrome", chromeMock);
+    await boot();
+    expect((await message("state.get")).result.dismissed).toBe(true);
+    await message("mode.set", undefined, { mode: "focus" });
+    expect((await message("state.get")).result.dismissed).toBe(true);
+    await message("visibility.set", undefined, { visible: true });
+    expect(data[STATE_STORAGE_KEY]).toMatchObject({ dismissed: false });
+    expect(await message("visibility.set", undefined, { visible: "false" })).toBeUndefined();
+  });
+
   it("toggles only the clicked tab without switching modes or connecting", async () => {
     data = { [STATE_STORAGE_KEY]: { mode: "focus" } };
     await boot();
