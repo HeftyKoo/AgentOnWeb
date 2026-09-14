@@ -12,6 +12,7 @@ const contract = JSON.parse(await readFile(resolve(root, "release-contract.json"
 const project = resolve(root, "apps/safari/AgentOnWeb/AgentOnWeb.xcodeproj/project.pbxproj");
 const projectText = await readFile(project, "utf8");
 await checkSafariPrivacy(root);
+await execute(process.execPath, [resolve(root, "scripts/build-safari-demo.mjs")], { cwd: root });
 const versions = [...projectText.matchAll(/MARKETING_VERSION = ([^;]+);/g)].map((match) => match[1]);
 if (versions.length !== 4 || versions.some((version) => version !== contract.version)) {
   throw new Error("Safari target versions must match release-contract.json before packaging.");
