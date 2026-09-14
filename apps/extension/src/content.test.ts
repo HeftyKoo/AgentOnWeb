@@ -20,7 +20,7 @@ beforeAll(async () => {
 });
 afterEach(() => { for (const dom of pages.splice(0)) dom.window.close(); });
 
-async function page(initial = idle, url = "https://example.org/", initialReply?: Promise<{ ok: boolean; result: SurfaceViewState }>) {
+async function page(initial = idle, url = "https://example.org/", initialReply?: Promise<{ ok: boolean; result: SurfaceViewState }>, onRequest?: (request: ContentRequest) => void) {
   // No external resources are loaded. Only our bundled content script executes.
   const dom = new JSDOM('<button id="website-control">Website control</button>', { url, runScripts: "outside-only" });
   pages.push(dom);
@@ -34,7 +34,10 @@ async function page(initial = idle, url = "https://example.org/", initialReply?:
     shadow = attachShadow.call(this, options); return shadow;
   });
   let receive!: (message: StateUpdate | SurfaceCommand) => void;
-  const sendMessage = vi.fn(async (_request: ContentRequest) => initialReply ?? { ok: true, result: initial });
+  const sendMessage = vi.fn(async (request: ContentRequest) => {
+    onRequest?.(request);
+    return initialReply ?? { ok: true, result: initial };
+  });
   Object.assign(window, { chrome: { runtime: { getURL: (path: string) => `chrome-extension://test-extension${path}`, sendMessage, onMessage: { addListener(listener: typeof receive) { receive = listener; } } } } });
   window.eval(source);
   await Promise.resolve();
@@ -50,6 +53,36 @@ async function page(initial = idle, url = "https://example.org/", initialReply?:
 }
 
 describe("page-local AgentOnWeb visibility", () => {
+  it("remembers Close across reloads and cross-site navigation until explicitly reopened", async () => {
+    let saved = { ...idle, dismissed: false };
+    const openPage = (url: string) => page(saved, url, undefined, (request) => {
+      if (request.type === "visibility.set") saved = { ...saved, dismissed: !request.visible };
+    });
+    const first = await openPage("https://example.org/");
+    first.shadow.querySelector<HTMLButtonElement>('[aria-label="Close AgentOnWeb"]')!.click();
+    for (const url of ["https://example.org/", "https://example.org/next", "https://example.net/"]) {
+      const next = await openPage(url);
+      expect(next.shadow.querySelector<HTMLElement>(".surface-setup")!.hidden).toBe(true);
+      expect(next.shadow.querySelector<HTMLElement>(".surface-dock")!.hidden).toBe(false);
+      next.emit("state.update", connected);
+      expect(next.frame.hasAttribute("src")).toBe(false);
+    }
+    const reopened = await openPage("https://example.net/");
+    reopened.emit("surface.show", { ...connected, dismissed: true });
+    expect(reopened.frame.hidden).toBe(false);
+    expect(saved.dismissed).toBe(false);
+    expect((await openPage("https://example.net/next")).shadow.querySelector<HTMLElement>(".surface-setup")!.hidden).toBe(false);
+  });
+
+  it("honors saved dismissal when a broadcast arrives before the initial reply", async () => {
+    const p = await page(idle, undefined, new Promise(() => {}));
+    p.emit("state.update", { ...connected, dismissed: true });
+    expect(p.frame.hasAttribute("src")).toBe(false);
+    expect(p.shadow.querySelector<HTMLElement>(".surface-setup")!.hidden).toBe(true);
+    p.emit("surface.toggle", { ...connected, dismissed: true });
+    expect(p.frame.hidden).toBe(false);
+  });
+
   it("keeps the native workspace opaque when the website styles all divs", async () => {
     const p = await page({ ...connected, mode: "focus" });
     const style = p.window.document.createElement("style");
@@ -121,7 +154,7 @@ describe("page-local AgentOnWeb visibility", () => {
     expect(p.shadow.querySelector<HTMLElement>(".agentonweb-root")!.dataset.active).toBe("false");
     expect(p.frame.hasAttribute("src")).toBe(false);
     expect(p.window.document.activeElement).toBe(p.websiteControl);
-    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["state.get"]);
+    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["state.get", "visibility.set"]);
     p.emit("surface.toggle", connected);
     expect(p.shadow.querySelector<HTMLElement>(".agentonweb-root")!.dataset.active).toBe("true");
     expect(p.frame.src).toContain("chrome-extension://test-extension/native-surface.html#");
@@ -145,7 +178,7 @@ describe("page-local AgentOnWeb visibility", () => {
     expect(p.shadow.querySelector("iframe")).toBe(p.frame);
     expect(setSource).not.toHaveBeenCalled();
     expect(p.host.dataset.mode).toBe("focus");
-    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["state.get"]);
+    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["state.get", "visibility.set", "visibility.set"]);
   });
 
   it("dismisses the setup with Escape without removing the dock or handling website Escape", async () => {
@@ -172,7 +205,9 @@ describe("page-local AgentOnWeb visibility", () => {
       expect(p.shadow.querySelector<HTMLElement>(".surface-setup")!.hidden).toBe(false);
     }
     expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual([
-      "state.get", "mode.set", "mode.set", "mode.set",
+      "state.get", "visibility.set", "visibility.set", "mode.set",
+      "visibility.set", "visibility.set", "mode.set",
+      "visibility.set", "visibility.set", "mode.set",
     ]);
   });
 

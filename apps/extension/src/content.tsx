@@ -38,16 +38,16 @@ if (!document.getElementById(HOST_ID)) {
   document.documentElement.append(host);
 
   let state: SurfaceViewState = {
-    mode: "watch",
+    mode: "chill",
     connection: "disconnected",
     opacity: DEFAULT_SURFACE_OPACITY,
   };
   let surfaceOrigin: string | undefined;
   let frameNonce: string | undefined;
   let sitePassActive = false;
-  // Each page starts open. Closing deactivates the panel/workspace while the
-  // lower-right dock remains available as the in-page re-entry point.
-  let visible = true;
+  // Restore the shared dismissal preference on first state delivery. Later
+  // broadcasts never reopen a page; the dock remains its explicit entry point.
+  let visible = false;
   let receivedUpdate = false;
   let previousFocus = document.activeElement instanceof HTMLElement && document.activeElement !== host
     ? document.activeElement : undefined;
@@ -151,6 +151,8 @@ if (!document.getElementById(HOST_ID)) {
   };
 
   const setVisible = (next: boolean) => {
+    receivedUpdate = true;
+    send({ source: "agentonweb-content", type: "visibility.set", visible: next });
     if (next === visible) {
       render(state);
       if (next && !state.surface) setup.element.focus({ preventScroll: true });
@@ -177,6 +179,7 @@ if (!document.getElementById(HOST_ID)) {
 
   browser.runtime.onMessage.addListener((message: unknown) => {
     if (isStateUpdate(message)) {
+      if (!receivedUpdate) visible = message.state.dismissed !== true;
       receivedUpdate = true;
       render(message.state);
     }
@@ -184,8 +187,7 @@ if (!document.getElementById(HOST_ID)) {
       receivedUpdate = true;
       state = message.state;
       const next = message.type === "surface.toggle" ? !visible : true;
-      if (next === visible) render(state);
-      else setVisible(next);
+      setVisible(next);
     }
   });
 
@@ -233,7 +235,11 @@ if (!document.getElementById(HOST_ID)) {
   browser.runtime.sendMessage({ source: "agentonweb-content", type: "state.get" } satisfies ContentRequest)
     .then((response: { ok?: boolean; result?: SurfaceViewState } | undefined) => {
       // A slow initial snapshot must not overwrite a newer explicit open/update.
-      if (response?.result && !receivedUpdate) render(response.result);
+      if (response?.result && !receivedUpdate) {
+        visible = response.result.dismissed !== true;
+        receivedUpdate = true;
+        render(response.result);
+      }
     }).catch(() => render(state));
 }
 
