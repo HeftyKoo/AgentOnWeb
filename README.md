@@ -24,6 +24,12 @@ Switching modes keeps your session running. In Chill, double-tap **Option / Alt*
 
 See Chill, Focus, Watch, opacity adjustment, and website interaction during a real coding session.
 
+## Installation & usage tutorial
+
+**[English tutorial](https://www.youtube.com/watch?v=CIfW76WAcwA)** · **[中文教程](https://www.youtube.com/watch?v=kyeRpiG3asg)**
+
+A 100-second walkthrough of DSH setup, Chrome Web Store installation, Connect authorization, creating your first code file, and using Chill, Focus, and Watch. Both videos include subtitles and chapter timestamps.
+
 ## Get the extension
 
 | Browser | Store installation |
