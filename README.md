@@ -1,5 +1,7 @@
 # AgentOnWeb
 
+**[English](README.md)** · **[简体中文](README.zh-CN.md)**
+
 **Your native coding agent, on the website you're using.**
 
 AgentOnWeb brings your coding workspace onto the page you already have open. Watch a video, browse documentation, or keep a website in view while working with your agent—then switch back to the page without leaving your conversation.
