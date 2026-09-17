@@ -18,7 +18,7 @@ Switching modes keeps your session running. In Chill, double-tap **Option / Alt*
 
 ## Watch the demo
 
-[![Watch the AgentOnWeb demo on YouTube](https://img.youtube.com/vi/s083RpD38HU/hqdefault.jpg)](https://www.youtube.com/watch?v=s083RpD38HU)
+[![Watch the AgentOnWeb demo on YouTube](docs/assets/agentonweb-demo-cover.png)](https://www.youtube.com/watch?v=s083RpD38HU)
 
 **[English demo](https://www.youtube.com/watch?v=s083RpD38HU)** · **[中文演示](https://www.youtube.com/watch?v=DV8s9z-w4GE)**
 
