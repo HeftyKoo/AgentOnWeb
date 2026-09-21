@@ -2,3 +2,4 @@
 export * from "./codec.js";
 export * from "./presentation.js";
 export * from "./types.js";
+export * from "./option-tap.js";

@@ -2,109 +2,100 @@
 
 **[English](README.md)** · **[简体中文](README.zh-CN.md)**
 
-**把你原生的编程助手带到你正在使用的网页上。**
+**把本机终端带到你正在使用的网页上。**
 
-AgentOnWeb 将你的编程工作区带到你当前打开的页面上。一边看视频、查阅文档，或保持某个网站在视野中，一边与你的助手协作——然后无需离开对话即可切回原页面。
+AgentOnWeb 在当前网页上显示本机工作区。你可以一边看视频、查阅文档，一边使用 Shell、运行 `codex` 等已安装的命令行工具，再切回网页；切换视图不会停止命令。
 
-当前版本 **DSH On Web** 将完整的 **DeepSeek Harness (DSH)** 工作区带入 Chrome、Firefox 和 Safari。你的会话、工具、审批、模型以及 DSH 插件都保留在熟悉的界面中。本版本仅支持 DSH。
+当前源码提供两条独立连接：
+
+- **Local terminal（本机终端）**：Shell 进程运行在你的电脑上，通过 Web 终端显示和交互。直接输入 `cd`，使用 Shell 的补全、历史和别名，运行已安装的 CLI。退出 CLI 后返回同一 Shell。它会新建由本机服务管理的 Shell，不会镜像已有的 Terminal.app 窗口。
+- **DeepSeek Harness（DSH）**：显示 DSH 自带的 Web 工作区，保留会话、工具、审批、模型和插件界面。
+
+已发布扩展和 DSH 插件属于此前的 DSH 版本。**本机终端目前需要从本仓库构建扩展，并安装本地打包的终端服务。** 终端服务尚未发布到 npm。终端实机验收覆盖 macOS 和 Chrome；Firefox、Safari 构建通过，但终端实机交互及 Windows/Linux 运行仍待验收。
 
 | 模式 | 功能 |
 | --- | --- |
-| **Chill（轻松）** | 在半透明的工作区中工作，网页在背后依然可见。可调整透明度以适应页面。 |
-| **Focus（专注）** | 为同一工作区切换不透明背景，专注编程。 |
-| **Watch（观看）** | 隐藏工作区，正常使用网页，同时保留一个小型 dock，随时唤回你的助手。 |
+| **Chill（轻松）** | 半透明工作区，背景透明度可调。 |
+| **Focus（专注）** | 为同一工作区切换不透明背景。 |
+| **Watch（观看）** | 隐藏工作区，正常使用网页，保留 dock 便于返回。 |
 
-切换模式不会中断会话。在 Chill 模式下，双击 **Option / Alt** 可与网页交互；再次双击即可返回 DSH。
+切换模式或隐藏面板不会停止本机进程。在 Chill 下双击 **Option / Alt** 切换到网页交互，再次双击返回工作区。
 
-## 观看演示
+## 开始使用本机终端
 
-[![在 YouTube 上观看 AgentOnWeb 演示](https://img.youtube.com/vi/s083RpD38HU/hqdefault.jpg)](https://www.youtube.com/watch?v=s083RpD38HU)
-
-**[中文演示](https://www.youtube.com/watch?v=DV8s9z-w4GE)** · **[English demo](https://www.youtube.com/watch?v=s083RpD38HU)**
-
-演示包含 Chill、Focus、Watch、透明度调节，以及在真实编程会话中与网页交互的过程。
-
-## 安装与使用教程
-
-**[中文教程](https://www.youtube.com/watch?v=kyeRpiG3asg)** · **[English tutorial](https://www.youtube.com/watch?v=CIfW76WAcwA)**
-
-100 秒演示 DSH 准备、Chrome 商店安装、Connect 连接授权、生成第一个代码文件，以及 Chill、Focus、Watch 的使用方式。两条视频均附字幕和章节时间点。
-
-## 获取扩展
-
-| 浏览器 | 商店安装 |
-| --- | --- |
-| Chrome | [从 Chrome 应用商店安装](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe) |
-| Firefox | [从 Firefox 附加组件安装](https://addons.mozilla.org/en-US/firefox/addon/agentonweb/) |
-| Safari | 即将上线——Mac App Store 链接将在审核通过后添加。 |
-
-<!-- 在 Safari 商店发布后，将其公开产品链接替换到上方占位符。 -->
-
-Safari 安装链接将在 Mac App Store 版本发布后提供。如果想现在就从源码试用 AgentOnWeb，请参见[开发](#开发)章节。
-
-## 开始使用 AgentOnWeb
-
-### 1. 配置 DSH
-
-你需要 **Node.js 22.19+**、**DeepSeek Harness**，以及在 DSH 中配置好的模型服务商凭据。浏览器扩展会连接运行在你电脑上的 DSH。
-
-如果尚未安装 DSH：
-
-```sh
-npm install -g @deepseek-ai/dsh
-```
-
-在 DSH 中配置服务商凭据（例如 `DEEPSEEK_API_KEY`），然后安装 AgentOnWeb 集成并启动工作区：
-
-```sh
-dsh plugin --profile web add @agentonweb/dsh-surface
-dsh web
-```
-
-使用扩展期间请保持 `dsh web` 运行。如果安装插件时 DSH 已在运行，请重启它。模型凭据保存在 DSH 中；你无需在扩展中输入 API 密钥。
-
-### 2. 连接你的浏览器
-
-1. 安装并启用浏览器扩展，然后打开一个普通网站。
-2. 点击 AgentOnWeb 面板中的 **Connect（连接）**。如果面板被隐藏，可点击扩展的工具栏图标或右下角的 dock。
-3. 在打开的 DSH 页面中，点击 **Allow connection（允许连接）**。
-4. 回到你的网站，开始在 DSH 工作区中工作。
-
-Safari 可能还会请求允许访问网站以及本地会话存储。按照浏览器提示完成连接即可。
-
-授权后，只要 DSH 在运行，浏览器就会自动重新连接。你可以通过 **DSH Settings（设置）→ AgentOnWeb → Revoke connection（撤销连接）** 移除访问权限。
-
-### 3. 选择你的工作方式
-
-使用右下角的 dock 切换 **Chill**、**Focus** 或 **Watch**。默认打开 Chill 模式，并带有透明度滑块。关闭面板或使用工具栏图标可将其隐藏；dock 始终可用，便于重新打开。
-
-| 操作 | macOS | Windows / Linux |
-| --- | --- | --- |
-| 显示或隐藏 AgentOnWeb | `Control+Shift+O` | `Alt+Shift+O` |
-| Chill / Focus / Watch | `Control+Shift+1 / 2 / 3` | `Alt+Shift+1 / 2 / 3` |
-| 在 Chill 模式下切换 DSH 与网页的交互 | 双击 `Option` | 双击 `Alt` |
-
-快捷键的可用性取决于浏览器及已有的按键绑定。你可以在浏览器的扩展快捷键设置中调整。AgentOnWeb 适用于普通 HTTP(S) 网站；浏览器受保护的页面（如扩展设置页）无法承载工作区。
-
-## 开发
-
-### 配置工作区
-
-使用 **Node.js 22.19+** 和 **pnpm 11.5.0**，并按上文说明安装和配置 DSH。
+在 macOS 安装 **Node.js 22.19+** 和 **pnpm 11.5.0**，然后运行：
 
 ```sh
 git clone https://github.com/HeftyKoo/AgentOnWeb.git
 cd AgentOnWeb
 pnpm install
-pnpm install:dsh-surface
+pnpm --filter @agentonweb/terminal-host pack --pack-destination "$PWD/release"
+npm install -g ./release/agentonweb-terminal-host-0.1.0.tgz
+pnpm build:extension
+aow service install
+```
+
+1. 在 Chrome 打开 `chrome://extensions`，启用**开发者模式**，选择**加载已解压的扩展程序**，载入本仓库的 `apps/extension/.output/chrome-mv3`。
+2. 打开普通网站，点击 dock 的 **+** 查找工作区，选择 **Local terminal**，如出现连接按钮则点击 **Connect**。
+3. 在 `aow service install` 打开的私有设置标签页中，点击 **Allow connection**。需要重新打开时运行 `aow service open`。
+4. 返回网页，直接使用 Shell：
+
+   ```sh
+   cd ~/你的项目
+   codex
+   ```
+
+Codex 只是使用示例，并非终端服务的依赖。请自行安装和配置所需 CLI。Shell 加载你自己的启动文件；工具使用本机凭据和权限，AgentOnWeb 不替你选择模型或覆盖 CLI 权限。
+
+终端工具栏的 **+** 新建 Shell，选择器切换终端，**×** 在确认后关闭所选终端。多个标签页可以查看同一个 Shell，点击 **Control here** 转移输入控制权。刷新或关闭浏览器视图不会结束进程；停止服务、退出系统登录或重启电脑会结束正在运行的 Shell。
+
+macOS 服务随登录启动。需要前台运行时使用 `aow terminal` 并保持进程运行。安装、撤销授权、更新服务和平台限制见[本机终端指南](packages/terminal-host/README.md)。
+
+## 连接 DSH
+
+DSH 为可选功能，与本机终端独立连接。你需要 **Node.js 22.19+**、DeepSeek Harness，以及在 DSH 内配置好的模型服务商凭据。仓库固定的 DSH 兼容基线记录在 [release-contract.json](release-contract.json)。
+
+```sh
+npm install -g @deepseek-ai/dsh@0.1.2-alpha.3
+dsh plugin --profile web add @agentonweb/dsh-surface@0.1.1
 dsh web
 ```
 
-`pnpm install:dsh-surface` 会构建本地集成并将其安装到 DSH 的 Web profile。更新插件后请重启 `dsh web`。
+保持 `dsh web` 运行，安装或更新插件后重启它。在 AgentOnWeb 中点击 dock 的 **+**，选择 **DeepSeek Harness**，然后在 DSH 页面批准 **Allow connection**。切换 DSH 与本机终端不会停止其中任意一个。
 
-### 构建并加载扩展
+模型凭据保存在 DSH 中。在 **DSH Settings → AgentOnWeb → Revoke connection** 撤销浏览器授权。Safari 可能请求本地工作区和会话存储权限，请按照提示操作。
 
-在另一个终端中，运行适用于你浏览器的构建：
+## 日常操作
+
+通过 dock 切换 Chill、Focus、Watch 或已连接的工作区，并调整 Chill 透明度。关闭面板或点击扩展工具栏图标可隐藏面板，dock 可以重新打开它。
+
+| 操作 | macOS | Windows / Linux |
+| --- | --- | --- |
+| 显示或隐藏 AgentOnWeb | `Control+Shift+O` | `Alt+Shift+O` |
+| Chill / Focus / Watch | `Control+Shift+1 / 2 / 3` | `Alt+Shift+1 / 2 / 3` |
+| 在 Chill 下切换工作区与网页交互 | 双击 `Option` | 双击 `Alt` |
+
+浏览器快捷键可能优先于终端按键。可在浏览器设置中调整扩展快捷键。支持普通 HTTP(S) 网页；扩展设置等受保护页面无法承载工作区。
+
+## DSH 版本：商店与视频
+
+以下商店链接和视频对应已发布的 DSH 使用流程。本机终端请使用上方源码安装步骤。
+
+| 浏览器 | 商店安装 |
+| --- | --- |
+| Chrome | [Chrome 应用商店](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe) |
+| Firefox | [Firefox 附加组件](https://addons.mozilla.org/en-US/firefox/addon/agentonweb/) |
+| Safari | 仓库尚未提供公开商店链接。 |
+
+[![在 YouTube 上观看 AgentOnWeb DSH 演示](docs/assets/agentonweb-demo-cover.png)](https://www.youtube.com/watch?v=s083RpD38HU)
+
+**演示：**[中文](https://www.youtube.com/watch?v=DV8s9z-w4GE) · [English](https://www.youtube.com/watch?v=s083RpD38HU)
+
+**DSH 安装教程：**[中文](https://www.youtube.com/watch?v=kyeRpiG3asg) · [English](https://www.youtube.com/watch?v=CIfW76WAcwA)
+
+## 开发
+
+执行 `pnpm install` 后，为所用浏览器构建并载入扩展：
 
 | 浏览器 | 构建命令 | 输出目录 |
 | --- | --- | --- |
@@ -112,29 +103,19 @@ dsh web
 | Firefox 140+ | `pnpm build:extension:firefox` | `apps/extension/.output/firefox-mv2` |
 | Safari 18.4+ | `pnpm build:extension:safari` | `apps/extension/.output/safari-mv2` |
 
-- **Chrome：** 打开 `chrome://extensions`，启用**开发者模式**，选择**加载已解压的扩展程序**，然后选择输出目录。
-- **Firefox：** 打开 `about:debugging#/runtime/this-firefox`，选择**临时载入附加组件**，然后选择输出目录中的 `manifest.json`。
-- **Safari：** 启用 Safari 的开发者功能，使用**添加临时扩展**并选择输出目录。关于签名 macOS 应用，请参阅 [Safari 构建指南](apps/safari/README.md)。
+Firefox 在 `about:debugging#/runtime/this-firefox` 使用**临时载入附加组件**，选择输出目录中的 `manifest.json`。Safari 启用开发者功能后使用**添加临时扩展**。包含扩展的 macOS 应用参见 [Safari 构建指南](apps/safari/README.md)。
 
-随后在普通网站上按照[连接你的浏览器](#2-连接你的浏览器)操作。
+开发终端时，先运行 `pnpm --filter @agentonweb/terminal-host build`，再运行 `node packages/terminal-host/lib/cli.js terminal`。同一用户的状态目录只能由一个终端服务占用；已安装并运行的服务会占用它。停止或更新含活动 Shell 的服务前，请参阅本机终端指南。
 
-### 验证变更
+开发 DSH 插件时，`pnpm install:dsh-surface` 构建并安装本仓库版本到 DSH 的 Web profile，然后重启 `dsh web`。
 
 ```sh
 pnpm check
+pnpm release:audit
 ```
 
-这会运行仓库检查、类型检查、测试以及浏览器构建。请使用真实扩展和运行中的 DSH 工作区验证交互相关的变更。
+`check` 运行仓库检查、TypeScript、测试和浏览器构建。`release:audit` 额外验证扩展、DSH 插件和终端安装包可重复构建，并隔离安装终端包、验证真实 Shell。交互变更应使用真实扩展和对应工作区验证，构建通过不等于浏览器实机验收。
 
-如需轻量级的演示预览：
-
-```sh
-pnpm build:preview
-pnpm preview
-```
-
-打包与发布流程请参阅[发布指南](docs/releasing.md)。
-
-## 链接
+离线演示可运行 `pnpm build:preview` 和 `pnpm preview`；演示不会执行命令。实现与打包细节见[架构说明](docs/architecture.md)和[发布指南](docs/releasing.md)。
 
 [报告问题](https://github.com/HeftyKoo/AgentOnWeb/issues) · [隐私政策](https://heftykoo.github.io/AgentOnWeb/privacy.html)

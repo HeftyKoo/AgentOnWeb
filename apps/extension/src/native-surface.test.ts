@@ -12,17 +12,20 @@ beforeAll(async () => {
 });
 afterEach(() => { for (const page of pages.splice(0)) page.window.close(); });
 
-function page(scheme: string, nativeUrl = "http://localhost:3080/") {
+async function page(scheme: string, nativeUrl = "http://localhost:3080/", authorized: boolean | Promise<{ ok: boolean }> = true) {
   const hash = new URLSearchParams({ url: nativeUrl, nonce: "test-nonce", parent: "https://example.org" });
   const dom = new JSDOM("<body></body>", { url: `${scheme}://test-extension/native-surface.html#${hash}`, runScripts: "outside-only" });
   pages.push(dom);
+  Object.assign(dom.window, { chrome: { runtime: { sendMessage: () => typeof authorized === "boolean" ? Promise.resolve({ ok: authorized }) : authorized } } });
   dom.window.eval(source);
+  await Promise.resolve();
+  await Promise.resolve();
   return dom.window;
 }
 
 describe("native workspace extension document", () => {
-  it.each(["chrome-extension", "moz-extension", "safari-web-extension"])("loads native DSH and preserves its message contract under %s", (scheme) => {
-    const window = page(scheme);
+  it.each(["chrome-extension", "moz-extension", "safari-web-extension"])("loads native DSH and preserves its message contract under %s", async (scheme) => {
+    const window = await page(scheme);
     const frame = window.document.querySelector("iframe")!;
     expect(window.document.documentElement.style.colorScheme).toBe("dark");
     expect(frame.src).toBe("http://localhost:3080/#agentonweb=test-nonce");
@@ -42,10 +45,10 @@ describe("native workspace extension document", () => {
     const opacity = { ...message, type: "opacity.set", opacity: 0.4 };
     emit(opacity);
     emit({ ...opacity, opacity: 2 });
-    expect(native.postMessage.mock.calls).toEqual([[message, "http://localhost:3080"], [opacity, "http://localhost:3080"]]);
+    expect(native.postMessage).not.toHaveBeenCalled();
     native.postMessage.mockClear();
     frame.dispatchEvent(new window.Event("load"));
-    expect(native.postMessage.mock.calls).toEqual([[message, "http://localhost:3080"], [opacity, "http://localhost:3080"]]);
+    expect(native.postMessage.mock.calls).toEqual([[{ source: "agentonweb-extension", type: "surface.ready", nonce: "test-nonce" }, "http://localhost:3080"], [message, "http://localhost:3080"], [opacity, "http://localhost:3080"]]);
     const option = { source: "agentonweb-surface", type: "site-pass.option-tap", nonce: "test-nonce" };
     emit(option, "http://localhost:3080", {});
     emit(option, "https://attacker.example", native);
@@ -53,7 +56,32 @@ describe("native workspace extension document", () => {
     emit(option, "http://localhost:3080", native);
     expect(parentPost).toHaveBeenCalledWith(option, "https://example.org");
   });
-  it("does not embed a remote workspace", () => {
-    expect(page("chrome-extension", "https://attacker.example/").document.querySelector("iframe")).toBeNull();
+  it("does not embed a remote workspace", async () => {
+    expect((await page("chrome-extension", "https://attacker.example/")).document.querySelector("iframe")).toBeNull();
+  });
+
+  it("buffers the parent's initial presentation while background authorization is pending", async () => {
+    let approve!: (result: { ok: boolean }) => void;
+    const authorization = new Promise<{ ok: boolean }>(resolve => { approve = resolve; });
+    const window = await page("chrome-extension", "http://localhost:3080/", authorization);
+    expect(window.document.querySelector("iframe")).toBeNull();
+    const mode = { source: "agentonweb-extension", type: "mode.set", mode: "chill", nonce: "test-nonce" };
+    const opacity = { source: "agentonweb-extension", type: "opacity.set", opacity: 0.6, nonce: "test-nonce" };
+    for (const data of [mode, opacity]) window.dispatchEvent(new window.MessageEvent("message", {
+      data, origin: "https://example.org", source: window.parent,
+    }));
+    approve({ ok: true });
+    await vi.waitFor(() => expect(window.document.querySelector("iframe")).not.toBeNull());
+    const frame = window.document.querySelector("iframe")!;
+    const native = { postMessage: vi.fn() };
+    Object.defineProperty(frame, "contentWindow", { value: native });
+    frame.dispatchEvent(new window.Event("load"));
+    expect(native.postMessage.mock.calls).toEqual([
+      [{ source: "agentonweb-extension", type: "surface.ready", nonce: "test-nonce" }, "http://localhost:3080"],
+      [mode, "http://localhost:3080"],
+      [opacity, "http://localhost:3080"],
+    ]);
   });
 });
+
+it("does not load an iframe forged by a webpage without the background lease", async () => { expect((await page("chrome-extension", "http://localhost:3080/", false)).document.querySelector("iframe")).toBeNull(); });

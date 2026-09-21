@@ -286,3 +286,10 @@ button { cursor: pointer; }
 .surface-setup small { display: block; margin-top: 10px; color: #aebbb2; line-height: 1.4; }
 .surface-setup small[data-error="true"] { color: #d3a95a; }
 .surface-setup .surface-setup-hint { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.12); font-size: 11px; }
+
+.runtime-switch { display:flex; gap:4px; pointer-events:auto; }
+.runtime-switch:empty { display:none; }
+.runtime-switch button { border:1px solid #ffffff30; border-radius:8px; background:#171c25; color:#eee; padding:8px 10px; font:12px system-ui; cursor:pointer; max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.runtime-switch button[aria-pressed="true"] { background:#354055; border-color:#aabbd2; }
+
+.runtime-switch { align-self:flex-end; width:max-content; max-width:calc(100vw - 28px); flex-wrap:wrap; justify-content:flex-end; }

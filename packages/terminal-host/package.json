@@ -1,0 +1,36 @@
+{
+  "name": "@agentonweb/terminal-host",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Your local interactive shell in AgentOnWeb",
+  "bin": {
+    "aow": "lib/cli.js"
+  },
+  "files": [
+    "lib",
+    "README.md",
+    "fix-pty-permissions.mjs"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-terminal-host.mjs",
+    "prepack": "pnpm run build",
+    "postinstall": "node fix-pty-permissions.mjs"
+  },
+  "dependencies": {
+    "node-pty": "^1.1.0",
+    "@xterm/headless": "^5.5.0",
+    "@xterm/addon-serialize": "^0.13.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@agentonweb/connector-host": "workspace:*",
+    "@agentonweb/connector-contract": "workspace:*",
+    "@agentonweb/terminal-core": "workspace:*",
+    "@agentonweb/terminal-surface": "workspace:*",
+    "@types/ws": "^8.18.1"
+  }
+}

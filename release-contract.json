@@ -1,10 +1,12 @@
 {
   "extensionVersion": "0.1.1",
   "pluginVersion": "0.1.1",
+  "terminalHostVersion": "0.1.0",
   "dsh": "0.1.2-alpha.3",
   "connectorProtocol": 1,
   "artifacts": {
     "extension": "agentonweb-extension-0.1.1.zip",
-    "dshPlugin": "agentonweb-dsh-surface-0.1.1.tgz"
+    "dshPlugin": "agentonweb-dsh-surface-0.1.1.tgz",
+    "terminalHost": "agentonweb-terminal-host-0.1.0.tgz"
   }
 }

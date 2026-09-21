@@ -1,0 +1,137 @@
+:root {
+  color-scheme: dark;
+  font: 13px system-ui;
+  color: #eee;
+  background: transparent;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  background: #15171c;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #ffffff20;
+}
+header strong {
+  white-space: nowrap;
+}
+#status {
+  flex: 1;
+  color: #abb7c6;
+  font-size: 12px;
+}
+button,
+summary {
+  font: inherit;
+  cursor: pointer;
+}
+button {
+  background: #262d37;
+  color: #eee;
+  border: 1px solid #455164;
+  border-radius: 6px;
+  padding: 5px 9px;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+details pre {
+  position: absolute;
+  top: 45px;
+  right: 10px;
+  z-index: 5;
+  max-width: 90vw;
+  overflow: auto;
+  background: #15171c;
+  border: 1px solid #455164;
+  padding: 14px;
+}
+main {
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+}
+.xterm {
+  height: 100%;
+}
+
+select {
+  font: inherit;
+  background: #262d37;
+  color: #eee;
+  border: 1px solid #455164;
+  border-radius: 6px;
+  padding: 5px;
+  max-width: 150px;
+}
+#connections {
+  background: #202630;
+  padding: 12px 16px;
+  border-bottom: 1px solid #455164;
+  max-height: 35vh;
+  overflow: auto;
+}
+#connections p {
+  color: #bcc8d7;
+}
+.connection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+.connection span {
+  overflow-wrap: anywhere;
+  flex: 1;
+}
+
+dialog {
+  background: #202630;
+  color: #eee;
+  border: 1px solid #455164;
+  border-radius: 10px;
+  padding: 20px;
+  max-width: min(420px, calc(100vw - 32px));
+}
+dialog::backdrop {
+  background: #0009;
+}
+dialog h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+dialog p {
+  line-height: 1.5;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+#close-error:empty {
+  display: none;
+}
+#close-error {
+  color: #ffb7ae;
+}
+#confirm-close {
+  background: #803a35;
+  border-color: #b96159;
+}
+button:focus-visible {
+  outline: 2px solid #98bfff;
+  outline-offset: 2px;
+}

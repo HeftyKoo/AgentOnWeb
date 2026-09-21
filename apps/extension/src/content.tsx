@@ -1,3 +1,4 @@
+import { OptionTapTracker } from "@agentonweb/connector-contract";
 import { createDock } from "./dock.js";
 import { browser } from "./browser-api.js";
 import { DEFAULT_SURFACE_OPACITY, DoubleTapLatch } from "./interaction.js";
@@ -22,7 +23,10 @@ if (!document.getElementById(HOST_ID)) {
   const shell = document.createElement("section");
   shell.className = "surface-shell";
   shell.setAttribute("aria-label", "AgentOnWeb native coding workspace");
-  const frame = document.createElement("iframe");
+  let frame = document.createElement("iframe");
+  const frames = new Map<string, HTMLIFrameElement>();
+  const unread = new Set<string>();
+  const loadedFrames = new WeakSet<HTMLIFrameElement>();
   frame.hidden = true;
   frame.className = "runtime-frame";
   frame.title = "Native coding workspace";
@@ -62,6 +66,11 @@ if (!document.getElementById(HOST_ID)) {
   };
   setup.onApproval = () => send({ source: "agentonweb-content", type: "runtime.approval" });
   setup.onClose = () => setVisible(false);
+  dock.onDiscover = () => send({ source: "agentonweb-content", type: "runtime.connect" });
+  dock.onRuntime = (runtimeId) => {
+    setVisible(true);
+    send({ source: "agentonweb-content", type: "runtime.activate", runtimeId });
+  };
   dock.onMode = (mode) => {
     setSitePass(false);
     optionLatch.reset();
@@ -79,7 +88,7 @@ if (!document.getElementById(HOST_ID)) {
   };
 
   const postToSurface = (message: Record<string, unknown>) => {
-    if (!frame.contentWindow || !frameNonce || !surfaceOrigin) return;
+    if (!loadedFrames.has(frame) || !frame.contentWindow || !frameNonce || !surfaceOrigin) return;
     frame.contentWindow.postMessage({
       source: "agentonweb-extension",
       nonce: frameNonce,
@@ -94,10 +103,12 @@ if (!document.getElementById(HOST_ID)) {
     postMode();
     postOpacity(state.opacity);
   };
-  frame.addEventListener("load", postPresentation);
-
   const render = (next: SurfaceViewState) => {
     state = next;
+    for (const [id, saved] of frames) {
+      saved.hidden = true;
+      if (state.surfaces && !state.surfaces.some(item => item.runtimeId === id)) { saved.remove(); frames.delete(id); }
+    }
     host.dataset.mode = state.mode;
     root.dataset.mode = state.mode;
     host.style.setProperty("--agentonweb-surface-opacity", String(state.opacity));
@@ -105,20 +116,22 @@ if (!document.getElementById(HOST_ID)) {
       setSitePass(false);
       optionLatch.reset();
     }
-    dock.render(state);
+    if (visible && state.mode !== "watch" && state.surface) unread.delete(state.surface.runtimeId);
+    dock.render({ ...state, runtimes: (state.runtimes ?? []).map(item => ({ ...item, newOutput: unread.has(item.id) })) });
     setup.render(state, visible);
     root.dataset.active = String(visible);
     root.dataset.hasSurface = String(Boolean(state.surface));
-    // Keep the native authorization tab usable before pairing; never overlay
-    // its approval UI or recursively embed a runtime into itself.
-    if ([state.nativeUrl, state.approvalUrl, state.surface?.url].some((url) => url && location.origin === new URL(url).origin)) {
+    // Discovery identifies other runtimes' management pages before pairing.
+    // Never cover them with the selected runtime or recursively embed a runtime.
+    if (state.nativeOrigins?.includes(location.origin)
+      || [state.nativeUrl, state.approvalUrl, state.surface?.url, ...(state.surfaces ?? []).map(item => item.url)].some((url) => url && location.origin === new URL(url).origin)) {
       host.hidden = true;
       return;
     }
     host.hidden = false;
     if (!state.surface) {
       frame.hidden = true;
-      frame.removeAttribute("src");
+
       surfaceOrigin = undefined;
       frameNonce = undefined;
       return;
@@ -129,6 +142,17 @@ if (!document.getElementById(HOST_ID)) {
       frame.hidden = true;
       return;
     }
+    const existingFrame = frames.get(state.surface.runtimeId);
+    if (existingFrame) frame = existingFrame;
+    else {
+      if (frames.size > 0 || frame.src) frame = document.createElement("iframe");
+      frame.className = "runtime-frame";
+      frame.allow = "clipboard-read; clipboard-write";
+      const mounted = frame;
+      frame.addEventListener("load", () => { loadedFrames.add(mounted); if (frame === mounted) postPresentation(); });
+      frames.set(state.surface.runtimeId, frame);
+      shell.prepend(frame);
+    }
     const nextNonce = state.surface.frameName.replace(/^agentonweb:/u, "");
     const runtime = browser.runtime as typeof browser.runtime & { getURL(path: string): string };
     const nextSource = new URL(runtime.getURL("/native-surface.html"));
@@ -138,6 +162,7 @@ if (!document.getElementById(HOST_ID)) {
     frameNonce = nextNonce;
     frame.title = state.surface.displayName;
     if (sourceChanged) {
+      loadedFrames.delete(frame);
       frame.name = state.surface.frameName;
       frame.src = nextSource.href;
     }
@@ -221,16 +246,31 @@ if (!document.getElementById(HOST_ID)) {
   };
 
   window.addEventListener("message", (event) => {
-    if (!frame.contentWindow || event.source !== frame.contentWindow || event.origin !== surfaceOrigin) return;
     const message = event.data as { source?: unknown; type?: unknown; nonce?: unknown } | null;
-    if (!message || message.source !== "agentonweb-surface" || message.type !== "site-pass.option-tap") return;
+    if (!message || message.source !== "agentonweb-surface") return;
+    if (message.type === "surface.output") {
+      const entry = [...frames].find(([, saved]) => saved.contentWindow === event.source);
+      if (!entry || !entry[1].src) return;
+      const expected = new URL(entry[1].src);
+      if (event.origin !== `${expected.protocol}//${expected.host}` || message.nonce !== entry[1].name.replace(/^agentonweb:/u, "")) return;
+      if (!visible || state.mode === "watch" || state.surface?.runtimeId !== entry[0]) {
+        unread.add(entry[0]);
+        dock.render({ ...state, runtimes: (state.runtimes ?? []).map(item => ({ ...item, newOutput: unread.has(item.id) })) });
+      }
+      return;
+    }
+    if (!frame.contentWindow || event.source !== frame.contentWindow || event.origin !== surfaceOrigin) return;
+    if (message.type !== "site-pass.option-tap") return;
     if (message.nonce !== frameNonce) return;
     if (state.runtime?.capabilities.optionTap !== false) handleOptionTap();
   });
 
-  window.addEventListener("keydown", (event) => {
-    if (event.key === "Alt" && !event.repeat) handleOptionTap();
+  const optionTap = new OptionTapTracker();
+  window.addEventListener("keydown", event => optionTap.keydown(event), true);
+  window.addEventListener("keyup", event => {
+    if (optionTap.keyup(event)) handleOptionTap();
   }, true);
+  window.addEventListener("blur", () => optionTap.reset());
 
   browser.runtime.sendMessage({ source: "agentonweb-content", type: "state.get" } satisfies ContentRequest)
     .then((response: { ok?: boolean; result?: SurfaceViewState } | undefined) => {
@@ -259,7 +299,7 @@ function createSetup(): {
   header.className = "surface-setup-header";
   const title = document.createElement("strong");
   title.id = "agentonweb-setup-title";
-  title.textContent = "AgentOnWeb · DSH On Web";
+  title.textContent = "AgentOnWeb · Local workspaces";
   const close = document.createElement("button");
   close.type = "button";
   close.className = "surface-setup-close";
@@ -267,7 +307,7 @@ function createSetup(): {
   close.setAttribute("aria-label", "Close AgentOnWeb");
   header.append(title, close);
   const copy = document.createElement("p");
-  copy.textContent = "Bring DeepSeek Harness onto this page. Start dsh web with the AgentOnWeb plugin, then approve this browser in the native workspace.";
+  copy.textContent = "Choose Local terminal to use your shell, or connect DSH. First-time setup: install the local service with aow service install, then approve this browser in its setup page.";
   const form = document.createElement("form");
   const runtimes = document.createElement("select");
   runtimes.setAttribute("aria-label", "Coding runtime");

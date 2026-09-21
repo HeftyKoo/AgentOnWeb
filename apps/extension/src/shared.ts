@@ -19,11 +19,13 @@ export interface SurfaceViewState {
   readonly dismissed?: boolean;
   readonly connection: SurfaceConnection;
   readonly surface?: NativeSurfaceView;
+  readonly surfaces?: readonly NativeSurfaceView[];
   readonly runtimeId?: string;
   readonly runtime?: RuntimeDescriptor;
-  readonly runtimes?: readonly { readonly id: string; readonly displayName: string }[];
+  readonly runtimes?: readonly { readonly id: string; readonly displayName: string; readonly newOutput?: boolean }[];
   readonly approvalUrl?: string;
   readonly nativeUrl?: string;
+  readonly nativeOrigins?: readonly string[];
   readonly error?: string;
 }
 
@@ -32,7 +34,7 @@ export type ContentRequest =
   | { readonly source: "agentonweb-content"; readonly type: "visibility.set"; readonly visible: boolean }
   | { readonly source: "agentonweb-content"; readonly type: "mode.set"; readonly mode: AgentOnWebMode }
   | { readonly source: "agentonweb-content"; readonly type: "opacity.set"; readonly opacity: number }
-  | { readonly source: "agentonweb-content"; readonly type: "runtime.connect"; readonly runtimeId?: string }
+  | { readonly source: "agentonweb-content"; readonly type: "runtime.connect" | "runtime.activate"; readonly runtimeId?: string }
   | { readonly source: "agentonweb-content"; readonly type: "runtime.approval" };
 
 export interface StateUpdate {
@@ -64,7 +66,7 @@ export function isContentRequest(value: unknown): value is ContentRequest {
   if (candidate.type === "visibility.set") return typeof candidate.visible === "boolean";
   if (candidate.type === "mode.set") return ["chill", "focus", "watch"].includes(String(candidate.mode));
   if (candidate.type === "opacity.set") return typeof candidate.opacity === "number" && Number.isFinite(candidate.opacity);
-  return candidate.type === "runtime.connect" && (candidate.runtimeId === undefined || typeof candidate.runtimeId === "string");
+  return (candidate.type === "runtime.connect" || candidate.type === "runtime.activate") && (candidate.runtimeId === undefined || typeof candidate.runtimeId === "string");
 }
 
 export function isStateUpdate(value: unknown): value is StateUpdate {

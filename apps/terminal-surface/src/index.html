@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Terminal · AgentOnWeb</title>
+    <link rel="stylesheet" href="/main.css" />
+  </head>
+  <body>
+    <header>
+      <strong id="title">Local terminal</strong
+      ><select id="sessions" aria-label="Terminal sessions"></select
+      ><button id="new" title="New local terminal" aria-label="New terminal">
+        +</button
+      ><button
+        id="close"
+        title="Close this terminal"
+        aria-label="Close terminal"
+      >
+        ×</button
+      ><span id="status" role="status">Connecting…</span
+      ><button id="control" disabled>Control here</button
+      ><button
+        id="image"
+        disabled
+        title="Ask the local CLI to paste the image from your system clipboard"
+      >
+        Paste image</button
+      ><button id="reconnect">Reconnect</button>
+      <details>
+        <summary>Local process</summary>
+        <pre id="details"></pre>
+      </details>
+    </header>
+    <section id="connections" hidden>
+      <strong>Browser connections</strong>
+      <p>
+        Approving gives this extension access to your local shell and files.
+        Only allow a request you initiated.
+      </p>
+      <div id="connection-items"></div>
+    </section>
+    <main id="terminal" aria-label="Local terminal"></main>
+    <dialog
+      id="close-dialog"
+      aria-labelledby="close-title"
+      aria-describedby="close-description"
+    >
+      <h2 id="close-title">Close terminal?</h2>
+      <p id="close-description">
+        This stops the terminal and its running processes.
+      </p>
+      <p id="close-error" role="status"></p>
+      <div class="dialog-actions">
+        <button id="cancel-close" autofocus>Cancel</button
+        ><button id="confirm-close">Close terminal</button>
+      </div>
+    </dialog>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

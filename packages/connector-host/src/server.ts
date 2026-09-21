@@ -1,13 +1,20 @@
 import type { AddressInfo } from "node:net";
 import { WebSocketServer, WebSocket } from "ws";
-import { CONNECTOR_PORTS, PROTOCOL_VERSION, encodeFrame, parseClientFrame, type SurfaceAdapter, type ServerFrame } from "@agentonweb/connector-contract";
+import { CONNECTOR_PORTS, PROTOCOL_VERSION, isLocalSurfaceUrl, parseRuntimeDescriptor, encodeFrame, parseClientFrame, type SurfaceAdapter, type ServerFrame } from "@agentonweb/connector-contract";
 import { Authorization, AuthorizationError, EXTENSION_ORIGIN } from "./authorization.js";
 export { Authorization } from "./authorization.js";
 
-export interface Connector { port: number; close(): Promise<void> }
+export interface Connector {
+  port: number;
+  /** Refresh delegated surface credentials without revoking browser grants. */
+  refreshSurfaces(): void;
+  close(): Promise<void>;
+}
 
 /** Runs inside a runtime plugin, never starts or supervises the runtime itself. */
 export async function startConnector(adapter: SurfaceAdapter, authority: Authorization, ports: readonly number[] = CONNECTOR_PORTS): Promise<Connector> {
+  parseRuntimeDescriptor(adapter.runtime);
+  if (!isLocalSurfaceUrl(adapter.approvalUrl)) throw new Error("Invalid native authorization URL.");
   for (const port of ports) {
     try { return await listen(port, adapter, authority); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE") throw error; }
@@ -92,6 +99,11 @@ async function listen(port: number, adapter: SurfaceAdapter, authority: Authoriz
   });
   return {
     port: (server.address() as AddressInfo).port,
+    refreshSurfaces() {
+      // A normal reconnect preserves the grant and requests a fresh surface.
+      // Sockets already closing with REVOKED keep their terminal rejection.
+      for (const socket of grants.keys()) if (socket.readyState === WebSocket.OPEN) socket.close(1012, "Surface credentials changed");
+    },
     async close() {
       off(); authority.close();
       for (const socket of server.clients) socket.terminate();
