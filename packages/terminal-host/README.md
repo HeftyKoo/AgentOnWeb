@@ -28,9 +28,9 @@ The shell loads your normal login/interactive startup files. Those files can cha
 ## Terminal controls
 
 - **+** opens another independent local shell (up to eight). The selector switches between shells without stopping their processes.
-- **×** closes the selected shell and its running process after an in-page confirmation. Cancel or Escape leaves it running. Typing `exit` ends that shell normally; **+** opens a new one.
+- **×** appears on tab hover or keyboard focus and closes that shell and its running process after an in-page confirmation. Cancel or Escape leaves it running. Typing `exit` ends that shell normally; **+** opens a new one.
 - An unowned terminal accepts typing immediately. When another tab controls it, **Control here** explicitly takes over; the previous tab becomes read-only.
-- **Reconnect** and page refresh restore the same host-owned terminal. Shell directory, history, draft input and running commands remain in the process. Uncertain input is never resent.
+- Tab dots show connected (green), connecting (amber), disconnected (red), or background/exited (gray). **Reconnect** appears only when disconnected; connecting shows a disabled spinning indicator. Reconnect and page refresh restore the same host-owned terminal. Shell directory, history, draft input and running commands remain in the process. Uncertain input is never resent.
 - **Paste image** sends Ctrl+V to the active native program. In Codex this uses the local system clipboard; it is not a browser upload. In a shell Ctrl+V retains the shell's normal meaning.
 - DSH remains a separate runtime that you can switch to without stopping your shell.
 

@@ -19,30 +19,39 @@ terminal.loadAddon(fit);
 const container = document.querySelector<HTMLElement>("#terminal")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 const notice = document.querySelector<HTMLElement>("#connection-notice")!;
-const actions = document.querySelector<HTMLDetailsElement>("#terminal-actions")!;
+
 function showStatus(message: string) {
   if (status.textContent !== message) status.textContent = message;
   if (notice.textContent !== message) notice.textContent = message;
   notice.hidden = message === "Connected";
 }
-document.addEventListener("pointerdown", event => {
-  if (!actions.contains(event.target as Node)) actions.open = false;
-});
-document.addEventListener("keydown", event => {
-  if (event.key === "Escape" && actions.open) {
-    actions.open = false;
-    actions.querySelector<HTMLElement>("summary")!.focus();
-  }
-});
-actions.addEventListener("click", event => {
-  if ((event.target as Element).closest("button:not(:disabled)")) actions.open = false;
-});
 const control = document.querySelector<HTMLButtonElement>("#control")!;
 const image = document.querySelector<HTMLButtonElement>("#image")!;
 terminal.open(container);
 const sessionPicker = document.querySelector<HTMLElement>("#sessions")!;
 const newButton = document.querySelector<HTMLButtonElement>("#new")!;
-const closeButton = document.querySelector<HTMLButtonElement>("#close")!;
+type ConnectionState = "background" | "connecting" | "connected" | "disconnected" | "exited";
+const sessionStates = new Map<string, ConnectionState>();
+function updateTabs() {
+  for (const tab of sessionPicker.querySelectorAll<HTMLElement>(".terminal-tab")) {
+    const id = tab.dataset.session!;
+    const state = sessionStates.get(id) ?? "background";
+    tab.dataset.state = state;
+    const label = state === "background" ? "In local host" : state === "connecting" ? "Connecting…" : state === "exited" ? "Process exited" : state === "connected" ? "Connected" : "Disconnected";
+    const dot = tab.querySelector<HTMLElement>(".status-dot")!;
+    dot.title = label;
+    dot.setAttribute("aria-label", label);
+    const reconnect = tab.querySelector<HTMLButtonElement>(".tab-reconnect")!;
+    reconnect.hidden = state !== "disconnected" && state !== "connecting";
+    reconnect.disabled = state !== "disconnected";
+    reconnect.title = state === "connecting" ? "Connecting…" : "Reconnect";
+    reconnect.setAttribute("aria-label", `${reconnect.title} ${tab.dataset.name}`);
+  }
+}
+function setConnectionState(state: ConnectionState) {
+  if (sessionId) sessionStates.set(sessionId, state);
+  updateTabs();
+}
 let sessionId = sessionStorage.getItem("agentonweb-terminal") || "";
 const apiHeaders = {
   "X-AgentOnWeb-Terminal": "1",
@@ -71,13 +80,24 @@ async function refreshSessions(current: number) {
   if (!list.some((item) => item.id === sessionId)) sessionId = list[0]?.id || "";
   sessionPicker.replaceChildren(
     ...list.map((item) => {
+      const tab = document.createElement("div");
+      tab.className = "terminal-tab";
+      tab.dataset.session = item.id;
+      tab.dataset.name = item.name;
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "terminal-tab";
+      button.className = "tab-select";
       button.dataset.session = item.id;
-      button.textContent = item.name;
       button.title = item.name;
       button.setAttribute("aria-pressed", String(item.id === sessionId));
+      tab.dataset.selected = String(item.id === sessionId);
+      const dot = document.createElement("span");
+      dot.className = "status-dot";
+      dot.setAttribute("role", "img");
+      const name = document.createElement("span");
+      name.className = "tab-name";
+      name.textContent = item.name;
+      button.append(dot, name);
       button.onclick = () => {
         if (sessionId === item.id) return;
         sessionId = item.id;
@@ -85,11 +105,29 @@ async function refreshSessions(current: number) {
         focusOnConnect = true;
         void connect();
       };
-      return button;
+      const reconnect = document.createElement("button");
+      reconnect.type = "button";
+      reconnect.className = "tab-reconnect";
+      reconnect.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M20 12a8 8 0 1 0-2.34 5.66"/></svg>';
+      reconnect.onclick = () => {
+        if (sessionStates.get(item.id) !== "disconnected") return;
+        sessionId = item.id;
+        focusOnConnect = true;
+        void connect();
+      };
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "tab-close";
+      close.title = `Close ${item.name}`;
+      close.setAttribute("aria-label", close.title);
+      close.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg>';
+      close.onclick = () => openCloseDialog(item.id, item.name);
+      tab.append(button, reconnect, close);
+      return tab;
     }),
   );
   sessionStorage.setItem("agentonweb-terminal", sessionId);
-  closeButton.disabled = !sessionId;
+  updateTabs();
 }
 
 let socket: WebSocket | undefined;
@@ -146,6 +184,10 @@ async function connect(automaticRetry = false) {
   if (parent !== window && !authorizedParent) return;
   const current = ++generation;
   clearTimeout(retry);
+  for (const [id, state] of sessionStates) {
+    if (id !== sessionId && (state === "connected" || state === "connecting")) sessionStates.set(id, "background");
+  }
+  setConnectionState("connecting");
   socket?.close();
   ready = active = false;
   terminal.options.disableStdin = true;
@@ -161,14 +203,13 @@ async function connect(automaticRetry = false) {
       showStatus("No terminals. Click + to open your local shell.");
       return;
     }
+    setConnectionState("connecting");
     const response = await fetch("/ticket?session=" + encodeURIComponent(sessionId), {
       headers: { "X-AgentOnWeb-Terminal": "1" },
     });
     if (!response.ok) throw new Error("Session expired. Reconnect from AgentOnWeb.");
     const info = await response.json();
     if (current !== generation) return;
-    document.querySelector("#details")!.textContent =
-      `${info.executable}\nInitial directory: ${info.cwd}\nUse pwd in the shell to see its current directory.`;
     const ws = new WebSocket(`ws://${location.host}/terminal`, info.token);
     socket = ws;
     ws.onmessage = (event) => {
@@ -176,6 +217,7 @@ async function connect(automaticRetry = false) {
       const m = JSON.parse(event.data);
       if (m.type === "snapshot") {
         epoch = m.epoch;
+        setConnectionState(m.exitCode !== undefined ? "exited" : "connected");
         terminal.reset();
         terminal.resize(m.cols, m.rows);
         terminal.write(m.data, () => {
@@ -200,6 +242,8 @@ async function connect(automaticRetry = false) {
           parent.postMessage({ source: "agentonweb-surface", type: "surface.output", nonce }, "*");
         }
       } else if (m.type === "control") {
+        setConnectionState(m.exited !== undefined ? "exited" : "connected");
+        control.hidden = m.active || m.exited !== undefined;
         active = m.active;
         lease = m.lease;
         epoch = m.epoch;
@@ -216,6 +260,7 @@ async function connect(automaticRetry = false) {
         resize();
       } else if (m.type === "resize") terminal.resize(m.cols, m.rows);
       else if (m.type === "exit") {
+        setConnectionState("exited");
         active = false;
         terminal.options.disableStdin = true;
         control.disabled = image.disabled = true;
@@ -224,6 +269,7 @@ async function connect(automaticRetry = false) {
     };
     ws.onclose = (event) => {
       if (current !== generation) return;
+      setConnectionState("disconnected");
       ready = active = false;
       terminal.options.disableStdin = true;
       control.disabled = image.disabled = true;
@@ -234,7 +280,10 @@ async function connect(automaticRetry = false) {
       if (event.code !== 4401) retry = setTimeout(() => { void connect(true); }, 1500);
     };
   } catch (error) {
-    if (current === generation) showStatus(error instanceof Error ? error.message : "Connection failed");
+    if (current === generation) {
+      setConnectionState("disconnected");
+      showStatus(error instanceof Error ? error.message : "Connection failed");
+    }
   }
 }
 newButton.onclick = async () => {
@@ -255,14 +304,13 @@ const cancelClose = document.querySelector<HTMLButtonElement>("#cancel-close")!;
 const closeError = document.querySelector<HTMLElement>("#close-error")!;
 let closingSessionId = "";
 let closePending = false;
-closeButton.onclick = () => {
-  if (!sessionId || closeDialog.open) return;
-  closingSessionId = sessionId;
-  const name = sessionPicker.querySelector('[aria-pressed="true"]')?.textContent || "terminal";
+function openCloseDialog(id: string, name: string) {
+  if (closeDialog.open) return;
+  closingSessionId = id;
   document.querySelector("#close-title")!.textContent = `Close ${name}?`;
   closeError.textContent = "";
   closeDialog.showModal();
-};
+}
 cancelClose.onclick = () => closeDialog.close();
 closeDialog.oncancel = (event) => {
   if (closePending) event.preventDefault();
@@ -273,9 +321,12 @@ confirmClose.onclick = async () => {
   confirmClose.disabled = cancelClose.disabled = true;
   try {
     await api("/api/terminals", { action: "close", id: closingSessionId });
-    if (sessionId === closingSessionId) sessionId = "";
+    sessionStates.delete(closingSessionId);
     closeDialog.close();
-    await connect();
+    if (sessionId === closingSessionId) {
+      sessionId = "";
+      await connect();
+    } else await refreshSessions(generation);
   } catch (error) {
     closeError.textContent = error instanceof Error ? error.message : "Could not close this terminal.";
   } finally {
@@ -335,9 +386,6 @@ if (parent === window) {
     void showConnections();
   }, 2000);
 }
-document.querySelector<HTMLButtonElement>("#reconnect")!.onclick = () => {
-  void connect();
-};
 new ResizeObserver(resize).observe(container);
 document.addEventListener("visibilitychange", resize);
 const nonce = new URLSearchParams(location.hash.slice(1)).get("agentonweb");

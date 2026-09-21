@@ -28,20 +28,33 @@ header {
 }
 #sessions { display:flex; flex:0 1 auto; min-width:0; gap:3px; overflow-x:auto; scrollbar-width:none; }
 #sessions::-webkit-scrollbar { display:none; }
-#sessions .terminal-tab { flex:0 0 auto; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 14px; color:#98a79e; background:transparent; border:1px solid transparent; border-bottom:0; border-radius:7px 7px 0 0; }
-#sessions .terminal-tab[aria-pressed="true"] { color:#e4eee8; background:#15171c; border-color:#303a34; box-shadow:inset 0 2px #68f99c; }
+#sessions .terminal-tab { display:flex; align-items:center; flex:0 0 auto; max-width:230px; padding:0 6px 0 2px; color:#98a79e; border:1px solid transparent; border-bottom:0; border-radius:7px 7px 0 0; transition:background-color 120ms ease,color 120ms ease; }
+#sessions .terminal-tab[data-selected="true"] { color:#e4eee8; background:#15171c; border-color:#303a34; box-shadow:inset 0 2px #68f99c; }
+#sessions .terminal-tab:hover { background:#19211c; color:#e4eee8; }
+#sessions .terminal-tab[data-selected="true"]:hover { background:#1b201f; }
+.terminal-tab button { border:0; background:transparent; color:inherit; }
+.tab-select { display:flex; align-items:center; gap:8px; min-width:0; height:100%; padding:0 8px; border-radius:0; }
+.tab-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.status-dot { flex:none; width:7px; height:7px; border-radius:50%; background:#78827c; }
+[data-state="connected"] .status-dot { background:#68df92; }
+[data-state="disconnected"] .status-dot { background:#f27575; }
+[data-state="connecting"] .status-dot { background:#efc66a; }
+.tab-reconnect, .tab-close { display:grid; place-items:center; flex:none; width:24px; height:24px; padding:5px; border-radius:4px; transition:opacity 120ms ease,background-color 120ms ease,color 120ms ease; }
+.terminal-tab svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.tab-close { opacity:0; pointer-events:none; }
+.terminal-tab:hover .tab-close, .terminal-tab:focus-within .tab-close { opacity:0.7; pointer-events:auto; }
+.terminal-tab .tab-close:hover, .terminal-tab .tab-reconnect:hover:not(:disabled) { background:#ffffff0c; color:#f1f3f5; opacity:1; }
+.terminal-tab button:focus-visible { outline:1px solid #68df92; outline-offset:-3px; }
+[data-state="connecting"] .tab-reconnect svg { animation:tab-spin 1s linear infinite; }
+@keyframes tab-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { #sessions .terminal-tab, .terminal-tab button { transition:none; } [data-state="connecting"] .tab-reconnect svg { animation:none; } }
+@media (hover:none) { .tab-close { opacity:1; pointer-events:auto; } }
+[hidden] { display:none !important; }
 #new { flex:none; width:32px; padding:0; background:transparent; border:0; font-size:18px; }
-#terminal-actions { flex:none; margin-left:auto; }
-#terminal-actions > summary { display:grid; place-items:center; width:34px; height:36px; border-radius:5px; list-style:none; font-size:20px; }
-#terminal-actions > summary::-webkit-details-marker { display:none; }
-#terminal-actions > summary:hover { background:#26332a; }
-.terminal-menu { position:absolute; top:48px; right:8px; width:min(280px,calc(100vw - 16px)); max-height:calc(100vh - 70px); overflow:auto; padding:8px; background:#101a14; border:1px solid #344b3d; border-radius:9px; box-shadow:0 12px 28px #0006; }
-.terminal-menu > button { display:block; width:100%; text-align:left; padding:9px; border:0; background:transparent; }
-.terminal-menu > button:hover:not(:disabled) { background:#1c2b21; }
-#status { display:block; padding:8px 9px; color:#abbcaf; font-size:12px; }
+.terminal-tools { display:flex; align-items:center; gap:4px; margin-left:auto; padding-bottom:5px; }
+.terminal-tools button { white-space:nowrap; background:transparent; border:0; color:#98a79e; font-size:12px; }
 #connection-notice { position:absolute; top:50px; right:12px; z-index:4; max-width:calc(100vw - 24px); padding:7px 11px; background:#18231c; color:#d1e6d9; border:1px solid #45604e; border-radius:6px; font-size:12px; pointer-events:none; }
 #connection-notice[hidden] { display:none; }
-.process-details { padding:9px; }
 summary:focus-visible { outline:2px solid #68f99c; outline-offset:2px; }
 button,
 summary {
@@ -59,7 +72,6 @@ button:disabled {
   opacity: 0.5;
   cursor: default;
 }
-details pre { white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.5 ui-monospace,monospace; color:#a6b9ad; }
 main {
   flex: 1;
   min-height: 0;
