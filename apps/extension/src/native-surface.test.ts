@@ -16,6 +16,7 @@ async function page(scheme: string, nativeUrl = "http://localhost:3080/", author
   const hash = new URLSearchParams({ url: nativeUrl, nonce: "test-nonce", parent: "https://example.org" });
   const dom = new JSDOM("<body></body>", { url: `${scheme}://test-extension/native-surface.html#${hash}`, runScripts: "outside-only" });
   pages.push(dom);
+  Object.defineProperty(dom.window, "parent", { value: { postMessage: vi.fn() } });
   Object.assign(dom.window, { chrome: { runtime: { sendMessage: () => typeof authorized === "boolean" ? Promise.resolve({ ok: authorized }) : authorized } } });
   dom.window.eval(source);
   await Promise.resolve();
@@ -24,6 +25,21 @@ async function page(scheme: string, nativeUrl = "http://localhost:3080/", author
 }
 
 describe("native workspace extension document", () => {
+  it("announces wrapper readiness before authorization so presentation can be buffered", async () => {
+    const hash = new URLSearchParams({ url: "http://localhost:3080/", nonce: "test-nonce", parent: "https://example.org" });
+    const dom = new JSDOM("<body></body>", {
+      url: `chrome-extension://test-extension/native-surface.html#${hash}`, runScripts: "outside-only",
+    });
+    pages.push(dom);
+    Object.defineProperty(dom.window, "parent", { value: { postMessage: vi.fn() } });
+    const post = vi.spyOn(dom.window.parent, "postMessage").mockImplementation(() => {});
+    Object.assign(dom.window, { chrome: { runtime: { sendMessage: () => new Promise(() => {}) } } });
+    dom.window.eval(source);
+    expect(post).toHaveBeenCalledExactlyOnceWith({
+      source: "agentonweb-surface", type: "surface.wrapper-ready", nonce: "test-nonce",
+    }, "https://example.org");
+    expect(dom.window.document.querySelector("iframe")).toBeNull();
+  });
   it.each(["chrome-extension", "moz-extension", "safari-web-extension"])("loads native DSH and preserves its message contract under %s", async (scheme) => {
     const window = await page(scheme);
     const frame = window.document.querySelector("iframe")!;

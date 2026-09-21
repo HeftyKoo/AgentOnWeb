@@ -26,7 +26,7 @@ if (!document.getElementById(HOST_ID)) {
   let frame = document.createElement("iframe");
   const frames = new Map<string, HTMLIFrameElement>();
   const unread = new Set<string>();
-  const loadedFrames = new WeakSet<HTMLIFrameElement>();
+  const readyFrames = new WeakSet<HTMLIFrameElement>();
   frame.hidden = true;
   frame.className = "runtime-frame";
   frame.title = "Native coding workspace";
@@ -36,7 +36,9 @@ if (!document.getElementById(HOST_ID)) {
   const passLabel = document.createElement("div");
   passLabel.className = "site-pass-label";
   passLabel.textContent = "WEBSITE  ⌥⌥";
-  shell.append(frame, setup.element, dock.element, passLabel);
+  // Keep the placeholder detached: mounting about:blank inherits the site's
+  // CSP and can duplicate its parser warnings before a workspace is opened.
+  shell.append(setup.element, dock.element, passLabel);
   root.append(shell);
   shadow.append(style, root);
   document.documentElement.append(host);
@@ -88,7 +90,7 @@ if (!document.getElementById(HOST_ID)) {
   };
 
   const postToSurface = (message: Record<string, unknown>) => {
-    if (!loadedFrames.has(frame) || !frame.contentWindow || !frameNonce || !surfaceOrigin) return;
+    if (!readyFrames.has(frame) || !frame.contentWindow || !frameNonce || !surfaceOrigin) return;
     frame.contentWindow.postMessage({
       source: "agentonweb-extension",
       nonce: frameNonce,
@@ -148,10 +150,7 @@ if (!document.getElementById(HOST_ID)) {
       if (frames.size > 0 || frame.src) frame = document.createElement("iframe");
       frame.className = "runtime-frame";
       frame.allow = "clipboard-read; clipboard-write";
-      const mounted = frame;
-      frame.addEventListener("load", () => { loadedFrames.add(mounted); if (frame === mounted) postPresentation(); });
       frames.set(state.surface.runtimeId, frame);
-      shell.prepend(frame);
     }
     const nextNonce = state.surface.frameName.replace(/^agentonweb:/u, "");
     const runtime = browser.runtime as typeof browser.runtime & { getURL(path: string): string };
@@ -162,16 +161,18 @@ if (!document.getElementById(HOST_ID)) {
     frameNonce = nextNonce;
     frame.title = state.surface.displayName;
     if (sourceChanged) {
-      loadedFrames.delete(frame);
+      readyFrames.delete(frame);
       frame.name = state.surface.frameName;
       frame.src = nextSource.href;
     }
+    // Set the authorized URL before mounting, and never reinsert a retained
+    // iframe: reinsertion destroys its browsing context in some browsers.
+    if (!frame.isConnected) shell.prepend(frame);
     // Explicitly hide the frame in Watch. Safari can keep painting descendants
     // of a cross-process extension frame when only CSS visibility is hidden.
     frame.hidden = state.mode === "watch";
-    // Before the navigation loads, contentWindow still has the website's
-    // origin. Posting the localhost presentation target at that moment makes
-    // the browser record a misleading origin-mismatch extension error.
+    // A load event can describe about:blank or a blocked error document.
+    // Only the wrapper's origin/source/nonce-checked handshake proves readiness.
     if (!sourceChanged) postPresentation();
   };
 
@@ -248,11 +249,16 @@ if (!document.getElementById(HOST_ID)) {
   window.addEventListener("message", (event) => {
     const message = event.data as { source?: unknown; type?: unknown; nonce?: unknown } | null;
     if (!message || message.source !== "agentonweb-surface") return;
-    if (message.type === "surface.output") {
+    if (message.type === "surface.output" || message.type === "surface.wrapper-ready") {
       const entry = [...frames].find(([, saved]) => saved.contentWindow === event.source);
       if (!entry || !entry[1].src) return;
       const expected = new URL(entry[1].src);
       if (event.origin !== `${expected.protocol}//${expected.host}` || message.nonce !== entry[1].name.replace(/^agentonweb:/u, "")) return;
+      if (message.type === "surface.wrapper-ready") {
+        readyFrames.add(entry[1]);
+        if (entry[1] === frame) postPresentation();
+        return;
+      }
       if (!visible || state.mode === "watch" || state.surface?.runtimeId !== entry[0]) {
         unread.add(entry[0]);
         dock.render({ ...state, runtimes: (state.runtimes ?? []).map(item => ({ ...item, newOutput: unread.has(item.id) })) });
