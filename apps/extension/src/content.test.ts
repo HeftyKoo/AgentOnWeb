@@ -406,6 +406,71 @@ describe("page-local AgentOnWeb visibility", () => {
     expect(beforeDiscovery.host.hidden).toBe(true);
   });
 
+  it("collapses runtime choices and keeps the current trigger stable across updates", async () => {
+    const state = {
+      ...connected,
+      runtimeId: "terminal",
+      runtimes: [
+        { id: "terminal", displayName: "Local terminal" },
+        { id: "deepseek-harness", displayName: "DeepSeek Harness" },
+      ],
+    };
+    const p = await page(state);
+    const trigger = p.shadow.querySelector<HTMLButtonElement>(".runtime-current")!;
+    const options = p.shadow.querySelector<HTMLElement>(".runtime-options")!;
+    expect(trigger.textContent).toBe("Local terminal");
+    expect(options.hidden).toBe(true);
+    trigger.click();
+    expect(options.hidden).toBe(false);
+    options.querySelectorAll<HTMLButtonElement>("button")[1]!.click();
+    expect(options.hidden).toBe(true);
+    expect(p.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "runtime.activate", runtimeId: "deepseek-harness" }));
+    // Don't claim activation until the background confirms it.
+    expect(trigger.textContent).toBe("Local terminal");
+    p.emit("state.update", { ...state, runtimeId: "deepseek-harness" });
+    expect(p.shadow.querySelector(".runtime-current")).toBe(trigger);
+    expect(trigger.textContent).toBe("DeepSeek Harness");
+    expect(options.hidden).toBe(true);
+    trigger.click();
+    p.emit("state.update", { ...state, runtimeId: "deepseek-harness" });
+    expect(options.hidden).toBe(false);
+    trigger.dispatchEvent(new p.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(options.hidden).toBe(true);
+  });
+
+  it("preserves the focused runtime option when unread output or names change", async () => {
+    const state = {
+      ...connected, mode: "watch" as const, runtimeId: connected.surface!.runtimeId,
+      runtimes: [
+        { id: connected.surface!.runtimeId, displayName: "Native test" },
+        { id: "deepseek-harness", displayName: "DeepSeek Harness" },
+      ],
+    };
+    const p = await page(state);
+    p.shadow.querySelector<HTMLButtonElement>(".runtime-current")!.click();
+    const options = p.shadow.querySelector<HTMLElement>(".runtime-options")!;
+    const option = options.querySelectorAll<HTMLButtonElement>("button")[1]!;
+    option.focus();
+    expect(p.shadow.activeElement).toBe(option);
+    p.window.dispatchEvent(new p.window.MessageEvent("message", {
+      data: { source: "agentonweb-surface", type: "surface.output", nonce: "test-nonce" },
+      origin: "chrome-extension://test-extension", source: p.frame.contentWindow,
+    }));
+    expect(options.querySelector("button")!.getAttribute("aria-label")).toBe("Native test, new output");
+    expect(options.querySelectorAll("button")[1]).toBe(option);
+    expect(p.shadow.activeElement).toBe(option);
+    expect(options.hidden).toBe(false);
+    p.emit("state.update", {
+      ...state, runtimes: [state.runtimes[0]!, { ...state.runtimes[1]!, displayName: "DSH renamed", newOutput: true }],
+    });
+    expect(options.querySelectorAll("button")[1]).toBe(option);
+    expect(p.shadow.activeElement).toBe(option);
+    expect(options.hidden).toBe(false);
+    expect(option.textContent).toContain("DSH renamed");
+    option.click();
+    expect(p.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "runtime.activate", runtimeId: "deepseek-harness" }));
+  });
+
   it("retains each native iframe and its browsing context across runtime switches", async () => {
     const one = connected.surface!;
     const two = {
