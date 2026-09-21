@@ -2,7 +2,7 @@ import { createConnection } from "node:net";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { mkdtemp, realpath, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { once } from "node:events";
 import { afterEach, expect, it } from "vitest";
 import WebSocket from "ws";
@@ -98,6 +98,8 @@ it("keeps shell sessions alive across viewers and isolates setup authorization f
     })
   ).json()) as { id: string };
   expect(created.id).not.toBe(initial[0]!.id);
+
+
   for (let count = 2; count < 8; count++) {
     expect(
       (
@@ -124,10 +126,14 @@ it("keeps shell sessions alive across viewers and isolates setup authorization f
   const socket = new WebSocket(origin.replace("http:", "ws:") + "/terminal", ticket.token, {
     headers: { Cookie: delegated, Origin: origin },
   });
+  const names: any[] = [];
+  let control: any;
   let text = "";
   let sent = false;
   socket.on("message", (raw) => {
     const message = JSON.parse(String(raw));
+    if (message.type === "session-names") names.push(message.sessions);
+    if (message.type === "control") control = message;
     if (message.type === "output" || message.type === "snapshot") text += message.data;
     if (message.type === "control" && message.active && !sent) {
       sent = true;
@@ -150,11 +156,38 @@ it("keeps shell sessions alive across viewers and isolates setup authorization f
   expect((await fetch(folderUrl)).status).toBe(403);
   if (["darwin", "linux"].includes(process.platform)) {
     expect(await (await fetch(folderUrl, { headers })).json()).toEqual({ id: created.id, cwd: await realpath("/tmp") });
+    await expect.poll(() => names.at(-1)?.find((item: any) => item.id === created.id)?.name, { timeout: 3000 }).toBe(basename(await realpath("/tmp")));
+    const labels = await (await fetch(origin + "/api/terminals", { headers })).json();
+    expect(labels.find((item: any) => item.id === created.id).name).toBe(basename(await realpath("/tmp")));
     const other = await (await fetch(origin + "/api/terminals?cwd=" + initial[0]!.id, { headers })).json();
     expect(other.id).toBe(initial[0]!.id);
     expect(other.cwd).not.toBe(await realpath("/tmp"));
   }
   expect((await fetch(origin + "/api/terminals?cwd=missing", { headers })).status).toBe(404);
+  const backgroundTicket = await (await fetch(origin + "/ticket?session=" + initial[0]!.id, { headers })).json() as { token: string };
+  const background = new WebSocket(origin.replace("http:", "ws:") + "/terminal", backgroundTicket.token, {
+    headers: { Cookie: delegated, Origin: origin },
+  });
+  const backgroundNames: any[] = [];
+  background.on("message", raw => {
+    const message = JSON.parse(String(raw));
+    if (message.type === "session-names") backgroundNames.push(message.sessions);
+  });
+  await expect.poll(() => backgroundNames.length).toBeGreaterThan(0);
+  if (["darwin", "linux"].includes(process.platform)) {
+    // No GET refresh here: output from a later cd must update both viewers.
+    socket.send(JSON.stringify({ type: "input", epoch: control.epoch, lease: control.lease, data: "cd /\npwd\n" }));
+    await expect.poll(() => backgroundNames.at(-1)?.find((item: any) => item.id === created.id)?.name, { timeout: 3000 }).toBe("/");
+    await expect.poll(() => names.at(-1)?.find((item: any) => item.id === created.id)?.name).toBe("/");
+  }
+  const rename = (name: unknown) => fetch(origin + "/api/terminals", { method: "POST", headers: { ...headers, Origin: origin }, body: JSON.stringify({ action: "rename", id: created.id, name }) });
+  expect((await rename("  API server  ")).status).toBe(200);
+  await expect.poll(() => names.at(-1)?.find((item: any) => item.id === created.id)?.name).toBe("API server");
+  await expect.poll(() => backgroundNames.at(-1)?.find((item: any) => item.id === created.id)?.name).toBe("API server");
+  background.close();
+  const renamed = await (await fetch(origin + "/api/terminals", { headers })).json();
+  expect(renamed.find((item: any) => item.id === created.id).name).toBe("API server");
+  for (const name of [" ", "x".repeat(81), "line\nbreak", 42]) expect((await rename(name)).status).toBe(400);
   socket.close();
   const kept = (await (await fetch(origin + "/api/terminals", { headers })).json()) as { id: string }[];
   expect(kept.some((item) => item.id === created.id)).toBe(true);

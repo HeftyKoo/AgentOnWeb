@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFile, writeFile, rename, unlink } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
@@ -37,7 +37,30 @@ const authority = await Authorization.open(stateDirectory);
 const env = Object.fromEntries(
   Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
 );
-const sessions = new Map<string, { session: TerminalSession; name: string }>();
+type HostedSession = { session: TerminalSession; name?: string; directory: string; directoryRefresh?: Promise<void> };
+const sessions = new Map<string, HostedSession>();
+function sessionNames() {
+  return [...sessions].map(([id, value]) => ({ id, name: value.name ?? (basename(value.directory) || value.directory) }));
+}
+function broadcastSessionNames() {
+  const message = JSON.stringify({ type: "session-names", sessions: sessionNames() });
+  for (const ws of sockets.clients) {
+    if (ws.readyState === WebSocket.OPEN) ws.send(message);
+  }
+}
+async function refreshDirectory(id: string, item: HostedSession): Promise<void> {
+  if (item.name || sessions.get(id) !== item) return;
+  if (item.directoryRefresh) return item.directoryRefresh;
+  item.directoryRefresh = (async () => {
+    const directory = await processDirectory(item.session.pty.pid);
+    // A rename or close may have happened while the process lookup was pending.
+    if (!directory || item.name || sessions.get(id) !== item || directory === item.directory) return;
+    item.directory = directory;
+    broadcastSessionNames();
+  })();
+  try { await item.directoryRefresh; }
+  finally { delete item.directoryRefresh; }
+}
 class RequestError extends Error {
   constructor(
     readonly status: number,
@@ -46,14 +69,22 @@ class RequestError extends Error {
     super(message);
   }
 }
-let nextSession = 1;
 function newSession() {
   if (sessions.size >= 8) throw new RequestError(409, "Close an unused terminal before opening another (maximum 8).");
   const id = randomUUID();
-  sessions.set(id, {
-    session: new TerminalSession(executable, args, cwd, env),
-    name: `Terminal ${nextSession++}`,
+  const item: HostedSession = { session: new TerminalSession(executable, args, cwd, env), directory: cwd };
+  sessions.set(id, item);
+  // Coalesce shell output into at most one lookup per second per session,
+  // regardless of viewer count. Idle shells create no directory traffic.
+  let directoryTimer: ReturnType<typeof setTimeout> | undefined;
+  const output = item.session.pty.onData(() => {
+    if (item.name || directoryTimer || sockets.clients.size === 0) return;
+    directoryTimer = setTimeout(() => {
+      directoryTimer = undefined;
+      void refreshDirectory(id, item);
+    }, 1000);
   });
+  item.session.pty.onExit(() => { clearTimeout(directoryTimer); output.dispose(); });
   return id;
 }
 newSession();
@@ -147,6 +178,13 @@ const server = createServer(async (req, res) => {
           const id = newSession();
           res.end(JSON.stringify({ id }));
           return;
+        } else if (action.action === "rename") {
+          const item = sessions.get(action.id);
+          if (!item) throw new RequestError(404, "Terminal no longer exists.");
+          if (typeof action.name !== "string" || !action.name.trim() || action.name.trim().length > 80 || /[\x00-\x1f\x7f]/u.test(action.name))
+            throw new RequestError(400, "Use a name of 1–80 characters without line breaks.");
+          item.name = action.name.trim();
+          broadcastSessionNames();
         } else if (action.action === "close" && sessions.has(action.id)) {
           sessions.get(action.id)!.session.dispose();
           sessions.delete(action.id);
@@ -158,13 +196,11 @@ const server = createServer(async (req, res) => {
         res.writeHead(405).end();
         return;
       }
-      res.end(
-        JSON.stringify(
-          url.pathname === "/api/connections"
-            ? authority.snapshot()
-            : [...sessions].map(([id, value]) => ({ id, name: value.name })),
-        ),
-      );
+      if (url.pathname === "/api/connections") res.end(JSON.stringify(authority.snapshot()));
+      else {
+        await Promise.all([...sessions].map(([id, item]) => refreshDirectory(id, item)));
+        res.end(JSON.stringify(sessionNames()));
+      }
       return;
     }
     if (req.method !== "GET") {
@@ -264,6 +300,9 @@ server.on("upgrade", (req, socket, head) => {
   const session = sessions.get(permission.sessionId)!.session;
   tickets.delete(ticket as string);
   sockets.handleUpgrade(req, socket, head, (ws) => {
+    // Close the HTTP-list/WS-subscription gap, including background tab names.
+    ws.send(JSON.stringify({ type: "session-names", sessions: sessionNames() }));
+    void Promise.all([...sessions].map(([sessionId, item]) => refreshDirectory(sessionId, item)));
     const id = session.attach({
       send: (message) => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
