@@ -50,6 +50,13 @@ async function page(
   pages.push(dom);
   const { window } = dom;
   const { document } = window;
+  const createdFrames: HTMLIFrameElement[] = [];
+  const createElement = document.createElement.bind(document);
+  vi.spyOn(document, "createElement").mockImplementation(((name: string, options?: ElementCreationOptions) => {
+    const element = createElement(name, options);
+    if (name === "iframe") createdFrames.push(element as HTMLIFrameElement);
+    return element;
+  }) as typeof document.createElement);
   const websiteControl = document.querySelector<HTMLButtonElement>("button")!;
   websiteControl.focus();
   let shadow!: ShadowRoot;
@@ -79,7 +86,11 @@ async function page(
   window.eval(source);
   await Promise.resolve();
   const host = document.getElementById("agentonweb-extension-root")!;
-  const frame = shadow.querySelector<HTMLIFrameElement>("iframe")!;
+  const frame = shadow.querySelector<HTMLIFrameElement>("iframe") ?? createdFrames[0]!;
+  const ready = (target = frame, origin = "chrome-extension://test-extension", nonce = "test-nonce", sender: unknown = target.contentWindow) =>
+    window.dispatchEvent(new window.MessageEvent("message", {
+      data: { source: "agentonweb-surface", type: "surface.wrapper-ready", nonce }, origin, source: sender as Window,
+    }));
   const emit = (type: StateUpdate["type"] | SurfaceCommand["type"], state = initial) =>
     receive({ source: "agentonweb-background", type, state });
   const escape = (target: { dispatchEvent(event: any): boolean }) => {
@@ -101,6 +112,7 @@ async function page(
     sendMessage,
     emit,
     escape,
+    ready,
   };
 }
 
@@ -178,7 +190,14 @@ describe("page-local AgentOnWeb visibility", () => {
     );
   });
 
-  it("waits for the native frame to load before posting presentation state", async () => {
+  it("does not mount a CSP-inheriting blank document before a workspace is requested", async () => {
+    const p = await page();
+    expect(p.shadow.querySelector("iframe")).toBeNull();
+    p.emit("state.update", connected);
+    expect(p.shadow.querySelector("iframe")!.getAttribute("src")).toMatch(/^chrome-extension:/u);
+  });
+
+  it("waits for the authenticated wrapper before posting presentation state", async () => {
     const p = await page();
     const postMessage = vi.fn();
     Object.defineProperty(p.frame, "contentWindow", {
@@ -188,7 +207,25 @@ describe("page-local AgentOnWeb visibility", () => {
     p.emit("state.update", connected);
     expect(postMessage).not.toHaveBeenCalled();
     p.frame.dispatchEvent(new p.window.Event("load"));
+    expect(postMessage).not.toHaveBeenCalled();
+    p.ready(p.frame, "https://example.org");
+    p.ready(p.frame, undefined, "wrong");
+    p.ready(p.frame, undefined, undefined, p.window);
+    expect(postMessage).not.toHaveBeenCalled();
+    p.ready();
     expect(postMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not trust an inherited about:blank load as extension readiness", async () => {
+    const p = await page();
+    const postMessage = vi.fn();
+    Object.defineProperty(p.frame, "contentWindow", { configurable: true, value: { postMessage } });
+    p.emit("state.update", connected);
+    // load can still belong to the initial website-origin document, or an
+    // error document. Neither is proof of the extension wrapper's origin.
+    p.frame.dispatchEvent(new p.window.Event("load"));
+    p.emit("state.update", { ...connected, opacity: 0.7 });
+    expect(postMessage).not.toHaveBeenCalled();
   });
 
   it("restores presentation delivery after the only runtime disconnects and reconnects", async () => {
@@ -210,7 +247,7 @@ describe("page-local AgentOnWeb visibility", () => {
     });
     p.emit("state.update", { ...state, mode: "focus", opacity: 0.8 });
     expect(postMessage).not.toHaveBeenCalled();
-    replacement.dispatchEvent(new p.window.Event("load"));
+    p.ready(replacement);
     expect(postMessage.mock.calls.map(([message]) => message)).toEqual([
       {
         source: "agentonweb-extension",

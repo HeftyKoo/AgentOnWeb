@@ -46,6 +46,11 @@ async function initialize() {
       if (modeMessage) post(modeMessage);
       if (opacityMessage) post(opacityMessage);
     });
+    // The content script must not infer our origin from iframe load: the
+    // initial about:blank and CSP error documents also dispatch that event.
+    // Announce only after installing the listener that buffers presentation.
+    if (window.parent !== window)
+      window.parent.postMessage({ source: "agentonweb-surface", type: "surface.wrapper-ready", nonce }, parentOrigin);
     // The extension document can finish loading while this authorization is
     // pending. Buffer its parent's initial presentation before awaiting it;
     // only an approved document may load the native workspace itself.
