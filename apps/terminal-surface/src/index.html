@@ -10,20 +10,11 @@
     <header>
       <div id="sessions" aria-label="Terminal sessions"></div>
       <button id="new" title="New local terminal" aria-label="New terminal">+</button>
-      <details id="terminal-actions">
-        <summary aria-label="Terminal actions" title="Terminal actions">⋯</summary>
-        <div class="terminal-menu">
-          <span id="status">Connecting…</span>
-          <button id="control" disabled>Control here</button>
-          <button id="image" disabled title="Ask the local CLI to paste the image from your system clipboard">Paste image</button>
-          <button id="reconnect">Reconnect</button>
-          <button id="close">Close terminal…</button>
-          <details class="process-details">
-            <summary>Local process</summary>
-            <pre id="details"></pre>
-          </details>
-        </div>
-      </details>
+      <div class="terminal-tools">
+        <button id="control" disabled hidden>Control here</button>
+        <button id="image" disabled title="Ask the local CLI to paste the image from your system clipboard">Paste image</button>
+      </div>
+      <span id="status" hidden>Connecting…</span>
     </header>
     <div id="connection-notice" role="status" hidden></div>
     <section id="connections" hidden>

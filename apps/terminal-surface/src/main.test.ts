@@ -141,7 +141,14 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
     data: "old output",
   });
   const lateAck = terminalMock.writes.shift()!;
-  dom.window.document.querySelector<HTMLButtonElement>("#reconnect")!.click();
+  const reconnect = dom.window.document.querySelector<HTMLButtonElement>(".tab-reconnect")!;
+  expect(reconnect.hidden).toBe(true);
+  expect(reconnect.disabled).toBe(true);
+  sockets[0].onclose({ code: 1006 });
+  expect(reconnect.hidden).toBe(false);
+  expect(reconnect.disabled).toBe(false);
+  reconnect.click();
+  expect(reconnect.disabled).toBe(true);
   await vi.waitFor(() => expect(lists).toBe(2));
   dom.window.document.querySelector<HTMLButtonElement>("#new")!.click();
   await vi.waitFor(() => expect(sockets).toHaveLength(2));
@@ -169,18 +176,22 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
   terminalMock.writes.shift()!();
   expect(dom.window.document.querySelector<HTMLButtonElement>("#control")!.disabled).toBe(true);
   expect(dom.window.document.querySelector<HTMLElement>("#connection-notice")!.hidden).toBe(false);
-  dom.window.document.querySelector<HTMLButtonElement>('[data-session="one"]')!.click();
+  dom.window.document.querySelector<HTMLButtonElement>('.tab-select[data-session="one"]')!.click();
   await vi.waitFor(() => expect(sockets).toHaveLength(3));
   expect(ticketUrls.at(-1)).toBe("/ticket?session=one");
-  expect(dom.window.document.querySelector('[data-session="one"]')!.getAttribute("aria-pressed")).toBe("true");
+  expect(dom.window.document.querySelector('.tab-select[data-session="one"]')!.getAttribute("aria-pressed")).toBe("true");
   const notice = dom.window.document.querySelector<HTMLElement>("#connection-notice")!;
   vi.useRealTimers();
   vi.useFakeTimers({ toFake: ["setTimeout", "setInterval"] });
   sockets[2].onclose({ code: 1006 });
   const disconnected = notice.textContent;
+  expect(dom.window.document.querySelector('.terminal-tab[data-session="one"]')!.getAttribute("data-state")).toBe("disconnected");
   await vi.advanceTimersByTimeAsync(1500);
   await vi.waitFor(() => expect(sockets).toHaveLength(4));
   expect(notice.textContent).toBe(disconnected);
+  expect(dom.window.document.querySelector('.terminal-tab[data-session="one"]')!.getAttribute("data-state")).toBe("connecting");
+  expect(dom.window.document.querySelector<HTMLButtonElement>('.terminal-tab[data-session="one"] .tab-reconnect')!.disabled).toBe(true);
+  expect(dom.window.document.querySelector("#terminal-actions")).toBeNull();
   expect(dom.window.document.querySelector('#status[role="status"], #status[aria-live]')).toBeNull();
 });
 
@@ -243,14 +254,14 @@ it("closes a shell with in-page confirmation when browser confirm is blocked", a
   );
   const button = (id: string) => dom.window.document.querySelector<HTMLButtonElement>(id)!;
   await vi.waitFor(() => expect(dom.window.document.querySelector<HTMLButtonElement>('#sessions [aria-pressed="true"]')!.dataset.session).toBe("one"));
-  button("#close").click();
+  button(".tab-close").click();
   const dialog = dom.window.document.querySelector<HTMLDialogElement>("#close-dialog");
   expect(dialog?.open).toBe(true);
   expect(mutations).toEqual([]);
   button("#cancel-close").click();
   expect(dialog!.open).toBe(false);
   expect(mutations).toEqual([]);
-  button("#close").click();
+  button(".tab-close").click();
   button("#confirm-close").click();
   button("#confirm-close").click();
   expect(mutations).toEqual([{ action: "close", id: "one" }]);
