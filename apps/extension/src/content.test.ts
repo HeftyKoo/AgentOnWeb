@@ -406,6 +406,32 @@ describe("page-local AgentOnWeb visibility", () => {
     expect(beforeDiscovery.host.hidden).toBe(true);
   });
 
+  it("collapses all controls to an accessible launcher and restores focus on Escape", async () => {
+    const p = await page(connected);
+    const dock = p.shadow.querySelector<HTMLElement>(".surface-dock")!;
+    const toggle = p.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!;
+    const palette = p.shadow.querySelector<HTMLElement>(".surface-palette")!;
+    const picker = p.shadow.querySelector<HTMLElement>(".runtime-switch")!;
+    expect(dock.dataset.expanded).toBe("false");
+    expect(palette.inert).toBe(true);
+    expect(picker.inert).toBe(true);
+    toggle.click();
+    expect(palette.inert).toBe(false);
+    const mode = p.shadow.querySelector<HTMLButtonElement>(".surface-mode")!;
+    mode.focus();
+    mode.dispatchEvent(new p.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(dock.dataset.expanded).toBe("false");
+    expect(palette.inert).toBe(true);
+    expect(picker.inert).toBe(true);
+    expect(p.shadow.activeElement).toBe(toggle);
+    toggle.click();
+    const opacity = p.shadow.querySelector<HTMLInputElement>(".surface-opacity input")!;
+    expect(opacity.disabled).toBe(false);
+    p.emit("state.update", { ...connected, mode: "watch" });
+    expect(opacity.disabled).toBe(true);
+    expect(dock.dataset.expanded).toBe("true");
+  });
+
   it("collapses runtime choices and keeps the current trigger stable across updates", async () => {
     const state = {
       ...connected,
@@ -420,10 +446,13 @@ describe("page-local AgentOnWeb visibility", () => {
     const options = p.shadow.querySelector<HTMLElement>(".runtime-options")!;
     expect(trigger.textContent).toBe("Local terminal");
     expect(options.hidden).toBe(true);
+    p.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!.click();
     trigger.click();
     expect(options.hidden).toBe(false);
     options.querySelectorAll<HTMLButtonElement>("button")[1]!.click();
     expect(options.hidden).toBe(true);
+    expect(p.shadow.querySelector<HTMLElement>(".surface-dock")!.dataset.view).toBe("controls");
+    expect(p.shadow.querySelector<HTMLElement>(".surface-dock")!.dataset.expanded).toBe("true");
     expect(p.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "runtime.activate", runtimeId: "deepseek-harness" }));
     // Don't claim activation until the background confirms it.
     expect(trigger.textContent).toBe("Local terminal");
@@ -447,6 +476,7 @@ describe("page-local AgentOnWeb visibility", () => {
       ],
     };
     const p = await page(state);
+    p.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!.click();
     p.shadow.querySelector<HTMLButtonElement>(".runtime-current")!.click();
     const options = p.shadow.querySelector<HTMLElement>(".runtime-options")!;
     const option = options.querySelectorAll<HTMLButtonElement>("button")[1]!;
