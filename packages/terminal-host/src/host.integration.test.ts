@@ -1,6 +1,6 @@
 import { createConnection } from "node:net";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { mkdtemp, realpath, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { once } from "node:events";
@@ -43,6 +43,11 @@ it("keeps shell sessions alive across viewers and isolates setup authorization f
   expect(errors).toBe("");
   const launchUrl = /Open once: (http:\/\/[^\s]+)/u.exec(output)![1]!;
   const origin = new URL(launchUrl).origin;
+  const token = new URL(launchUrl).searchParams.get("token")!;
+  for (const invalid of ["", token + "x", token.slice(0, -1), token.slice(0, -1) + (token.endsWith("A") ? "B" : "A")]) {
+    expect((await fetch(`${origin}/launch?token=${invalid}`)).status).toBe(401);
+  }
+  expect((await fetch(origin + "/launch")).status).toBe(401);
   const launch = await fetch(launchUrl, { redirect: "manual" });
   expect(launch.status).toBe(200);
   expect(launch.headers.get("location")).toBeNull();
@@ -89,6 +94,17 @@ it("keeps shell sessions alive across viewers and isolates setup authorization f
     ).status,
   ).toBe(403);
   expect((await fetch(launchUrl, { redirect: "manual" })).status).toBe(401);
+  for (const endpoint of ["/api/terminals", "/api/connections"]) {
+    for (const body of ["{", "", "null", "[]", "42", '"new"']) {
+      const response = await fetch(origin + endpoint, {
+        method: "POST",
+        headers: { ...headers, Cookie: cookies.join("; "), Origin: origin },
+        body,
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toHaveProperty("error");
+    }
+  }
   const initial = (await (await fetch(origin + "/api/terminals", { headers })).json()) as { id: string }[];
   const created = (await (
     await fetch(origin + "/api/terminals", {
@@ -233,6 +249,30 @@ it("rejects unknown commands before creating a host", () => {
   expect(result.status).not.toBe(0);
   expect(result.stderr).toContain("Usage: aow terminal");
 });
+
+it("reports a lock release failure and exits after closing the host", async () => {
+  directory = await mkdtemp(join(tmpdir(), "aow-shutdown-test-"));
+  host = spawn(process.execPath, [resolve("packages/terminal-host/lib/cli.js"), "terminal"], {
+    env: { ...process.env, HOME: directory, SHELL: "/bin/sh", ENV: undefined, BASH_ENV: undefined, ZDOTDIR: undefined },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let output = "";
+  let errors = "";
+  host.stdout!.on("data", chunk => { output += String(chunk); });
+  host.stderr!.on("data", chunk => { errors += String(chunk); });
+  const stateDirectory = join(directory, ".agentonweb", "terminal");
+  await expect.poll(() => stat(join(stateDirectory, "endpoint.json")).then(() => true, () => false), { timeout: 10000 }).toBe(true);
+  await mkdir(join(stateDirectory, "host.pid.guard"));
+  const stopped = once(host, "exit");
+  host.kill("SIGTERM");
+  await expect.poll(() => host!.exitCode, { timeout: 3000 }).toBe(1);
+  await stopped;
+  expect(errors).toContain("Terminal host shutdown failed.");
+  expect(errors).toContain("lock update is in progress");
+  await expect(stat(join(stateDirectory, "endpoint.json"))).rejects.toMatchObject({ code: "ENOENT" });
+  const origin = new URL(/Open once: (http:\/\/[^\s]+)/u.exec(output)![1]!).origin;
+  await expect(fetch(origin)).rejects.toThrow();
+}, 15000);
 
 it("refreshes other authorized browsers after revocation without stopping their shell", async () => {
   directory = await mkdtemp(join(tmpdir(), "aow-revoke-test-"));
