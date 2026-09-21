@@ -119,6 +119,7 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
     lease: 1,
     active: true,
   });
+  expect(dom.window.document.querySelector<HTMLElement>("#connection-notice")!.hidden).toBe(true);
   terminalMock.binary!("\x1b[M\x20\x80\x40");
   terminalMock.input!("世界 👋");
   expect(sockets[0].sent).toContainEqual({
@@ -146,7 +147,7 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
   await vi.waitFor(() => expect(sockets).toHaveLength(2));
   resolveOld(Response.json([{ id: "one", name: "One" }]));
   await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(dom.window.document.querySelector<HTMLSelectElement>("#sessions")!.value).toBe("two");
+  expect(dom.window.document.querySelector<HTMLButtonElement>('#sessions [aria-pressed="true"]')!.dataset.session).toBe("two");
   expect(ticketUrls.at(-1)).toBe("/ticket?session=two");
   lateAck();
   expect(sockets[1].sent).toEqual([]);
@@ -167,6 +168,20 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
   });
   terminalMock.writes.shift()!();
   expect(dom.window.document.querySelector<HTMLButtonElement>("#control")!.disabled).toBe(true);
+  expect(dom.window.document.querySelector<HTMLElement>("#connection-notice")!.hidden).toBe(false);
+  dom.window.document.querySelector<HTMLButtonElement>('[data-session="one"]')!.click();
+  await vi.waitFor(() => expect(sockets).toHaveLength(3));
+  expect(ticketUrls.at(-1)).toBe("/ticket?session=one");
+  expect(dom.window.document.querySelector('[data-session="one"]')!.getAttribute("aria-pressed")).toBe("true");
+  const notice = dom.window.document.querySelector<HTMLElement>("#connection-notice")!;
+  vi.useRealTimers();
+  vi.useFakeTimers({ toFake: ["setTimeout", "setInterval"] });
+  sockets[2].onclose({ code: 1006 });
+  const disconnected = notice.textContent;
+  await vi.advanceTimersByTimeAsync(1500);
+  await vi.waitFor(() => expect(sockets).toHaveLength(4));
+  expect(notice.textContent).toBe(disconnected);
+  expect(dom.window.document.querySelector('#status[role="status"], #status[aria-live]')).toBeNull();
 });
 
 it("closes a shell with in-page confirmation when browser confirm is blocked", async () => {
@@ -227,7 +242,7 @@ it("closes a shell with in-page confirmation when browser confirm is blocked", a
     }),
   );
   const button = (id: string) => dom.window.document.querySelector<HTMLButtonElement>(id)!;
-  await vi.waitFor(() => expect(dom.window.document.querySelector<HTMLSelectElement>("#sessions")!.value).toBe("one"));
+  await vi.waitFor(() => expect(dom.window.document.querySelector<HTMLButtonElement>('#sessions [aria-pressed="true"]')!.dataset.session).toBe("one"));
   button("#close").click();
   const dialog = dom.window.document.querySelector<HTMLDialogElement>("#close-dialog");
   expect(dialog?.open).toBe(true);
