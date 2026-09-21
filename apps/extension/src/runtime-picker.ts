@@ -10,7 +10,7 @@ const RUNTIME_ICONS = new Map([
 ]);
 
 /** Presentation only: activation remains owned by the background runtime. */
-export function createRuntimePicker(onSelect: (id: string) => void) {
+export function createRuntimePicker(onSelect: (id: string) => void, onOpen: (open: boolean) => void) {
   const element = document.createElement("div");
   element.className = "runtime-switch";
   element.hidden = true;
@@ -34,24 +34,13 @@ export function createRuntimePicker(onSelect: (id: string) => void) {
   options.className = "runtime-options";
   options.setAttribute("aria-label", "Local workspaces");
   options.hidden = true;
-  const rain = document.createElement("div");
-  rain.className = "runtime-rain";
-  rain.setAttribute("aria-hidden", "true");
-  for (let i = 0; i < 12; i++) {
-    const stream = document.createElement("span");
-    stream.textContent = "01\nカイ\n10\nア0\n01\nウ1";
-    stream.style.setProperty("--stream", String(i));
-    rain.append(stream);
-  }
-  element.append(rain, trigger, options);
+  element.append(trigger, options);
   function setOpen(open: boolean) {
     options.hidden = !open;
     trigger.setAttribute("aria-expanded", String(open));
+    onOpen(open);
   }
   trigger.addEventListener("click", () => setOpen(options.hidden));
-  element.addEventListener("focusout", (event) => {
-    if (!element.contains(event.relatedTarget as Node | null)) setOpen(false);
-  });
   element.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !options.hidden) {
       event.stopPropagation();
@@ -66,6 +55,9 @@ export function createRuntimePicker(onSelect: (id: string) => void) {
   const optionButtons = new Map<string, HTMLButtonElement>();
   return {
     element,
+    trigger,
+    options,
+    setOpen,
     render(state: SurfaceViewState) {
       const runtimes = state.runtimes ?? [];
       const current = runtimes.find(item => item.id === state.runtimeId);

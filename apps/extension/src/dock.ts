@@ -1,22 +1,18 @@
 import { createRuntimePicker } from "./runtime-picker.js";
 import chillIcon from "@phosphor-icons/core/regular/cloud-sun.svg?raw";
 import focusIcon from "@phosphor-icons/core/regular/crosshair-simple.svg?raw";
-import opacityIcon from "@phosphor-icons/core/regular/circle-half-tilt.svg?raw";
 import watchIcon from "@phosphor-icons/core/regular/eye.svg?raw";
+import layersIcon from "@phosphor-icons/core/regular/stack.svg?raw";
+import backIcon from "@phosphor-icons/core/regular/arrow-left.svg?raw";
+import plusIcon from "@phosphor-icons/core/regular/plus.svg?raw";
 import type { AgentOnWebMode } from "@agentonweb/connector-contract";
-import logoDataUrl from "./assets/agentonweb-mark.png";
 import type { SurfaceViewState } from "./shared.js";
 
-const MODE_META: ReadonlyArray<{
-  readonly mode: AgentOnWebMode;
-  readonly label: string;
-  readonly shortcut: string;
-  readonly icon: string;
-}> = [
-  { mode: "chill", label: "Chill", shortcut: "⌃⇧1", icon: chillIcon },
-  { mode: "focus", label: "Focus", shortcut: "⌃⇧2", icon: focusIcon },
-  { mode: "watch", label: "Watch", shortcut: "⌃⇧3", icon: watchIcon },
-];
+const MODES = [
+  { mode: "chill", label: "Chill", icon: chillIcon },
+  { mode: "focus", label: "Focus", icon: focusIcon },
+  { mode: "watch", label: "Watch", icon: watchIcon },
+] as const;
 
 export interface SurfaceDock {
   readonly element: HTMLElement;
@@ -34,105 +30,131 @@ export function createDock(): SurfaceDock {
   const element = document.createElement("nav");
   element.className = "surface-dock";
   element.setAttribute("aria-label", "AgentOnWeb presentation controls");
-
+  const plate = document.createElement("div");
+  plate.className = "surface-plate";
+  plate.setAttribute("aria-hidden", "true");
   const palette = document.createElement("div");
   palette.className = "surface-palette";
   palette.id = "agentonweb-surface-palette";
-  palette.hidden = true;
-
-  const runtimePicker = createRuntimePicker(id => api.onRuntime(id));
-  element.append(runtimePicker.element);
-  const buttons = new Map<AgentOnWebMode, HTMLButtonElement>();
-  const api: SurfaceDock = {
-    element,
-    onDiscover: () => {},
-    onRuntime: (_runtimeId: string) => {},
-    onMode: (_mode: AgentOnWebMode) => {},
-    onOpacityPreview: (_opacity: number) => {},
-    onOpacity: (_opacity: number) => {},
-    focus: () => toggle.focus({ preventScroll: true }),
-    render(state) {
-      runtimePicker.render(state);
-      for (const [mode, button] of buttons) {
-        button.setAttribute("aria-pressed", String(state.mode === mode));
-      }
-      opacityInput.value = String(Math.round(state.opacity * 100));
-      opacityInput.disabled = state.runtime?.capabilities.translucency === false;
-      opacityValue.value = `${Math.round(state.opacity * 100)}%`;
-    },
-    setExpanded(expanded) {
-      element.dataset.expanded = String(expanded);
-      palette.hidden = !expanded;
-      toggle.setAttribute("aria-expanded", String(expanded));
-      toggle.setAttribute("aria-label", expanded ? "Collapse AgentOnWeb controls" : "Expand AgentOnWeb controls");
-    },
-  };
-
-  const discover = document.createElement("button");
-  discover.type = "button";
-  discover.className = "surface-icon-button";
-  discover.textContent = "+";
-  discover.setAttribute("aria-label", "Find local workspaces");
+  const header = document.createElement("div");
+  header.className = "surface-heading";
+  const heading = document.createElement("span");
+  heading.textContent = "AGENTONWEB";
+  const discover = button("Find local workspaces", plusIcon);
   discover.addEventListener("click", () => api.onDiscover());
-  element.append(discover);
-  for (const meta of MODE_META) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "surface-icon-button";
-    button.dataset.tooltip = `${meta.label.toUpperCase()}  ${meta.shortcut}`;
-    button.setAttribute("aria-label", `${meta.label} mode, shortcut Control Shift ${meta.shortcut.at(-1)}`);
-    button.append(iconElement(meta.icon));
-    button.addEventListener("click", () => api.onMode(meta.mode));
-    buttons.set(meta.mode, button);
-    palette.append(button);
-  }
-
+  const back = button("Back to controls", backIcon);
+  back.addEventListener("click", () => { runtimePicker.setOpen(false); runtimePicker.trigger.focus({ preventScroll: true }); });
+  header.append(heading, discover, back);
+  const controls = document.createElement("div");
+  controls.className = "surface-controls";
+  const modes = document.createElement("div");
+  modes.className = "surface-modes";
+  const light = document.createElement("span");
+  light.className = "surface-mode-light";
+  light.setAttribute("aria-hidden", "true");
+  modes.append(light);
+  const buttons = MODES.map((meta, index) => {
+    const item = button(`${meta.label} mode, shortcut Control Shift ${index + 1}`, meta.icon);
+    item.className = "surface-mode";
+    item.append(document.createTextNode(meta.label.toUpperCase()));
+    item.addEventListener("click", () => { api.onMode(meta.mode); pulse(); });
+    modes.append(item);
+    return item;
+  });
   const opacityControl = document.createElement("label");
   opacityControl.className = "surface-opacity";
-  opacityControl.dataset.tooltip = "CHILL OPACITY";
-  opacityControl.append(iconElement(opacityIcon));
+  const opacityLabel = document.createElement("span");
+  opacityLabel.className = "surface-opacity-label";
+  opacityLabel.textContent = "OPACITY";
   const opacityValue = document.createElement("output");
   opacityValue.className = "surface-opacity-value";
-  opacityValue.value = "60%";
+  opacityLabel.append(opacityValue);
   const opacityInput = document.createElement("input");
   opacityInput.type = "range";
   opacityInput.min = "20";
   opacityInput.max = "90";
   opacityInput.step = "1";
-  opacityInput.value = "60";
   opacityInput.setAttribute("aria-label", "Chill mode opacity");
   opacityInput.addEventListener("input", () => {
-    const next = Number(opacityInput.value) / 100;
     opacityValue.value = `${opacityInput.value}%`;
-    api.onOpacityPreview(next);
+    api.onOpacityPreview(Number(opacityInput.value) / 100);
   });
-  opacityInput.addEventListener("change", () => api.onOpacity(Number(opacityInput.value) / 100));
-  opacityControl.append(opacityValue, opacityInput);
-  palette.append(opacityControl);
-
-  const toggle = document.createElement("button");
-  toggle.type = "button";
+  opacityInput.addEventListener("change", () => { api.onOpacity(Number(opacityInput.value) / 100); pulse(); });
+  opacityControl.append(opacityLabel, opacityInput);
+  controls.append(modes, opacityControl);
+  palette.append(header, controls);
+  let expanded = false;
+  let workspaceView = false;
+  const runtimePicker = createRuntimePicker(id => api.onRuntime(id), open => {
+    workspaceView = open;
+    // Runtime selection replaces the controls inside the same shell.
+    if (open) expanded = true;
+    update();
+  });
+  const toggle = button("Expand AgentOnWeb controls", layersIcon);
   toggle.className = "surface-toggle";
-  toggle.dataset.tooltip = "AGENTONWEB";
   toggle.setAttribute("aria-controls", palette.id);
-  toggle.setAttribute("aria-expanded", "false");
-  toggle.setAttribute("aria-label", "Expand AgentOnWeb controls");
-  const logo = document.createElement("img");
-  logo.src = logoDataUrl;
-  logo.alt = "";
-  logo.draggable = false;
-  toggle.append(logo);
-  toggle.addEventListener("click", () => api.setExpanded(toggle.getAttribute("aria-expanded") !== "true"));
-
-  element.append(palette, toggle);
+  toggle.addEventListener("click", () => api.setExpanded(!expanded));
+  const sweep = document.createElement("div");
+  sweep.className = "surface-sweep";
+  sweep.setAttribute("aria-hidden", "true");
+  element.append(plate, palette, runtimePicker.element, toggle, sweep);
+  element.addEventListener("keydown", event => {
+    if (event.key === "Escape") { event.stopPropagation(); api.setExpanded(false); }
+  });
+  element.addEventListener("animationend", event => {
+    if (event.animationName === "surface-scan") element.classList.remove("is-pulsing");
+  });
+  function pulse() {
+    element.classList.remove("is-pulsing");
+    void element.offsetWidth;
+    element.classList.add("is-pulsing");
+  }
+  function update() {
+    element.dataset.expanded = String(expanded);
+    element.dataset.view = workspaceView ? "workspaces" : "controls";
+    palette.inert = !expanded;
+    runtimePicker.element.inert = !expanded;
+    controls.inert = !expanded || workspaceView;
+    heading.textContent = workspaceView ? "WORKSPACES" : "AGENTONWEB";
+    back.hidden = !workspaceView;
+    discover.hidden = workspaceView;
+    toggle.setAttribute("aria-expanded", String(expanded));
+    toggle.setAttribute("aria-label", expanded ? "Collapse AgentOnWeb controls" : "Expand AgentOnWeb controls");
+  }
+  const api: SurfaceDock = {
+    element,
+    onDiscover: () => {}, onRuntime: () => {}, onMode: () => {}, onOpacityPreview: () => {}, onOpacity: () => {},
+    focus: () => toggle.focus({ preventScroll: true }),
+    render(state) {
+      runtimePicker.render(state);
+      const index = MODES.findIndex(meta => meta.mode === state.mode);
+      buttons.forEach((item, i) => item.setAttribute("aria-pressed", String(i === index)));
+      light.style.transform = `translateX(calc(${index} * (100% + 6px)))`;
+      opacityInput.value = String(Math.round(state.opacity * 100));
+      opacityInput.disabled = state.mode !== "chill" || state.runtime?.capabilities.translucency === false;
+      opacityControl.dataset.disabled = String(opacityInput.disabled);
+      opacityValue.value = `${Math.round(state.opacity * 100)}%`;
+      toggle.dataset.unread = String(state.runtimes?.some(runtime => runtime.newOutput) ?? false);
+    },
+    setExpanded(next) {
+      if (!next && element.contains(element.getRootNode() instanceof ShadowRoot
+        ? (element.getRootNode() as ShadowRoot).activeElement : document.activeElement)) toggle.focus({ preventScroll: true });
+      expanded = next;
+      runtimePicker.setOpen(false);
+      update();
+      if (next) pulse();
+    },
+  };
   api.setExpanded(false);
   return api;
 }
 
-function iconElement(source: string): SVGElement {
-  const parsed = new DOMParser().parseFromString(source, "image/svg+xml").documentElement;
-  if (!(parsed instanceof SVGElement)) throw new Error("Phosphor icon did not parse as SVG");
-  parsed.setAttribute("aria-hidden", "true");
-  parsed.setAttribute("focusable", "false");
-  return parsed;
+function button(label: string, source: string): HTMLButtonElement {
+  const element = document.createElement("button");
+  element.type = "button";
+  element.setAttribute("aria-label", label);
+  element.innerHTML = source;
+  element.querySelector("svg")?.setAttribute("aria-hidden", "true");
+  return element;
 }
