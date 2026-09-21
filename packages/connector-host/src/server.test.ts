@@ -37,6 +37,10 @@ afterEach(async () => {
 });
 
 describe("runtime-independent connector", () => {
+  it("rejects undiscoverable authorization URLs before listening", async () => {
+    const { authority } = await setup();
+    await expect(startConnector({ ...adapter, approvalUrl: "http://localhost:3080/approve" }, authority, [0])).rejects.toThrow("Invalid native authorization URL");
+  });
   it("discovers without creating approval requests or revealing credentials", async () => {
     const { server, authority } = await setup(); const socket = await connect(server);
     hello(socket, { intent: "discover" });

@@ -11,6 +11,9 @@ const packages = {
   contract: await readJson("packages/connector-contract/package.json"),
   host: await readJson("packages/connector-host/package.json"),
   surface: await readJson("packages/dsh-surface-plugin/package.json"),
+  terminal: await readJson("packages/terminal-core/package.json"),
+  terminalUI: await readJson("apps/terminal-surface/package.json"),
+  terminalHost: await readJson("packages/terminal-host/package.json"),
 };
 
 const expectedNames = {
@@ -18,6 +21,9 @@ const expectedNames = {
   contract: "@agentonweb/connector-contract",
   host: "@agentonweb/connector-host",
   surface: "@agentonweb/dsh-surface",
+  terminal: "@agentonweb/terminal-core",
+  terminalUI: "@agentonweb/terminal-surface",
+  terminalHost: "@agentonweb/terminal-host",
 };
 
 for (const [key, expected] of Object.entries(expectedNames)) {
@@ -35,6 +41,9 @@ const expectedRuntimeEdges = {
   contract: [],
   host: [expectedNames.contract],
   surface: [],
+  terminal: [],
+  terminalUI: [],
+  terminalHost: [],
 };
 
 for (const [key, expected] of Object.entries(expectedRuntimeEdges)) {
@@ -102,9 +111,10 @@ const contract = await readJson("release-contract.json");
 const expectedArtifacts = {
   extension: `agentonweb-extension-${contract.extensionVersion}.zip`,
   dshPlugin: `agentonweb-dsh-surface-${contract.pluginVersion}.tgz`,
+  terminalHost: `agentonweb-terminal-host-${contract.terminalHostVersion}.tgz`,
 };
 if (JSON.stringify(contract.artifacts) !== JSON.stringify(expectedArtifacts)) {
   throw new Error("release-contract.json artifact names must be derived from their own release versions.");
 }
 
-console.log("Architecture contract passed: four packages, inward dependencies, no legacy seams.");
+console.log("Architecture contract passed: seven packages, inward dependencies, no legacy seams.");

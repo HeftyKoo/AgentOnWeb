@@ -19,6 +19,8 @@ const MODE_META: ReadonlyArray<{
 
 export interface SurfaceDock {
   readonly element: HTMLElement;
+  onDiscover: () => void;
+  onRuntime: (runtimeId: string) => void;
   onMode: (mode: AgentOnWebMode) => void;
   onOpacityPreview: (opacity: number) => void;
   onOpacity: (opacity: number) => void;
@@ -37,14 +39,29 @@ export function createDock(): SurfaceDock {
   palette.id = "agentonweb-surface-palette";
   palette.hidden = true;
 
+  const runtimeSwitch = document.createElement("div");
+  runtimeSwitch.className = "runtime-switch";
+  runtimeSwitch.setAttribute("aria-label", "Local workspaces");
+  element.append(runtimeSwitch);
   const buttons = new Map<AgentOnWebMode, HTMLButtonElement>();
   const api: SurfaceDock = {
     element,
+    onDiscover: () => {},
+    onRuntime: (_runtimeId: string) => {},
     onMode: (_mode: AgentOnWebMode) => {},
     onOpacityPreview: (_opacity: number) => {},
     onOpacity: (_opacity: number) => {},
     focus: () => toggle.focus({ preventScroll: true }),
     render(state) {
+      runtimeSwitch.replaceChildren(...(state.runtimes ?? []).map(runtime => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = `${runtime.displayName}${runtime.newOutput ? " •" : ""}`;
+        button.setAttribute("aria-label", `${runtime.displayName}${runtime.newOutput ? ", new output" : ""}`);
+        button.setAttribute("aria-pressed", String(state.runtimeId === runtime.id));
+        button.addEventListener("click", () => api.onRuntime(runtime.id));
+        return button;
+      }));
       for (const [mode, button] of buttons) {
         button.setAttribute("aria-pressed", String(state.mode === mode));
       }
@@ -60,6 +77,13 @@ export function createDock(): SurfaceDock {
     },
   };
 
+  const discover = document.createElement("button");
+  discover.type = "button";
+  discover.className = "surface-icon-button";
+  discover.textContent = "+";
+  discover.setAttribute("aria-label", "Find local workspaces");
+  discover.addEventListener("click", () => api.onDiscover());
+  element.append(discover);
   for (const meta of MODE_META) {
     const button = document.createElement("button");
     button.type = "button";

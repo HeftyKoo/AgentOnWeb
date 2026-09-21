@@ -27,7 +27,7 @@ export async function installSafariSessionGate(): Promise<void> {
   const copy = document.createElement("p");
   copy.textContent = visitNonce
     ? "Continue to your website, then allow Safari to use this local workspace session there."
-    : "Safari needs permission to use your local DSH session on this website. Your session stays on this Mac.";
+    : "Safari needs permission to use your local workspace session on this website. Your session stays on this Mac.";
   const action = document.createElement("button");
   action.textContent = visitNonce ? "Continue to website" : "Allow local session";
   const error = document.createElement("p");

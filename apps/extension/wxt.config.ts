@@ -43,7 +43,7 @@ export default defineConfig({
   publicDir: "icons",
   manifest: ({ browser, manifestVersion }) => ({
     name: "AgentOnWeb",
-    description: "Agent On Web. Bring your native coding agent onto any website. This edition: DSH On Web.",
+    description: "Bring your local terminal and DSH workspace onto the website you are using.",
     version: releaseContract.extensionVersion,
     ...(browser === "chrome" ? { minimum_chrome_version: "132" } : {}),
     icons: {
