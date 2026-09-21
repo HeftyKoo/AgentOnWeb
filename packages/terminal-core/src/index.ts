@@ -13,7 +13,7 @@ export class TerminalSession {
   readonly terminal = new headless.Terminal({ cols: 100, rows: 30, scrollback: 3000, allowProposedApi: true });
   readonly serializer = new serialize.SerializeAddon();
   #clients = new Map<string, Client>();
-  #controller: string | undefined;
+  #resizeOwner: string | undefined;
   #lease = 0;
   #sequence = 0;
   #pendingBytes = 0;
@@ -51,9 +51,6 @@ export class TerminalSession {
       viewer.send({ type: "snapshot", epoch: this.epoch, sequence: this.#sequence,
         cols: this.terminal.cols, rows: this.terminal.rows, data: this.serializer.serialize(), exitCode: this.#exited });
       this.#clients.get(id)!.ready = true;
-      // An unowned terminal is ready to type immediately. Existing writers
-      // are never displaced by opening another browser view.
-      if (!this.#controller && this.#exited === undefined) { this.#controller = id; ++this.#lease; }
       this.#state();
     });
     this.#clients.set(id, { viewer, outstanding: new Map(), bytes: 0, ready: false });
@@ -62,7 +59,7 @@ export class TerminalSession {
 
   detach(id: string): void {
     this.#clients.delete(id);
-    if (this.#controller === id) { this.#controller = undefined; ++this.#lease; this.#state(); }
+    if (this.#resizeOwner === id) { this.#resizeOwner = undefined; ++this.#lease; this.#state(); }
   }
 
   receive(id: string, message: unknown): void {
@@ -73,14 +70,22 @@ export class TerminalSession {
       for (const [seq, bytes] of client.outstanding) if (seq <= (m.sequence as number)) { client.bytes -= bytes; client.outstanding.delete(seq); }
       return;
     }
-    if (m.type === "take-control" && this.#exited === undefined) { this.#controller = id; ++this.#lease; this.#state(); return; }
-    if (id !== this.#controller || m.lease !== this.#lease || m.epoch !== this.epoch || this.#exited !== undefined) return;
+    if (!client.ready || m.epoch !== this.epoch || this.#exited !== undefined) return;
+    // Input is shared. The lease coordinates only viewport size, never typing.
+    if (m.type === "focus") {
+      if (this.#resizeOwner !== id) { this.#resizeOwner = id; ++this.#lease; this.#state(); }
+      return;
+    }
+    if (m.type === "blur") {
+      if (this.#resizeOwner === id && m.lease === this.#lease) { this.#resizeOwner = undefined; ++this.#lease; this.#state(); }
+      return;
+    }
     if (m.type === "input" && typeof m.data === "string" && m.data.length <= 65536) this.pty.write(m.data);
     // xterm's binary event carries raw bytes (for example legacy mouse reports),
     // not Unicode text. Writing it as a string would UTF-8 encode high bytes.
     if (m.type === "input-binary" && typeof m.data === "string" && m.data.length <= 65536
       && /^[\x00-\xff]*$/u.test(m.data)) this.pty.write(Buffer.from(m.data, "latin1"));
-    if (m.type === "resize" && Number.isInteger(m.cols) && Number.isInteger(m.rows)
+    if (m.type === "resize" && id === this.#resizeOwner && m.lease === this.#lease && Number.isInteger(m.cols) && Number.isInteger(m.rows)
       && (m.cols as number) >= 2 && (m.cols as number) <= 500 && (m.rows as number) >= 2 && (m.rows as number) <= 300) {
       this.terminal.resize(m.cols as number, m.rows as number);
       this.pty.resize(m.cols as number, m.rows as number);
@@ -94,6 +99,6 @@ export class TerminalSession {
     if (this.#exited === undefined) this.pty.kill();
     this.terminal.dispose();
   }
-  #state(): void { for (const [id, client] of this.#clients) client.viewer.send({ type: "control", active: this.#exited === undefined && id === this.#controller, exited: this.#exited, lease: this.#lease, epoch: this.epoch }); }
+  #state(): void { for (const [id, client] of this.#clients) client.viewer.send({ type: "control", active: this.#exited === undefined, resizeOwner: id === this.#resizeOwner, exited: this.#exited, lease: this.#lease, epoch: this.epoch }); }
   #broadcast(message: object): void { for (const client of this.#clients.values()) client.viewer.send(message); }
 }

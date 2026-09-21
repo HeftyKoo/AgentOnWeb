@@ -25,8 +25,6 @@ function showStatus(message: string) {
   if (notice.textContent !== message) notice.textContent = message;
   notice.hidden = message === "Connected";
 }
-const control = document.querySelector<HTMLButtonElement>("#control")!;
-const image = document.querySelector<HTMLButtonElement>("#image")!;
 terminal.open(container);
 const sessionPicker = document.querySelector<HTMLElement>("#sessions")!;
 const newButton = document.querySelector<HTMLButtonElement>("#new")!;
@@ -88,7 +86,22 @@ async function refreshSessions(current: number) {
       button.type = "button";
       button.className = "tab-select";
       button.dataset.session = item.id;
-      button.title = item.name;
+      tab.title = "Loading folder…";
+      let folderPending = false;
+      const showFolder = async () => {
+        if (folderPending) return;
+        folderPending = true;
+        try {
+          const result: { id?: string; cwd?: string } = await api("/api/terminals?cwd=" + encodeURIComponent(item.id));
+          tab.title = result.id === item.id && result.cwd ? result.cwd : "Current folder unavailable";
+        } catch {
+          tab.title = "Current folder unavailable";
+        } finally {
+          folderPending = false;
+        }
+      };
+      tab.addEventListener("mouseenter", () => { void showFolder(); });
+      button.addEventListener("focus", () => { void showFolder(); });
       button.setAttribute("aria-pressed", String(item.id === sessionId));
       tab.dataset.selected = String(item.id === sessionId);
       const dot = document.createElement("span");
@@ -134,6 +147,7 @@ let socket: WebSocket | undefined;
 let epoch = "",
   lease = 0,
   active = false,
+  resizeOwner = false,
   ready = false,
   retry: ReturnType<typeof setTimeout> | undefined;
 let generation = 0;
@@ -143,7 +157,7 @@ function send(message: object) {
   if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
 }
 function resize() {
-  if (!active || !ready || document.hidden || container.clientWidth < 30 || container.clientHeight < 30) return;
+  if (!active || !ready || !resizeOwner || !document.hasFocus() || document.hidden || container.clientWidth < 30 || container.clientHeight < 30) return;
   const size = fit.proposeDimensions();
   if (size && size.cols >= 2 && size.rows >= 2) send({ type: "resize", ...size, epoch, lease });
 }
@@ -172,14 +186,29 @@ for (const identifier of [
 for (const code of [4, 10, 11, 12]) terminal.parser.registerOscHandler(code, (data) => data.includes("?"));
 terminal.onData((data) => input(data));
 terminal.onBinary((data) => input(data, true));
-control.onclick = () => {
-  send({ type: "take-control" });
-  terminal.focus();
-};
-image.onclick = () => {
+function focusView() {
+  if (ready && active && !document.hidden && document.hasFocus()) send({ type: "focus", epoch });
+}
+function blurView() {
+  if (ready && resizeOwner) send({ type: "blur", epoch, lease });
+  resizeOwner = false;
+}
+window.addEventListener("focus", focusView);
+window.addEventListener("blur", blurView);
+container.addEventListener("focusin", focusView);
+container.addEventListener("pointerdown", focusView);
+// Capture before xterm's text-only paste handler. Command+V supplies the
+// clipboard event; the native CLI reads the host clipboard on Ctrl+V.
+container.addEventListener("paste", event => {
+  const clipboard = event.clipboardData;
+  if (!clipboard) return;
+  const hasImage = Array.from(clipboard.items).some(item => item.type.startsWith("image/"))
+    || Array.from(clipboard.files).some(file => file.type.startsWith("image/"));
+  if (!hasImage) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
   input("\x16");
-  terminal.focus();
-};
+}, true);
 async function connect(automaticRetry = false) {
   if (parent !== window && !authorizedParent) return;
   const current = ++generation;
@@ -189,9 +218,8 @@ async function connect(automaticRetry = false) {
   }
   setConnectionState("connecting");
   socket?.close();
-  ready = active = false;
+  ready = active = resizeOwner = false;
   terminal.options.disableStdin = true;
-  control.disabled = image.disabled = true;
   // Retain the last failure while retrying; don't flash an intermediate state
   // or repeatedly announce the same failure to assistive technology.
   if (!automaticRetry) showStatus("Connecting…");
@@ -223,11 +251,11 @@ async function connect(automaticRetry = false) {
         terminal.write(m.data, () => {
           if (current !== generation) return;
           ready = true;
-          control.disabled = m.exitCode !== undefined;
           if (focusOnConnect) {
             focusOnConnect = false;
             terminal.focus();
           }
+          focusView();
           resize();
         });
         if (m.exitCode !== undefined)
@@ -243,36 +271,32 @@ async function connect(automaticRetry = false) {
         }
       } else if (m.type === "control") {
         setConnectionState(m.exited !== undefined ? "exited" : "connected");
-        control.hidden = m.active || m.exited !== undefined;
+        const wasActive = active;
         active = m.active;
+        resizeOwner = m.resizeOwner === true;
         lease = m.lease;
         epoch = m.epoch;
         terminal.options.disableStdin = !active;
-        image.disabled = !active;
-        control.textContent = active ? "You control this terminal" : "Control here";
         showStatus(
           m.exited !== undefined
             ? `Process exited (${m.exited}). Open a new terminal with +.`
-            : active
-              ? "Connected"
-              : "Read-only · take control to type");
-        control.disabled = m.exited !== undefined;
+            : "Connected");
+        if (!wasActive) focusView();
+        if (document.hidden || !document.hasFocus()) blurView();
         resize();
       } else if (m.type === "resize") terminal.resize(m.cols, m.rows);
       else if (m.type === "exit") {
         setConnectionState("exited");
         active = false;
         terminal.options.disableStdin = true;
-        control.disabled = image.disabled = true;
         showStatus(`Process exited (${m.code}). Open a new terminal with +.`);
       }
     };
     ws.onclose = (event) => {
       if (current !== generation) return;
       setConnectionState("disconnected");
-      ready = active = false;
+      ready = active = resizeOwner = false;
       terminal.options.disableStdin = true;
-      control.disabled = image.disabled = true;
       showStatus(
         event.code === 4401
           ? "Authorization revoked. Connect again from AgentOnWeb."
@@ -387,7 +411,10 @@ if (parent === window) {
   }, 2000);
 }
 new ResizeObserver(resize).observe(container);
-document.addEventListener("visibilitychange", resize);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) blurView();
+  else focusView();
+});
 const nonce = new URLSearchParams(location.hash.slice(1)).get("agentonweb");
 let authorizedParent = parent === window;
 let mode = "focus",

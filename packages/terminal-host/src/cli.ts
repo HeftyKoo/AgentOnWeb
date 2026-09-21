@@ -7,6 +7,7 @@ import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { Authorization, startConnector } from "@agentonweb/connector-host";
 import { TerminalSession } from "@agentonweb/terminal-core";
+import { processDirectory } from "./process-directory.js";
 import { lockHost } from "./host-lock.js";
 import { executablePath, shellLaunch } from "./launch.js";
 import { serviceCommand, serviceDirectory } from "./service.js";
@@ -113,6 +114,13 @@ const server = createServer(async (req, res) => {
         return;
       }
       res.setHeader("Content-Type", "application/json");
+      if (req.method === "GET" && url.pathname === "/api/terminals" && url.searchParams.has("cwd")) {
+        const id = url.searchParams.get("cwd")!;
+        const item = sessions.get(id);
+        if (!item) { res.writeHead(404).end(); return; }
+        res.end(JSON.stringify({ id, cwd: await processDirectory(item.session.pty.pid) }));
+        return;
+      }
       if (req.method === "POST") {
         if (req.headers.origin !== origin) {
           res.writeHead(403).end();

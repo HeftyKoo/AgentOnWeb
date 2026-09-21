@@ -1,6 +1,6 @@
 import { createConnection } from "node:net";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { mkdtemp, realpath, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { once } from "node:events";
@@ -146,6 +146,15 @@ it("keeps shell sessions alive across viewers and isolates setup authorization f
       timeout: 5000,
     })
     .toBe(true);
+  const folderUrl = origin + "/api/terminals?cwd=" + created.id;
+  expect((await fetch(folderUrl)).status).toBe(403);
+  if (["darwin", "linux"].includes(process.platform)) {
+    expect(await (await fetch(folderUrl, { headers })).json()).toEqual({ id: created.id, cwd: await realpath("/tmp") });
+    const other = await (await fetch(origin + "/api/terminals?cwd=" + initial[0]!.id, { headers })).json();
+    expect(other.id).toBe(initial[0]!.id);
+    expect(other.cwd).not.toBe(await realpath("/tmp"));
+  }
+  expect((await fetch(origin + "/api/terminals?cwd=missing", { headers })).status).toBe(404);
   socket.close();
   const kept = (await (await fetch(origin + "/api/terminals", { headers })).json()) as { id: string }[];
   expect(kept.some((item) => item.id === created.id)).toBe(true);

@@ -51,8 +51,6 @@ header {
 @media (hover:none) { .tab-close { opacity:1; pointer-events:auto; } }
 [hidden] { display:none !important; }
 #new { flex:none; width:32px; padding:0; background:transparent; border:0; font-size:18px; }
-.terminal-tools { display:flex; align-items:center; gap:4px; margin-left:auto; padding-bottom:5px; }
-.terminal-tools button { white-space:nowrap; background:transparent; border:0; color:#98a79e; font-size:12px; }
 #connection-notice { position:absolute; top:50px; right:12px; z-index:4; max-width:calc(100vw - 24px); padding:7px 11px; background:#18231c; color:#d1e6d9; border:1px solid #45604e; border-radius:6px; font-size:12px; pointer-events:none; }
 #connection-notice[hidden] { display:none; }
 summary:focus-visible { outline:2px solid #68f99c; outline-offset:2px; }

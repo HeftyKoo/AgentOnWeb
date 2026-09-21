@@ -14,7 +14,6 @@ function viewer(session: TerminalSession) {
 it("restores parsed terminal state after a disconnected view while keeping the process", async () => {
   const session = makeSession(); const first = viewer(session);
   await vi.waitFor(() => expect(session.serializer.serialize()).toContain("READY"));
-  session.receive(first.id, { type: "take-control" });
   const grant = first.messages.slice().reverse().find(m => m.type === "control");
   session.receive(first.id, { type: "input", data: "draft", epoch: grant.epoch, lease: grant.lease });
   await vi.waitFor(() => expect(session.serializer.serialize()).toContain("INPUT:draft"));
@@ -23,20 +22,39 @@ it("restores parsed terminal state after a disconnected view while keeping the p
   await vi.waitFor(() => expect(second.messages.find(m => m.type === "snapshot")?.data).toContain("INPUT:draft"));
   expect(session.pty.pid).toBe(pid);
 });
-it("rejects old writer leases and only accepts resize from the controller", async () => {
+it("shares input across viewers while only the focused view controls size", async () => {
   const session = makeSession(); const one = viewer(session); const two = viewer(session);
-  session.receive(one.id, { type: "take-control" });
-  const old = one.messages.slice().reverse().find(m => m.type === "control");
-  session.receive(two.id, { type: "take-control" });
-  const current = two.messages.slice().reverse().find(m => m.type === "control");
-  session.receive(one.id, { type: "input", data: "FORBIDDEN", epoch: old.epoch, lease: old.lease });
-  session.receive(one.id, { type: "resize", cols: 44, rows: 10, epoch: old.epoch, lease: old.lease });
+  await vi.waitFor(() => expect(session.serializer.serialize()).toContain("READY"));
+  expect(one.messages.find(m => m.type === "control").active).toBe(true);
+  expect(two.messages.find(m => m.type === "control").active).toBe(true);
+  const write = vi.spyOn(session.pty, "write");
+  session.receive(one.id, { type: "focus", epoch: session.epoch });
+  const old = one.messages.at(-1);
+  session.receive(two.id, { type: "focus", epoch: session.epoch });
+  const current = two.messages.at(-1);
+  session.receive(one.id, { type: "input", data: "FIRST", epoch: session.epoch, lease: old.lease });
+  session.receive(two.id, { type: "input", data: "SECOND", epoch: session.epoch, lease: current.lease });
+  expect(write.mock.calls.map(call => call[0])).toEqual(["FIRST", "SECOND"]);
+  session.receive(one.id, { type: "resize", cols: 44, rows: 10, epoch: session.epoch, lease: old.lease });
   expect(session.terminal.cols).toBe(100);
-  session.receive(two.id, { type: "resize", cols: 80, rows: 24, epoch: current.epoch, lease: current.lease });
+  session.receive(two.id, { type: "resize", cols: 80, rows: 24, epoch: session.epoch, lease: current.lease });
   expect(session.terminal.cols).toBe(80);
-  session.receive(two.id, { type: "input", data: "ALLOWED", epoch: current.epoch, lease: current.lease });
-  await vi.waitFor(() => expect(session.serializer.serialize()).toContain("ALLOWED"));
-  expect(session.serializer.serialize()).not.toContain("FORBIDDEN");
+  expect(one.messages.at(-1)).toMatchObject({ type: "resize", cols: 80 });
+  // Late blur from the previous view must not release the newly focused view.
+  session.receive(one.id, { type: "blur", epoch: session.epoch, lease: old.lease });
+  session.receive(two.id, { type: "resize", cols: 90, rows: 24, epoch: session.epoch, lease: current.lease });
+  expect(session.terminal.cols).toBe(90);
+  session.receive(two.id, { type: "blur", epoch: session.epoch, lease: current.lease });
+  session.receive(two.id, { type: "resize", cols: 40, rows: 24, epoch: session.epoch, lease: current.lease });
+  expect(session.terminal.cols).toBe(90);
+  session.receive(one.id, { type: "input", data: "STALE", epoch: "old" });
+  expect(write.mock.calls.map(call => call[0])).toEqual(["FIRST", "SECOND"]);
+  await vi.waitFor(() => expect(session.serializer.serialize()).toContain("SECOND"));
+  for (const view of [one, two]) expect(view.messages.filter(m => m.type === "output").map(m => m.data).join("")).toContain("FIRST");
+  session.detach(two.id);
+  const before = write.mock.calls.length;
+  session.receive(two.id, { type: "input", data: "DETACHED", epoch: session.epoch });
+  expect(write).toHaveBeenCalledTimes(before);
 });
 it("preserves raw mouse bytes while encoding ordinary terminal input as UTF-8", async () => {
   const session = new TerminalSession(process.execPath, ["-e", "process.stdin.setRawMode(true); process.stdout.write('READY\\r\\n'); process.stdin.on('data', b => process.stdout.write('HEX:' + b.toString('hex') + '\\r\\n'))"], process.cwd(), { PATH: process.env.PATH ?? "" });
@@ -59,7 +77,6 @@ it("drops a slow viewer without stopping the PTY or a responsive viewer", async 
   const fastClose = vi.fn();
   fastId = session.attach({ send(message: any) { fastMessages.push(message); if (message.type === "output") session.receive(fastId, { type: "ack", sequence: message.sequence }); }, close: fastClose });
   await vi.waitFor(() => expect(session.serializer.serialize()).toContain("READY"));
-  session.receive(fastId, { type: "take-control" });
   const grant = fastMessages.slice().reverse().find(m => m.type === "control");
   session.receive(fastId, { type: "input", data: "x", epoch: grant.epoch, lease: grant.lease });
   // Observe delivered output instead of repeatedly serializing thousands of
@@ -107,7 +124,7 @@ it("does not grant control or accept input after the process exits", async () =>
   const write = vi.spyOn(session.pty, "write");
   const resize = vi.spyOn(session.pty, "resize");
   const count = restored.messages.length;
-  session.receive(restored.id, { type: "take-control" });
+  session.receive(restored.id, { type: "focus", epoch: grant.epoch });
   session.receive(restored.id, { type: "input", epoch: grant.epoch, lease: grant.lease, data: "ignored" });
   session.receive(restored.id, { type: "resize", epoch: grant.epoch, lease: grant.lease, cols: 80, rows: 24 });
   expect(restored.messages).toHaveLength(count);
