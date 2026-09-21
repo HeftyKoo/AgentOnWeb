@@ -1,3 +1,4 @@
+import { createRuntimePicker } from "./runtime-picker.js";
 import chillIcon from "@phosphor-icons/core/regular/cloud-sun.svg?raw";
 import focusIcon from "@phosphor-icons/core/regular/crosshair-simple.svg?raw";
 import opacityIcon from "@phosphor-icons/core/regular/circle-half-tilt.svg?raw";
@@ -39,10 +40,8 @@ export function createDock(): SurfaceDock {
   palette.id = "agentonweb-surface-palette";
   palette.hidden = true;
 
-  const runtimeSwitch = document.createElement("div");
-  runtimeSwitch.className = "runtime-switch";
-  runtimeSwitch.setAttribute("aria-label", "Local workspaces");
-  element.append(runtimeSwitch);
+  const runtimePicker = createRuntimePicker(id => api.onRuntime(id));
+  element.append(runtimePicker.element);
   const buttons = new Map<AgentOnWebMode, HTMLButtonElement>();
   const api: SurfaceDock = {
     element,
@@ -53,15 +52,7 @@ export function createDock(): SurfaceDock {
     onOpacity: (_opacity: number) => {},
     focus: () => toggle.focus({ preventScroll: true }),
     render(state) {
-      runtimeSwitch.replaceChildren(...(state.runtimes ?? []).map(runtime => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = `${runtime.displayName}${runtime.newOutput ? " •" : ""}`;
-        button.setAttribute("aria-label", `${runtime.displayName}${runtime.newOutput ? ", new output" : ""}`);
-        button.setAttribute("aria-pressed", String(state.runtimeId === runtime.id));
-        button.addEventListener("click", () => api.onRuntime(runtime.id));
-        return button;
-      }));
+      runtimePicker.render(state);
       for (const [mode, button] of buttons) {
         button.setAttribute("aria-pressed", String(state.mode === mode));
       }

@@ -287,9 +287,29 @@ button { cursor: pointer; }
 .surface-setup small[data-error="true"] { color: #d3a95a; }
 .surface-setup .surface-setup-hint { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.12); font-size: 11px; }
 
-.runtime-switch { display:flex; gap:4px; pointer-events:auto; }
-.runtime-switch:empty { display:none; }
-.runtime-switch button { border:1px solid #ffffff30; border-radius:8px; background:#171c25; color:#eee; padding:8px 10px; font:12px system-ui; cursor:pointer; max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.runtime-switch button[aria-pressed="true"] { background:#354055; border-color:#aabbd2; }
-
-.runtime-switch { align-self:flex-end; width:max-content; max-width:calc(100vw - 28px); flex-wrap:wrap; justify-content:flex-end; }
+/* Fixed geometry: labels, glyphs and effects never resize the dock or iframe. */
+.runtime-switch { position:relative; align-self:flex-end; flex:none; width:208px; height:42px; pointer-events:auto; }
+.runtime-switch[hidden], .runtime-options[hidden] { display:none; }
+.runtime-switch button { font:12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; cursor:pointer; color:#d7e7dd; }
+.runtime-current { position:relative; display:grid; grid-template-columns:20px minmax(0,1fr) 12px; align-items:center; gap:9px; width:100%; height:42px; padding:0 12px; background:#0c1410; border:1px solid #344b3d; border-radius:8px; overflow:hidden; }
+.runtime-current::before { content:""; position:absolute; bottom:0; left:12px; right:12px; height:1px; background:#68f99c; opacity:.65; }
+.runtime-current::after { content:"01 ア 10 カ 01 ウ"; position:absolute; inset:0; display:grid; place-items:center; background:#0c1410; color:#68f99c; opacity:0; pointer-events:none; font:12px monospace; letter-spacing:3px; }
+.runtime-current:hover, .runtime-current[aria-expanded="true"] { border-color:#68f99c; }
+.runtime-name { display:block; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; text-align:left; }
+.runtime-symbol, .runtime-caret { display:flex; color:#68f99c; }
+.runtime-symbol svg { width:20px; height:20px; fill:currentColor; }
+.runtime-caret svg { width:12px; height:12px; fill:currentColor; }
+.runtime-current[data-unread="true"] .runtime-caret { color:#ffc978; }
+.runtime-options { position:absolute; right:0; bottom:50px; z-index:8; width:min(270px,calc(100vw - 28px)); padding:5px; background:#101a14; border:1px solid #344b3d; border-radius:9px; box-shadow:0 8px 24px #0006; }
+.runtime-options button { display:block; width:100%; min-height:40px; padding:9px 12px 9px 24px; position:relative; border:0; border-radius:4px; background:transparent; text-align:left; overflow-wrap:anywhere; }
+.runtime-options button:hover { background:#1c2b21; }
+.runtime-options button[aria-pressed="true"] { color:#68f99c; }
+.runtime-options button[aria-pressed="true"]::before { content:""; position:absolute; left:9px; top:17px; width:5px; height:5px; border-radius:50%; background:#68f99c; }
+.runtime-switch button:focus-visible { outline:2px solid #68f99c; outline-offset:2px; }
+.runtime-rain { position:absolute; right:0; bottom:0; width:208px; height:140px; overflow:hidden; pointer-events:none; mask-image:linear-gradient(transparent,#000 65%); }
+.runtime-rain span { position:absolute; left:calc(var(--stream) * 18px); top:-85px; white-space:pre; color:#68f99c; font:11px/13px monospace; opacity:0; }
+.is-switching .runtime-rain span { animation:runtime-rain 620ms ease-out both; animation-delay:calc(var(--stream) * 5ms); }
+.is-switching .runtime-current::after { animation:runtime-decode 620ms steps(6,end) both; }
+@keyframes runtime-rain { 0% { transform:translateY(0); opacity:0; } 25% { opacity:.55; } 100% { transform:translateY(210px); opacity:0; } }
+@keyframes runtime-decode { 0% { opacity:1; transform:translateY(0); } 60% { opacity:.6; transform:translateY(2px); } 100% { opacity:0; transform:translateY(-8px); } }
+@media (prefers-reduced-motion:reduce) { .is-switching .runtime-rain span, .is-switching .runtime-current::after { animation:none; } }
