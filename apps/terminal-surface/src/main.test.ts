@@ -77,10 +77,12 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
   let resolveOld!: (response: Response) => void;
   let lists = 0;
   const ticketUrls: string[] = [];
+  let folder = "/projects/one";
   vi.stubGlobal(
     "fetch",
     vi.fn(async (path: string, options: any) => {
       if (path === "/api/connections") return new Response("", { status: 403 });
+      if (path.startsWith("/api/terminals?cwd=")) return Response.json({ id: path.split("=")[1], cwd: folder });
       if (path === "/api/terminals" && options.method === "POST") return Response.json({ id: "two" });
       if (path === "/api/terminals") {
         lists++;
@@ -104,6 +106,12 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
   await import("./main.js");
   expect(dom.window.location.href).toBe("http://localhost:1234/");
   await vi.waitFor(() => expect(sockets).toHaveLength(1));
+  const tab = dom.window.document.querySelector<HTMLElement>(".terminal-tab")!;
+  tab.dispatchEvent(new dom.window.MouseEvent("mouseenter"));
+  await vi.waitFor(() => expect(tab.title).toBe("/projects/one"));
+  folder = "/projects/changed folder";
+  tab.dispatchEvent(new dom.window.MouseEvent("mouseenter"));
+  await vi.waitFor(() => expect(tab.title).toBe(folder));
   const message = (socket: any, value: object) => socket.onmessage({ data: JSON.stringify(value) });
   message(sockets[0], {
     type: "snapshot",
@@ -120,6 +128,29 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
     active: true,
   });
   expect(dom.window.document.querySelector<HTMLElement>("#connection-notice")!.hidden).toBe(true);
+  Object.defineProperty(dom.window.document, "hidden", { value: false });
+  const focused = vi.spyOn(dom.window.document, "hasFocus").mockReturnValue(true);
+  const terminalElement = dom.window.document.querySelector<HTMLElement>("#terminal")!;
+  Object.defineProperty(terminalElement, "clientWidth", { value: 800 });
+  Object.defineProperty(terminalElement, "clientHeight", { value: 500 });
+  dom.window.dispatchEvent(new dom.window.Event("focus"));
+  expect(sockets[0].sent.at(-1)).toEqual({ type: "focus", epoch: "old" });
+  message(sockets[0], { type: "control", epoch: "old", lease: 1, active: true, resizeOwner: true });
+  expect(sockets[0].sent.at(-1)).toEqual({ type: "resize", cols: 80, rows: 24, epoch: "old", lease: 1 });
+  focused.mockReturnValue(false);
+  dom.window.dispatchEvent(new dom.window.Event("blur"));
+  expect(sockets[0].sent.at(-1)).toEqual({ type: "blur", epoch: "old", lease: 1 });
+  message(sockets[0], { type: "control", epoch: "old", lease: 1, active: true, resizeOwner: false });
+
+  const paste = new dom.window.Event("paste", { bubbles: true, cancelable: true });
+  Object.defineProperty(paste, "clipboardData", { value: { items: [{ type: "image/png", kind: "file" }], files: [] } });
+  dom.window.document.querySelector("#terminal")!.dispatchEvent(paste);
+  expect(paste.defaultPrevented).toBe(true);
+  expect(sockets[0].sent).toContainEqual({ type: "input", data: "\x16", epoch: "old", lease: 1 });
+  const textPaste = new dom.window.Event("paste", { bubbles: true, cancelable: true });
+  Object.defineProperty(textPaste, "clipboardData", { value: { items: [{ type: "text/plain", kind: "string" }], files: [] } });
+  dom.window.document.querySelector("#terminal")!.dispatchEvent(textPaste);
+  expect(textPaste.defaultPrevented).toBe(false);
   terminalMock.binary!("\x1b[M\x20\x80\x40");
   terminalMock.input!("世界 👋");
   expect(sockets[0].sent).toContainEqual({
@@ -174,7 +205,7 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
     exited: 0,
   });
   terminalMock.writes.shift()!();
-  expect(dom.window.document.querySelector<HTMLButtonElement>("#control")!.disabled).toBe(true);
+  expect(dom.window.document.querySelector("#control")).toBeNull();
   expect(dom.window.document.querySelector<HTMLElement>("#connection-notice")!.hidden).toBe(false);
   dom.window.document.querySelector<HTMLButtonElement>('.tab-select[data-session="one"]')!.click();
   await vi.waitFor(() => expect(sockets).toHaveLength(3));
@@ -192,6 +223,11 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
   expect(dom.window.document.querySelector('.terminal-tab[data-session="one"]')!.getAttribute("data-state")).toBe("connecting");
   expect(dom.window.document.querySelector<HTMLButtonElement>('.terminal-tab[data-session="one"] .tab-reconnect')!.disabled).toBe(true);
   expect(dom.window.document.querySelector("#terminal-actions")).toBeNull();
+  const sentBefore = sockets[3].sent.length;
+  const blockedPaste = new dom.window.Event("paste", { bubbles: true, cancelable: true });
+  Object.defineProperty(blockedPaste, "clipboardData", { value: { items: [{ type: "image/png" }], files: [] } });
+  dom.window.document.querySelector("#terminal")!.dispatchEvent(blockedPaste);
+  expect(sockets[3].sent).toHaveLength(sentBefore);
   expect(dom.window.document.querySelector('#status[role="status"], #status[aria-live]')).toBeNull();
 });
 
