@@ -33,12 +33,14 @@ const sessionStates = new Map<string, ConnectionState>();
 function updateTabs() {
   for (const tab of sessionPicker.querySelectorAll<HTMLElement>(".terminal-tab")) {
     const id = tab.dataset.session!;
+    tab.dataset.selected = String(id === sessionId);
+    tab.querySelector(".tab-select")!.setAttribute("aria-pressed", String(id === sessionId));
     const state = sessionStates.get(id) ?? "background";
     tab.dataset.state = state;
     const label = state === "background" ? "In local host" : state === "connecting" ? "Connecting…" : state === "exited" ? "Process exited" : state === "connected" ? "Connected" : "Disconnected";
     const dot = tab.querySelector<HTMLElement>(".status-dot")!;
-    dot.title = label;
     dot.setAttribute("aria-label", label);
+    dot.title = label;
     const reconnect = tab.querySelector<HTMLButtonElement>(".tab-reconnect")!;
     reconnect.hidden = state !== "disconnected" && state !== "connecting";
     reconnect.disabled = state !== "disconnected";
@@ -72,12 +74,85 @@ async function api(path: string, action?: object) {
   }
   return response.json();
 }
+const tabMenu = document.querySelector<HTMLElement>("#tab-menu")!;
+const menuRename = document.querySelector<HTMLButtonElement>("#tab-menu-rename")!;
+let menuTab: HTMLElement | undefined;
+function closeTabMenu(restoreFocus = false) {
+  const tab = menuTab;
+  menuTab = undefined;
+  tabMenu.hidden = true;
+  if (restoreFocus && tab?.isConnected) tab.querySelector<HTMLButtonElement>(".tab-select")!.focus();
+}
+function openTabMenu(tab: HTMLElement, event: MouseEvent) {
+  event.preventDefault();
+  hideFolderTooltip();
+  menuTab = tab;
+  tabMenu.hidden = false;
+  const bounds = tab.getBoundingClientRect();
+  const x = event.clientX || bounds.left;
+  const y = event.clientY || bounds.bottom;
+  tabMenu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - tabMenu.offsetWidth - 8))}px`;
+  tabMenu.style.top = `${Math.max(8, Math.min(y, window.innerHeight - tabMenu.offsetHeight - 8))}px`;
+  menuRename.focus();
+}
+menuRename.onclick = () => {
+  const tab = menuTab;
+  closeTabMenu(true);
+  if (tab?.isConnected) openRenameDialog(tab.dataset.session!, tab.dataset.name!);
+};
+document.addEventListener("pointerdown", event => {
+  if (!tabMenu.contains(event.target as Node)) closeTabMenu();
+});
+tabMenu.addEventListener("keydown", event => {
+  if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeTabMenu(true); }
+  else if (event.key === "Tab") closeTabMenu();
+  else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) { event.preventDefault(); menuRename.focus(); }
+});
+window.addEventListener("blur", () => closeTabMenu());
+window.addEventListener("resize", () => closeTabMenu());
+sessionPicker.addEventListener("scroll", () => closeTabMenu());
+const folderTooltip = document.querySelector<HTMLElement>("#folder-tooltip")!;
+let tooltipTab: HTMLElement | undefined;
+let tooltipRequest = 0;
+function hideFolderTooltip() {
+  ++tooltipRequest;
+  tooltipTab?.querySelector(".tab-select")?.removeAttribute("aria-describedby");
+  tooltipTab = undefined;
+  folderTooltip.hidden = true;
+}
+function showFolderTooltip(tab: HTMLElement, text: string) {
+  if (!tab.isConnected) return;
+  folderTooltip.textContent = text;
+  folderTooltip.hidden = false;
+  const bounds = tab.getBoundingClientRect();
+  folderTooltip.style.left = `${Math.max(8, Math.min(bounds.left, window.innerWidth - folderTooltip.offsetWidth - 8))}px`;
+  folderTooltip.style.top = `${bounds.bottom + 8}px`;
+}
+sessionPicker.addEventListener("scroll", hideFolderTooltip);
+window.addEventListener("resize", hideFolderTooltip);
+function applySessionNames(list: { id: string; name: string }[]) {
+  for (const tab of sessionPicker.querySelectorAll<HTMLElement>(".terminal-tab")) {
+    const item = list.find(item => item.id === tab.dataset.session);
+    if (!item) continue;
+    tab.dataset.name = item.name;
+    const name = tab.querySelector(".tab-name")!;
+    if (name.textContent !== item.name) name.textContent = item.name;
+    const close = tab.querySelector<HTMLButtonElement>(".tab-close")!;
+    close.title = `Close ${item.name}`;
+    close.setAttribute("aria-label", close.title);
+  }
+  updateTabs();
+}
 async function refreshSessions(current: number) {
   const list: { id: string; name: string }[] = await api("/api/terminals");
   if (current !== generation) return;
   if (!list.some((item) => item.id === sessionId)) sessionId = list[0]?.id || "";
-  sessionPicker.replaceChildren(
-    ...list.map((item) => {
+  hideFolderTooltip();
+  closeTabMenu();
+  const existing = new Map([...sessionPicker.querySelectorAll<HTMLElement>(".terminal-tab")].map(tab => [tab.dataset.session!, tab]));
+  const tabs = list.map((item) => {
+      const retained = existing.get(item.id);
+      if (retained) return retained;
       const tab = document.createElement("div");
       tab.className = "terminal-tab";
       tab.dataset.session = item.id;
@@ -86,30 +161,44 @@ async function refreshSessions(current: number) {
       button.type = "button";
       button.className = "tab-select";
       button.dataset.session = item.id;
-      tab.title = "Loading folder…";
-      let folderPending = false;
+      button.setAttribute("aria-description", "Right-click, double-click or press F2 to rename");
+      tab.addEventListener("contextmenu", event => openTabMenu(tab, event));
       const showFolder = async () => {
-        if (folderPending) return;
-        folderPending = true;
+        if (!tabMenu.hidden) return;
+        const request = ++tooltipRequest;
+        tooltipTab = tab;
+        button.setAttribute("aria-describedby", "folder-tooltip");
+        showFolderTooltip(tab, "Loading folder…");
         try {
           const result: { id?: string; cwd?: string } = await api("/api/terminals?cwd=" + encodeURIComponent(item.id));
-          tab.title = result.id === item.id && result.cwd ? result.cwd : "Current folder unavailable";
+          if (tooltipTab === tab && request === tooltipRequest) showFolderTooltip(tab, result.id === item.id && result.cwd ? result.cwd : "Current folder unavailable");
         } catch {
-          tab.title = "Current folder unavailable";
-        } finally {
-          folderPending = false;
+          if (tooltipTab === tab && request === tooltipRequest) showFolderTooltip(tab, "Current folder unavailable");
         }
       };
       tab.addEventListener("mouseenter", () => { void showFolder(); });
+      tab.addEventListener("mouseleave", hideFolderTooltip);
       button.addEventListener("focus", () => { void showFolder(); });
+      button.addEventListener("blur", hideFolderTooltip);
+      button.addEventListener("dblclick", () => openRenameDialog(item.id, tab.dataset.name!));
+      button.addEventListener("keydown", event => {
+        if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+          event.preventDefault();
+          openTabMenu(tab, new window.MouseEvent("contextmenu"));
+        }
+        if (event.key === "F2") { event.preventDefault(); openRenameDialog(item.id, tab.dataset.name!); }
+        if (event.key === "Escape") hideFolderTooltip();
+      });
       button.setAttribute("aria-pressed", String(item.id === sessionId));
       tab.dataset.selected = String(item.id === sessionId);
       const dot = document.createElement("span");
       dot.className = "status-dot";
       dot.setAttribute("role", "img");
+      dot.addEventListener("mouseenter", hideFolderTooltip);
       const name = document.createElement("span");
       name.className = "tab-name";
       name.textContent = item.name;
+      name.addEventListener("mouseenter", () => { void showFolder(); });
       button.append(dot, name);
       button.onclick = () => {
         if (sessionId === item.id) return;
@@ -134,13 +223,18 @@ async function refreshSessions(current: number) {
       close.title = `Close ${item.name}`;
       close.setAttribute("aria-label", close.title);
       close.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg>';
-      close.onclick = () => openCloseDialog(item.id, item.name);
+      close.onclick = () => openCloseDialog(item.id, tab.dataset.name!);
       tab.append(button, reconnect, close);
       return tab;
-    }),
-  );
+    });
+  const retained = new Set(tabs);
+  for (const tab of existing.values()) if (!retained.has(tab)) tab.remove();
+  tabs.forEach((tab, index) => {
+    const atIndex = sessionPicker.children[index] ?? null;
+    if (atIndex !== tab) sessionPicker.insertBefore(tab, atIndex);
+  });
   sessionStorage.setItem("agentonweb-terminal", sessionId);
-  updateTabs();
+  applySessionNames(list);
 }
 
 let socket: WebSocket | undefined;
@@ -243,7 +337,9 @@ async function connect(automaticRetry = false) {
     ws.onmessage = (event) => {
       if (current !== generation) return;
       const m = JSON.parse(event.data);
-      if (m.type === "snapshot") {
+      if (m.type === "session-names") {
+        applySessionNames(m.sessions);
+      } else if (m.type === "snapshot") {
         epoch = m.epoch;
         setConnectionState(m.exitCode !== undefined ? "exited" : "connected");
         terminal.reset();
@@ -320,6 +416,46 @@ newButton.onclick = async () => {
     showStatus(String(error));
   } finally {
     newButton.disabled = false;
+  }
+};
+const renameDialog = document.querySelector<HTMLDialogElement>("#rename-dialog")!;
+const renameInput = document.querySelector<HTMLInputElement>("#rename-name")!;
+const renameError = document.querySelector<HTMLElement>("#rename-error")!;
+const saveRename = document.querySelector<HTMLButtonElement>("#save-rename")!;
+const cancelRename = document.querySelector<HTMLButtonElement>("#cancel-rename")!;
+let renamingSessionId = "";
+let renamePending = false;
+function openRenameDialog(id: string, name: string) {
+  if (renameDialog.open) return;
+  hideFolderTooltip();
+  renamingSessionId = id;
+  renameInput.value = name;
+  renameError.textContent = "";
+  renameDialog.showModal();
+  renameInput.focus();
+  renameInput.select();
+}
+cancelRename.onclick = () => renameDialog.close();
+renameDialog.oncancel = event => { if (renamePending) event.preventDefault(); };
+document.querySelector<HTMLFormElement>("#rename-form")!.onsubmit = async event => {
+  event.preventDefault();
+  if (renamePending) return;
+  const name = renameInput.value.trim();
+  if (!name || name.length > 80 || /[\x00-\x1f\x7f]/u.test(name)) {
+    renameError.textContent = "Use a name of 1–80 characters without line breaks.";
+    return;
+  }
+  renamePending = true;
+  saveRename.disabled = cancelRename.disabled = renameInput.disabled = true;
+  try {
+    const list = await api("/api/terminals", { action: "rename", id: renamingSessionId, name });
+    applySessionNames(list);
+    renameDialog.close();
+  } catch (error) {
+    renameError.textContent = error instanceof Error ? error.message : "Could not rename this terminal.";
+  } finally {
+    renamePending = false;
+    saveRename.disabled = cancelRename.disabled = renameInput.disabled = false;
   }
 };
 const closeDialog = document.querySelector<HTMLDialogElement>("#close-dialog")!;

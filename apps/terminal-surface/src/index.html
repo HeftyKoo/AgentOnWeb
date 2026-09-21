@@ -12,6 +12,10 @@
       <button id="new" title="New local terminal" aria-label="New terminal">+</button>
       <span id="status" hidden>Connecting…</span>
     </header>
+    <div id="tab-menu" role="menu" aria-label="Terminal actions" hidden>
+      <button id="tab-menu-rename" role="menuitem" type="button">Rename<span aria-hidden="true">F2</span></button>
+    </div>
+    <div id="folder-tooltip" role="tooltip" hidden></div>
     <div id="connection-notice" role="status" hidden></div>
     <section id="connections" hidden>
       <strong>Browser connections</strong>
@@ -36,6 +40,18 @@
         <button id="cancel-close" autofocus>Cancel</button
         ><button id="confirm-close">Close terminal</button>
       </div>
+    </dialog>
+    <dialog id="rename-dialog" aria-labelledby="rename-title">
+      <form id="rename-form">
+        <h2 id="rename-title">Rename terminal</h2>
+        <label for="rename-name">Terminal name</label>
+        <input id="rename-name" type="text" maxlength="80" required autocomplete="off" />
+        <p id="rename-error" role="status"></p>
+        <div class="dialog-actions">
+          <button id="cancel-rename" type="button">Cancel</button>
+          <button id="save-rename" type="submit">Save</button>
+        </div>
+      </form>
     </dialog>
     <script type="module" src="/main.js"></script>
   </body>

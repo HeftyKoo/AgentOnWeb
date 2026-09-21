@@ -108,10 +108,12 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
   await vi.waitFor(() => expect(sockets).toHaveLength(1));
   const tab = dom.window.document.querySelector<HTMLElement>(".terminal-tab")!;
   tab.dispatchEvent(new dom.window.MouseEvent("mouseenter"));
-  await vi.waitFor(() => expect(tab.title).toBe("/projects/one"));
+  await vi.waitFor(() => expect(dom.window.document.querySelector("#folder-tooltip")!.textContent).toBe("/projects/one"));
   folder = "/projects/changed folder";
   tab.dispatchEvent(new dom.window.MouseEvent("mouseenter"));
-  await vi.waitFor(() => expect(tab.title).toBe(folder));
+  await vi.waitFor(() => expect(dom.window.document.querySelector("#folder-tooltip")!.textContent).toBe(folder));
+  tab.dispatchEvent(new dom.window.MouseEvent("mouseleave"));
+  expect(dom.window.document.querySelector<HTMLElement>("#folder-tooltip")!.hidden).toBe(true);
   const message = (socket: any, value: object) => socket.onmessage({ data: JSON.stringify(value) });
   message(sockets[0], {
     type: "snapshot",
@@ -127,6 +129,11 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
     lease: 1,
     active: true,
   });
+  const statusDot = dom.window.document.querySelector<HTMLElement>(".status-dot")!;
+  expect(statusDot.title).toBe("Connected");
+  tab.dispatchEvent(new dom.window.MouseEvent("mouseenter"));
+  statusDot.dispatchEvent(new dom.window.MouseEvent("mouseenter"));
+  expect(dom.window.document.querySelector<HTMLElement>("#folder-tooltip")!.hidden).toBe(true);
   expect(dom.window.document.querySelector<HTMLElement>("#connection-notice")!.hidden).toBe(true);
   Object.defineProperty(dom.window.document, "hidden", { value: false });
   const focused = vi.spyOn(dom.window.document, "hasFocus").mockReturnValue(true);
@@ -176,6 +183,7 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
   expect(reconnect.hidden).toBe(true);
   expect(reconnect.disabled).toBe(true);
   sockets[0].onclose({ code: 1006 });
+  expect(dom.window.document.querySelector<HTMLElement>(".status-dot")!.title).toBe("Disconnected");
   expect(reconnect.hidden).toBe(false);
   expect(reconnect.disabled).toBe(false);
   reconnect.click();
@@ -187,6 +195,7 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(dom.window.document.querySelector<HTMLButtonElement>('#sessions [aria-pressed="true"]')!.dataset.session).toBe("two");
   expect(ticketUrls.at(-1)).toBe("/ticket?session=two");
+  expect(dom.window.document.querySelector('.terminal-tab[data-session="one"]')).toBe(tab);
   lateAck();
   expect(sockets[1].sent).toEqual([]);
   message(sockets[1], {
@@ -207,8 +216,14 @@ it("ignores stale session lists and ACKs when switching shells, and keeps exited
   terminalMock.writes.shift()!();
   expect(dom.window.document.querySelector("#control")).toBeNull();
   expect(dom.window.document.querySelector<HTMLElement>("#connection-notice")!.hidden).toBe(false);
+  const picker = dom.window.document.querySelector<HTMLElement>("#sessions")!;
+  const retainedTabs = [...picker.children];
+  picker.scrollLeft = 25;
   dom.window.document.querySelector<HTMLButtonElement>('.tab-select[data-session="one"]')!.click();
+  expect(tab.dataset.selected).toBe("true");
   await vi.waitFor(() => expect(sockets).toHaveLength(3));
+  expect([...picker.children]).toEqual(retainedTabs);
+  expect(picker.scrollLeft).toBe(25);
   expect(ticketUrls.at(-1)).toBe("/ticket?session=one");
   expect(dom.window.document.querySelector('.tab-select[data-session="one"]')!.getAttribute("aria-pressed")).toBe("true");
   const notice = dom.window.document.querySelector<HTMLElement>("#connection-notice")!;
@@ -346,4 +361,70 @@ it("shows the host session-limit explanation after a rejected new terminal", asy
       "Close an unused terminal before opening another (maximum 8).",
     ),
   );
+});
+
+it("renames a background terminal without reconnecting and updates its close label", async () => {
+  dom = new JSDOM(await readFile(new URL("./index.html", import.meta.url), "utf8"), { url: "http://localhost:1234/" });
+  for (const key of ["window", "document", "location", "sessionStorage"]) vi.stubGlobal(key, (dom.window as any)[key]);
+  vi.stubGlobal("parent", dom.window);
+  vi.stubGlobal("ResizeObserver", class { observe() {} });
+  vi.useFakeTimers({ toFake: ["setInterval"] });
+  vi.spyOn(dom.window, "setInterval").mockImplementation((callback, delay) => setInterval(callback as () => void, delay) as unknown as number);
+  let socket: any;
+  const connect = vi.fn();
+  vi.stubGlobal("WebSocket", class { static OPEN = 1; constructor() { socket = this; connect(); } close() {} });
+  dom.window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+  dom.window.HTMLDialogElement.prototype.close = function () { this.open = false; };
+  const list = [{ id: "one", name: "One" }, { id: "two", name: "Two" }];
+  const changes: any[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (path: string, options: any) => {
+    if (path === "/api/connections") return new Response("", { status: 403 });
+    if (path === "/api/terminals") {
+      if (options.method === "POST") {
+        const change = JSON.parse(options.body); changes.push(change);
+        list.find(item => item.id === change.id)!.name = change.name;
+      }
+      return Response.json(list);
+    }
+    return Response.json({ token: "token" });
+  }));
+  await import("./main.js");
+  await vi.waitFor(() => expect(connect).toHaveBeenCalledOnce());
+  dom.window.document.querySelector('.tab-select[data-session="two"]')!.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "F2", bubbles: true }));
+  const dialog = dom.window.document.querySelector<HTMLDialogElement>("#rename-dialog")!;
+  expect(dialog.open).toBe(true);
+  const input = dom.window.document.querySelector<HTMLInputElement>("#rename-name")!;
+  expect(input.value).toBe("Two");
+  dom.window.document.querySelector<HTMLButtonElement>("#cancel-rename")!.click();
+  expect(dialog.open).toBe(false);
+  const tab = dom.window.document.querySelector<HTMLElement>('.terminal-tab[data-session="two"]')!;
+  const context = new dom.window.MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 100, clientY: 30 });
+  tab.dispatchEvent(context);
+  expect(context.defaultPrevented).toBe(true);
+  const menu = dom.window.document.querySelector<HTMLElement>("#tab-menu")!;
+  expect(menu.hidden).toBe(false);
+  expect(dom.window.document.querySelector<HTMLElement>("#folder-tooltip")!.hidden).toBe(true);
+  expect(dom.window.document.querySelector('.tab-select[aria-pressed="true"]')!.getAttribute("data-session")).toBe("one");
+  menu.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  expect(menu.hidden).toBe(true);
+  tab.dispatchEvent(new dom.window.MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+  dom.window.document.querySelector<HTMLButtonElement>("#tab-menu-rename")!.click();
+  expect(menu.hidden).toBe(true);
+  expect(dialog.open).toBe(true);
+  expect(input.value).toBe("Two");
+  input.value = "  API server  ";
+  dom.window.document.querySelector("#rename-form")!.dispatchEvent(new dom.window.Event("submit", { cancelable: true }));
+  await vi.waitFor(() => expect(dialog.open).toBe(false));
+  expect(changes).toEqual([{ action: "rename", id: "two", name: "API server" }]);
+  Object.defineProperty(dom.window.document, "hidden", { value: false });
+  list[0]!.name = "changed-directory";
+  socket.onmessage({ data: JSON.stringify({ type: "session-names", sessions: list }) });
+  const listGets = () => vi.mocked(fetch).mock.calls.filter(([url, options]) => url === "/api/terminals" && options?.method !== "POST").length;
+  const requestsBeforeIdle = listGets();
+  await vi.advanceTimersByTimeAsync(10_000);
+  expect(listGets()).toBe(requestsBeforeIdle);
+  await vi.waitFor(() => expect(dom.window.document.querySelector('.terminal-tab[data-session="one"] .tab-name')!.textContent).toBe("changed-directory"));
+  expect(connect).toHaveBeenCalledOnce();
+  expect(dom.window.document.querySelector('.terminal-tab[data-session="two"] .tab-name')!.textContent).toBe("API server");
+  expect(dom.window.document.querySelector('.terminal-tab[data-session="two"] .tab-close')!.getAttribute("aria-label")).toBe("Close API server");
 });
