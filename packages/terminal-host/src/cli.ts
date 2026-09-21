@@ -9,6 +9,7 @@ import { Authorization, startConnector } from "@agentonweb/connector-host";
 import { TerminalSession } from "@agentonweb/terminal-core";
 import { processDirectory } from "./process-directory.js";
 import { lockHost } from "./host-lock.js";
+import { cleanup } from "./cleanup.js";
 import { executablePath, shellLaunch } from "./launch.js";
 import { serviceCommand, serviceDirectory } from "./service.js";
 import type { NativeSurface } from "@agentonweb/connector-contract";
@@ -90,13 +91,16 @@ function newSession() {
 newSession();
 const adminSecret = randomBytes(32).toString("base64url");
 const adminCookie = `aow_admin_${runtimeId.replaceAll("-", "_")}`;
-function matchesCookie(cookie: string, name: string, secret: string): boolean {
+function matchesSecret(value: string, secret: string): boolean {
+  const actual = Buffer.from(value);
   const expected = Buffer.from(secret);
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+function matchesCookie(cookie: string, name: string, secret: string): boolean {
   return cookie.split(";").some((part) => {
     const value = part.trim();
     if (!value.startsWith(`${name}=`)) return false;
-    const actual = Buffer.from(value.slice(name.length + 1));
-    return actual.length === expected.length && timingSafeEqual(actual, expected);
+    return matchesSecret(value.slice(name.length + 1), secret);
   });
 }
 const isAdmin = (cookie = "") => matchesCookie(cookie, adminCookie, adminSecret);
@@ -165,7 +169,11 @@ const server = createServer(async (req, res) => {
             return;
           }
         }
-        const action = JSON.parse(body);
+        let action;
+        try { action = JSON.parse(body); }
+        catch { throw new RequestError(400, "Request body must be valid JSON."); }
+        if (!action || typeof action !== "object" || Array.isArray(action))
+          throw new RequestError(400, "Request body must be a JSON object.");
         if (url.pathname === "/api/connections") {
           if (action.action === "revoke") await authority.revoke(action.id);
           else if (action.action === "allow" || action.action === "deny")
@@ -207,7 +215,7 @@ const server = createServer(async (req, res) => {
       res.writeHead(405).end();
       return;
     }
-    if (url.pathname === "/launch" && launchToken && url.searchParams.get("token") === launchToken) {
+    if (url.pathname === "/launch" && matchesSecret(url.searchParams.get("token") ?? "", launchToken)) {
       launchToken = randomBytes(32).toString("base64url");
       await saveEndpoint();
       res.setHeader("Set-Cookie", [
@@ -362,20 +370,26 @@ let stopping = false;
 async function stop() {
   if (stopping) return;
   stopping = true;
-  for (const { session } of sessions.values()) session.dispose();
-  await unlink(join(stateDirectory, "endpoint.json")).catch(() => {});
-  for (const ws of sockets.clients) ws.terminate();
-  await connector.close();
-  await new Promise<void>((resolve, reject) => {
-    server.close((error) => (error ? reject(error) : resolve()));
-    // Active HTTP requests must not leave shutdown waiting indefinitely.
-    server.closeAllConnections();
-  });
-  await unlock();
+  await cleanup([
+    ...[...sessions.values()].map(({ session }) => () => session.dispose()),
+    () => unlink(join(stateDirectory, "endpoint.json")).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+    }),
+    ...[...sockets.clients].map((ws) => () => ws.terminate()),
+    () => connector.close(),
+    () => new Promise<void>((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+      // Active HTTP requests must not leave shutdown waiting indefinitely.
+      server.closeAllConnections();
+    }),
+    unlock,
+  ]);
 }
-process.on("SIGINT", () => {
-  void stop();
-});
-process.on("SIGTERM", () => {
-  void stop();
-});
+function onStopSignal() {
+  void stop().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
+process.on("SIGINT", onStopSignal);
+process.on("SIGTERM", onStopSignal);
