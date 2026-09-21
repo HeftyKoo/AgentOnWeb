@@ -18,10 +18,29 @@ const fit = new FitAddon();
 terminal.loadAddon(fit);
 const container = document.querySelector<HTMLElement>("#terminal")!;
 const status = document.querySelector<HTMLElement>("#status")!;
+const notice = document.querySelector<HTMLElement>("#connection-notice")!;
+const actions = document.querySelector<HTMLDetailsElement>("#terminal-actions")!;
+function showStatus(message: string) {
+  if (status.textContent !== message) status.textContent = message;
+  if (notice.textContent !== message) notice.textContent = message;
+  notice.hidden = message === "Connected";
+}
+document.addEventListener("pointerdown", event => {
+  if (!actions.contains(event.target as Node)) actions.open = false;
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && actions.open) {
+    actions.open = false;
+    actions.querySelector<HTMLElement>("summary")!.focus();
+  }
+});
+actions.addEventListener("click", event => {
+  if ((event.target as Element).closest("button:not(:disabled)")) actions.open = false;
+});
 const control = document.querySelector<HTMLButtonElement>("#control")!;
 const image = document.querySelector<HTMLButtonElement>("#image")!;
 terminal.open(container);
-const sessionPicker = document.querySelector<HTMLSelectElement>("#sessions")!;
+const sessionPicker = document.querySelector<HTMLElement>("#sessions")!;
 const newButton = document.querySelector<HTMLButtonElement>("#new")!;
 const closeButton = document.querySelector<HTMLButtonElement>("#close")!;
 let sessionId = sessionStorage.getItem("agentonweb-terminal") || "";
@@ -49,16 +68,26 @@ async function api(path: string, action?: object) {
 async function refreshSessions(current: number) {
   const list: { id: string; name: string }[] = await api("/api/terminals");
   if (current !== generation) return;
+  if (!list.some((item) => item.id === sessionId)) sessionId = list[0]?.id || "";
   sessionPicker.replaceChildren(
     ...list.map((item) => {
-      const option = document.createElement("option");
-      option.value = item.id;
-      option.textContent = item.name;
-      return option;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "terminal-tab";
+      button.dataset.session = item.id;
+      button.textContent = item.name;
+      button.title = item.name;
+      button.setAttribute("aria-pressed", String(item.id === sessionId));
+      button.onclick = () => {
+        if (sessionId === item.id) return;
+        sessionId = item.id;
+        sessionStorage.setItem("agentonweb-terminal", sessionId);
+        focusOnConnect = true;
+        void connect();
+      };
+      return button;
     }),
   );
-  if (!list.some((item) => item.id === sessionId)) sessionId = list[0]?.id || "";
-  sessionPicker.value = sessionId;
   sessionStorage.setItem("agentonweb-terminal", sessionId);
   closeButton.disabled = !sessionId;
 }
@@ -113,7 +142,7 @@ image.onclick = () => {
   input("\x16");
   terminal.focus();
 };
-async function connect() {
+async function connect(automaticRetry = false) {
   if (parent !== window && !authorizedParent) return;
   const current = ++generation;
   clearTimeout(retry);
@@ -121,13 +150,15 @@ async function connect() {
   ready = active = false;
   terminal.options.disableStdin = true;
   control.disabled = image.disabled = true;
-  status.textContent = "Connecting…";
+  // Retain the last failure while retrying; don't flash an intermediate state
+  // or repeatedly announce the same failure to assistive technology.
+  if (!automaticRetry) showStatus("Connecting…");
   try {
     await refreshSessions(current);
     if (current !== generation) return;
     if (!sessionId) {
       terminal.reset();
-      status.textContent = "No terminals. Click + to open your local shell.";
+      showStatus("No terminals. Click + to open your local shell.");
       return;
     }
     const response = await fetch("/ticket?session=" + encodeURIComponent(sessionId), {
@@ -158,7 +189,7 @@ async function connect() {
           resize();
         });
         if (m.exitCode !== undefined)
-          status.textContent = `Process exited (${m.exitCode}). Open a new terminal with +.`;
+          showStatus(`Process exited (${m.exitCode}). Open a new terminal with +.`);
       } else if (m.type === "output" && m.epoch === epoch) {
         terminal.write(m.data, () => {
           if (current === generation && ws.readyState === WebSocket.OPEN)
@@ -175,12 +206,12 @@ async function connect() {
         terminal.options.disableStdin = !active;
         image.disabled = !active;
         control.textContent = active ? "You control this terminal" : "Control here";
-        status.textContent =
+        showStatus(
           m.exited !== undefined
             ? `Process exited (${m.exited}). Open a new terminal with +.`
             : active
               ? "Connected"
-              : "Read-only · take control to type";
+              : "Read-only · take control to type");
         control.disabled = m.exited !== undefined;
         resize();
       } else if (m.type === "resize") terminal.resize(m.cols, m.rows);
@@ -188,7 +219,7 @@ async function connect() {
         active = false;
         terminal.options.disableStdin = true;
         control.disabled = image.disabled = true;
-        status.textContent = `Process exited (${m.code}). Open a new terminal with +.`;
+        showStatus(`Process exited (${m.code}). Open a new terminal with +.`);
       }
     };
     ws.onclose = (event) => {
@@ -196,21 +227,16 @@ async function connect() {
       ready = active = false;
       terminal.options.disableStdin = true;
       control.disabled = image.disabled = true;
-      status.textContent =
+      showStatus(
         event.code === 4401
           ? "Authorization revoked. Connect again from AgentOnWeb."
-          : "Disconnected · process stays in the local host";
-      if (event.code !== 4401) retry = setTimeout(connect, 1500);
+          : "Disconnected · process stays in the local host");
+      if (event.code !== 4401) retry = setTimeout(() => { void connect(true); }, 1500);
     };
   } catch (error) {
-    if (current === generation) status.textContent = error instanceof Error ? error.message : "Connection failed";
+    if (current === generation) showStatus(error instanceof Error ? error.message : "Connection failed");
   }
 }
-sessionPicker.onchange = () => {
-  sessionId = sessionPicker.value;
-  sessionStorage.setItem("agentonweb-terminal", sessionId);
-  void connect();
-};
 newButton.onclick = async () => {
   newButton.disabled = true;
   try {
@@ -218,7 +244,7 @@ newButton.onclick = async () => {
     focusOnConnect = true;
     await connect();
   } catch (error) {
-    status.textContent = String(error);
+    showStatus(String(error));
   } finally {
     newButton.disabled = false;
   }
@@ -232,7 +258,7 @@ let closePending = false;
 closeButton.onclick = () => {
   if (!sessionId || closeDialog.open) return;
   closingSessionId = sessionId;
-  const name = sessionPicker.selectedOptions[0]?.textContent || "terminal";
+  const name = sessionPicker.querySelector('[aria-pressed="true"]')?.textContent || "terminal";
   document.querySelector("#close-title")!.textContent = `Close ${name}?`;
   closeError.textContent = "";
   closeDialog.showModal();
@@ -290,7 +316,7 @@ async function showConnections() {
             await api("/api/connections", { action, id: item.id });
             await showConnections();
           } catch (error) {
-            status.textContent = String(error);
+            showStatus(String(error));
           }
         };
         row.append(button);
