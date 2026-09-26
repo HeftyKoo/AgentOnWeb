@@ -21,7 +21,7 @@ Package versions describe independently published artifacts. The handshake depen
 2. Discovery exposes runtime identity and capabilities only; it cannot return a session cookie or credential.
 3. A first connection creates a two-minute pending request and opens the native DSH page.
 4. Decline issues no credential. Allow creates a random credential bound to the extension origin and stores only its hash on disk.
-5. The authenticated extension requests `surface.get` and receives the clean DSH URL plus delegated cookie. Chrome and Firefox install an HttpOnly cookie in the current website's partition; Safari installs a session-only declarative header rule scoped to the mounted tab and exact localhost surface.
+5. The authenticated extension requests `surface.get` and receives the clean DSH URL plus delegated cookie. Chrome and Firefox install an HttpOnly cookie in the current website's partition. Chrome additionally installs a tab-scoped HTTP header lease so an old first-party cookie cannot shadow the current session. Safari combines its local HttpOnly cookie with the header lease. Header rules target the exact localhost surface; cookie leases also cover native WebSocket handshakes.
 6. Restart and reconnect reuse the stored installation credential. Revocation closes active sockets, clears delegated cookie/header leases, and requires a new native approval.
 
 The content script never receives the installation credential, delegated cookie, DSH launch token, arbitrary endpoint configuration, or session transcript.
@@ -43,7 +43,7 @@ The content script never receives the installation credential, delegated cookie,
 - Two-minute approval expiry and duplicate-request limits
 - Origin-bound random credentials with hash-only mode-0600 persistence
 - DSH Host/Origin plus same-origin JSON validation for authorization mutations
-- HttpOnly, Secure, partitioned delegated cookies in Chrome/Firefox; non-persisted tab-bound declarative session rules in Safari
+- HttpOnly, Secure, partitioned delegated cookies in Chrome/Firefox; session-only tab-bound declarative header rules in Chrome/Safari
 - Authorization recheck after asynchronous surface acquisition
 
 ## Verification

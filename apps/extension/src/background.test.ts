@@ -44,7 +44,10 @@ function createChrome() {
       getPartitionKey: vi.fn(async () => ({ partitionKey: { topLevelSite: "https://example.org" } })),
       set: vi.fn(async (_details: unknown) => ({ name: "native-session" })), remove: vi.fn(async () => ({})),
     },
-    declarativeNetRequest: { updateSessionRules: vi.fn(async (_update: { addRules?: unknown[]; removeRuleIds?: number[] }) => {}) },
+    declarativeNetRequest: {
+      getSessionRules: vi.fn(async () => [{ id: 1_000_999 }]),
+      updateSessionRules: vi.fn(async (_update: { addRules?: unknown[]; removeRuleIds?: number[] }) => {}),
+    },
   };
 }
 async function boot() {
@@ -130,6 +133,7 @@ describe("cross-browser native connection lifecycle", () => {
   });
 
   it("requires explicit connection and keeps credentials out of content-script state", async () => {
+    vi.stubEnv("BROWSER", "firefox");
     await boot(); expect(transport.connect).not.toHaveBeenCalled();
     expect(chromeMock.storage.local.setAccessLevel).toHaveBeenCalledWith({ accessLevel: "TRUSTED_CONTEXTS" });
     await message("runtime.connect"); expect(transport.connect).toHaveBeenCalledWith(available.endpoint, undefined);
@@ -146,6 +150,26 @@ describe("cross-browser native connection lifecycle", () => {
       expect(JSON.stringify(exposed)).not.toContain("private-session-cookie");
     }
     expect(chromeMock.cookies.set).toHaveBeenCalledWith(expect.objectContaining({ httpOnly: true, secure: true, partitionKey: { topLevelSite: "https://example.org" } }));
+  });
+
+  it("isolates Chrome HTTP and WebSocket authentication from stale first-party cookies", async () => {
+    await boot();
+    expect(chromeMock.declarativeNetRequest.updateSessionRules).toHaveBeenCalledWith({ removeRuleIds: [1_000_999] });
+    await message("runtime.connect");
+    transport.callbacks!.ready("private-chrome-credential");
+    await vi.waitFor(() => expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(tab.id, expect.objectContaining({
+      state: expect.objectContaining({ surface: expect.objectContaining({ runtimeId: runtime.id }) }),
+    })));
+    expect(chromeMock.cookies.set).toHaveBeenCalledWith(expect.objectContaining({ httpOnly: true, secure: true, partitionKey: { topLevelSite: "https://example.org" } }));
+    expect(chromeMock.declarativeNetRequest.updateSessionRules).toHaveBeenCalledWith(expect.objectContaining({ addRules: [expect.objectContaining({
+      action: { type: "modifyHeaders", requestHeaders: [{ header: "Cookie", operation: "set", value: "native-session=private-session-cookie" }] },
+      condition: expect.objectContaining({ regexFilter: "^(http|ws)://localhost:3080/", tabIds: [tab.id] }),
+    })] }));
+    for (const exposed of [await message("state.get"), data, chromeMock.tabs.sendMessage.mock.calls]) {
+      expect(JSON.stringify(exposed)).not.toContain("private-session-cookie");
+    }
+    transport.callbacks!.rejected("REVOKED", "Connection revoked.");
+    await vi.waitFor(() => expect(chromeMock.declarativeNetRequest.updateSessionRules).toHaveBeenCalledWith({ removeRuleIds: [1_000_001] }));
   });
 
   it("uses a tab-bound HTTP lease and a local HttpOnly cookie for Safari WebSockets", async () => {
@@ -167,7 +191,7 @@ describe("cross-browser native connection lifecycle", () => {
       .find((value) => value.addRules?.length);
     expect(update).toMatchObject({ addRules: [{
       action: { type: "modifyHeaders", requestHeaders: [{ header: "Cookie", operation: "set", value: "native-session=private-session-cookie" }] },
-      condition: { regexFilter: "^http://localhost:3080/", tabIds: [tab.id] },
+      condition: { regexFilter: "^(http|ws)://localhost:3080/", tabIds: [tab.id] },
     }] });
   });
 
@@ -179,7 +203,7 @@ describe("cross-browser native connection lifecycle", () => {
     };
     await boot(); await vi.waitFor(() => expect(transport.connect).toHaveBeenCalledWith(available.endpoint, "saved-credential"));
     transport.callbacks!.ready();
-    await vi.waitFor(() => expect(chromeMock.cookies.set).toHaveBeenCalled());
+    await vi.waitFor(() => expect(chromeMock.declarativeNetRequest.updateSessionRules).toHaveBeenCalledWith(expect.objectContaining({ addRules: expect.any(Array) })));
     transport.callbacks!.rejected("REVOKED", "Connection revoked."); transport.callbacks!.closed();
     await vi.waitFor(() => expect(data[COOKIE_SCOPES_STORAGE_KEY]).toEqual([]));
     expect(chromeMock.cookies.remove).toHaveBeenCalledWith(expect.objectContaining({ partitionKey: { topLevelSite: "https://stored.example" } }));
