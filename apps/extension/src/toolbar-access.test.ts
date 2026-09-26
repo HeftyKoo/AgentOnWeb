@@ -19,6 +19,7 @@ it("gives a visible fallback when a toolbar click cannot reach a page", async ()
     commands: { onCommand: event() },
     browserAction: { onClicked: { addListener: (handler: typeof clicked) => { clicked = handler; } } },
     permissions: { request: async () => true },
+    declarativeNetRequest: { getSessionRules: async () => [] },
     tabs: { create, query: async () => [], onRemoved: event(), sendMessage: async () => { throw new Error("No receiving end"); } },
   });
   await import("./background.js");
