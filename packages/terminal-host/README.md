@@ -60,3 +60,13 @@ The service binds only to IPv4 loopback. Connector discovery uses ports 3847–3
 The private setup link is stored in an owner-only state directory and rotates when opened. Do not share it. Revoking a connection rotates the terminal secret and closes viewers of this host. Remaining authorized browsers reconnect with their existing grants to obtain a fresh surface credential. Shell processes continue, and DSH is unaffected. Browser-reserved shortcuts and terminal-emulator limitations still apply.
 
 This package is not published to npm yet. Use the local archive. See the repository's verification records for actual platform and interaction coverage.
+
+## Codex session notifications
+
+Run `aow codex-hooks install`, review/trust **AgentOnWeb session status** in Codex `/hooks`, then start Codex inside a new terminal created by the updated host. The page launcher lists sessions and notifies on completion or approval requests; clicking opens the exact terminal, where approvals remain native. Existing hook/notify configuration is preserved with backups. See [event setup and architecture](../../docs/agent-notifications.md).
+
+## One-command setup (macOS + Chrome)
+
+The new `aow setup` entry configures the service, Chrome native pairing and Codex notifications together. Global npm installs run it when lifecycle scripts are permitted; the release shell installer calls it explicitly. Codex hook trust remains a first-use user action. The package and installer are not published yet. See [One-command setup (macOS + Chrome)](../../docs/one-command-setup.md).
+
+Global setup starts a login service, registers a Chrome native host and updates Codex hooks/notify with backups. Set `AOW_SKIP_SETUP=1` to install without automatic configuration. Before `npm uninstall -g @agentonweb/terminal-host`, finish live terminal work and run `aow uninstall` to reverse these integrations. It stops service terminals, preserves user settings/history/backups, and restores the original notify command. `aow codex-hooks uninstall` removes only the Codex integration.

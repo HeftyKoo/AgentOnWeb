@@ -14,6 +14,8 @@ export interface NativeSurfaceView {
 }
 
 export interface SurfaceViewState {
+  readonly readAttentionIds?: readonly string[];
+  readonly agentSessions?: readonly import("@agentonweb/connector-contract").AgentSession[];
   readonly mode: AgentOnWebMode;
   readonly opacity: number;
   readonly dismissed?: boolean;
@@ -30,6 +32,7 @@ export interface SurfaceViewState {
 }
 
 export type ContentRequest =
+  | { readonly source: "agentonweb-content"; readonly type: "agent.attention.read"; readonly attentionId: string }
   | { readonly source: "agentonweb-content"; readonly type: "state.get" }
   | { readonly source: "agentonweb-content"; readonly type: "visibility.set"; readonly visible: boolean }
   | { readonly source: "agentonweb-content"; readonly type: "mode.set"; readonly mode: AgentOnWebMode }
@@ -60,8 +63,9 @@ export function isSurfaceCommand(value: unknown): value is SurfaceCommand {
 
 export function isContentRequest(value: unknown): value is ContentRequest {
   if (!value || typeof value !== "object") return false;
-  const candidate = value as { source?: unknown; type?: unknown; mode?: unknown; opacity?: unknown; visible?: unknown; runtimeId?: unknown };
+  const candidate = value as { source?: unknown; type?: unknown; mode?: unknown; opacity?: unknown; visible?: unknown; runtimeId?: unknown; attentionId?: unknown };
   if (candidate.source !== "agentonweb-content") return false;
+  if (candidate.type === "agent.attention.read") return typeof candidate.attentionId === "string" && candidate.attentionId.length > 0 && candidate.attentionId.length <= 200;
   if (candidate.type === "state.get" || candidate.type === "runtime.approval") return true;
   if (candidate.type === "visibility.set") return typeof candidate.visible === "boolean";
   if (candidate.type === "mode.set") return ["chill", "focus", "watch"].includes(String(candidate.mode));

@@ -12,21 +12,60 @@ import { lockHost } from "./host-lock.js";
 import { cleanup } from "./cleanup.js";
 import { executablePath, shellLaunch } from "./launch.js";
 import { serviceCommand, serviceDirectory } from "./service.js";
+import { setup, uninstall } from "./setup.js";
+import { runNativeHost, nativeOrigins } from "./native-bridge.js";
+import { AgentSessions } from "./agent-sessions.js";
+import { installCodexHooks, uninstallCodexHooks, reportCodexEvent, reportCodexInput } from "./codex-hooks.js";
+import { completionEvent, forwardNotification } from "./codex-notify.js";
 import type { NativeSurface } from "@agentonweb/connector-contract";
 
 const inputArgs = process.argv.slice(2);
+if (inputArgs[0] === "native-host") {
+  await runNativeHost(inputArgs[1] ?? "", serviceDirectory);
+  process.exit(0);
+}
+if (inputArgs[0] === "setup") {
+  await setup(inputArgs.slice(1));
+  process.exit(0);
+}
+if (inputArgs[0] === "uninstall" && inputArgs.length === 1) {
+  await uninstall();
+  process.exit(0);
+}
+if (inputArgs[0] === "agent-notify") {
+  const payload = inputArgs.at(-1) ?? "";
+  try {
+    const event = completionEvent(JSON.parse(payload));
+    if (event) await reportCodexInput(event);
+  } catch { /* Notifications must never interfere with Codex. */ }
+  await forwardNotification(inputArgs.slice(1, -1), payload).catch(() => {});
+  process.exit(0);
+}
+if (inputArgs[0] === "agent-event") {
+  await reportCodexEvent().catch(() => {});
+  process.exit(0);
+}
+if (inputArgs[0] === "codex-hooks" && inputArgs[1] === "install") {
+  console.log(`Installed observational hooks: ${await installCodexHooks()}\nIn Codex, open /hooks and review/trust AgentOnWeb session status hooks, then start a new session inside an AgentOnWeb terminal.`);
+  process.exit(0);
+}
+if (inputArgs[0] === "codex-hooks" && inputArgs[1] === "uninstall") {
+  await uninstallCodexHooks();
+  console.log('AgentOnWeb hooks removed and the previous notify command restored.');
+  process.exit(0);
+}
 if (inputArgs[0] === "service") {
   await serviceCommand(inputArgs.slice(1));
   process.exit(0);
 }
 if (inputArgs.length === 1 && inputArgs[0] === "--help") {
   console.log(
-    "Usage: aow terminal | aow service install | aow service open | aow service status | aow service uninstall",
+    "Usage: aow setup | aow uninstall | aow terminal | aow codex-hooks install|uninstall | aow service install | aow service open | aow service status | aow service uninstall",
   );
   process.exit(0);
 }
 if (inputArgs.length && (inputArgs[0] !== "terminal" || inputArgs.slice(1).some((arg) => arg !== "--service"))) {
-  throw new Error("Usage: aow terminal | aow service install | aow --help");
+  throw new Error("Usage: aow setup | aow terminal | aow service install | aow --help");
 }
 const { command, args } = shellLaunch();
 const executable = await executablePath(command);
@@ -38,7 +77,9 @@ const authority = await Authorization.open(stateDirectory);
 const env = Object.fromEntries(
   Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
 );
-type HostedSession = { session: TerminalSession; name?: string; directory: string; directoryRefresh?: Promise<void> };
+const agentSessions = new AgentSessions();
+let agentEndpoint = "";
+type HostedSession = { token: string; exited?: boolean; session: TerminalSession; name?: string; directory: string; directoryRefresh?: Promise<void> };
 const sessions = new Map<string, HostedSession>();
 function sessionNames() {
   return [...sessions].map(([id, value]) => ({ id, name: value.name ?? (basename(value.directory) || value.directory) }));
@@ -73,7 +114,9 @@ class RequestError extends Error {
 function newSession() {
   if (sessions.size >= 8) throw new RequestError(409, "Close an unused terminal before opening another (maximum 8).");
   const id = randomUUID();
-  const item: HostedSession = { session: new TerminalSession(executable, args, cwd, env), directory: cwd };
+  const token = randomBytes(32).toString("base64url");
+  const item: HostedSession = { token, session: new TerminalSession(executable, args, cwd,
+    { ...env, AOW_AGENT_ENDPOINT: agentEndpoint, AOW_AGENT_TOKEN: token }), directory: cwd };
   sessions.set(id, item);
   // Coalesce shell output into at most one lookup per second per session,
   // regardless of viewer count. Idle shells create no directory traffic.
@@ -85,10 +128,9 @@ function newSession() {
       void refreshDirectory(id, item);
     }, 1000);
   });
-  item.session.pty.onExit(() => { clearTimeout(directoryTimer); output.dispose(); });
+  item.session.pty.onExit(() => { item.exited = true; clearTimeout(directoryTimer); output.dispose(); agentSessions.removeTerminal(id); });
   return id;
 }
-newSession();
 const adminSecret = randomBytes(32).toString("base64url");
 const adminCookie = `aow_admin_${runtimeId.replaceAll("-", "_")}`;
 function matchesSecret(value: string, secret: string): boolean {
@@ -105,6 +147,8 @@ function matchesCookie(cookie: string, name: string, secret: string): boolean {
 }
 const isAdmin = (cookie = "") => matchesCookie(cookie, adminCookie, adminSecret);
 let secret = randomBytes(32).toString("base64url");
+let nativePairBusy = false;
+const nativeToken = randomBytes(32).toString("base64url");
 let launchToken: string = randomBytes(32).toString("base64url");
 const cookieName = `aow_${runtimeId.replaceAll("-", "_")}`;
 let origin = "";
@@ -116,6 +160,7 @@ async function saveEndpoint() {
     temp,
     JSON.stringify({
       pid: process.pid,
+      nativeToken,
       launchUrl: `${origin}/launch?token=${launchToken}`,
     }),
     { mode: 0o600 },
@@ -125,6 +170,50 @@ async function saveEndpoint() {
 const publicRoot = new URL("./public/", import.meta.url);
 const server = createServer(async (req, res) => {
   try {
+    if (req.url === "/native-pair") {
+      if (req.method !== "POST" || req.headers.origin || req.headers.host !== new URL(origin).host
+        || !matchesSecret((req.headers.authorization ?? "").replace(/^Bearer /u, ""), nativeToken)) {
+        res.writeHead(403).end(); return;
+      }
+      if (nativePairBusy) { res.writeHead(409).end(); return; }
+      nativePairBusy = true;
+      try {
+        let body = "";
+        for await (const chunk of req) { body += chunk; if (body.length > 4096) { res.writeHead(413).end(); return; } }
+        const input = JSON.parse(body);
+        if (!(await nativeOrigins(stateDirectory)).includes(input.origin)) { res.writeHead(403).end(); return; }
+        const receiptPath = join(stateDirectory, "native-paired-" + new URL(input.origin).hostname);
+        let paired = false;
+        try { await readFile(receiptPath); paired = true; }
+        catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+        const canPair = !paired && !authority.snapshot().grants.some(g => g.origin === input.origin);
+        if (input.type === "probe") {
+          res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify({ ok: true, canPair })); return;
+        }
+        const pending = authority.snapshot().pending.find(p => p.origin === input.origin);
+        if (input.type !== "pair" || !canPair || !pending) { res.writeHead(409).end(); return; }
+        // Persist receipt before granting: revocation or clearing browser storage
+        // must never cause silent re-authorization on the next reconnect.
+        await writeFile(receiptPath, input.origin, { mode: 0o600 });
+        await authority.decide(pending.id, true);
+        res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify({ ok: true })); return;
+      } finally { nativePairBusy = false; }
+    }
+    if (req.url === "/agent-event") {
+      // No browser-origin requests or surface cookies can publish semantic events.
+      if (req.method !== "POST" || req.headers.origin || req.headers.host !== new URL(agentEndpoint).host) {
+        res.writeHead(403).end(); return;
+      }
+      const token = (req.headers.authorization ?? "").replace(/^Bearer /u, "");
+      const terminal = [...sessions].find(([, item]) => !item.exited && matchesSecret(token, item.token));
+      if (!terminal) { res.writeHead(403).end(); return; }
+      let body = "";
+      for await (const chunk of req) { body += chunk; if (body.length > 65_536) { res.writeHead(413).end(); return; } }
+      let input: unknown;
+      try { input = JSON.parse(body); } catch { res.writeHead(400).end(); return; }
+      res.writeHead(agentSessions.ingest(terminal[0], input) ? 204 : 400).end();
+      return;
+    }
     if (req.headers.host !== new URL(origin).host) {
       res.writeHead(403).end();
       return;
@@ -175,7 +264,12 @@ const server = createServer(async (req, res) => {
         if (!action || typeof action !== "object" || Array.isArray(action))
           throw new RequestError(400, "Request body must be a JSON object.");
         if (url.pathname === "/api/connections") {
-          if (action.action === "revoke") await authority.revoke(action.id);
+          if (action.action === "revoke") {
+            const grant = authority.snapshot().grants.find(g => g.id === action.id);
+            if (grant?.origin.startsWith("chrome-extension://"))
+              await writeFile(join(stateDirectory, "native-paired-" + new URL(grant.origin).hostname), grant.origin, { mode: 0o600 });
+            await authority.revoke(action.id);
+          }
           else if (action.action === "allow" || action.action === "deny")
             await authority.decide(action.id, action.action === "allow");
           else {
@@ -196,6 +290,7 @@ const server = createServer(async (req, res) => {
         } else if (action.action === "close" && sessions.has(action.id)) {
           sessions.get(action.id)!.session.dispose();
           sessions.delete(action.id);
+          agentSessions.removeTerminal(action.id);
         } else {
           res.writeHead(400).end();
           return;
@@ -335,6 +430,8 @@ await new Promise<void>((resolve, reject) => {
 const address = server.address();
 if (!address || typeof address === "string") throw new Error("Could not start local host");
 origin = `http://localhost:${address.port}`;
+agentEndpoint = `http://127.0.0.1:${address.port}/agent-event`;
+newSession();
 const surface: NativeSurface = {
   runtimeId,
   displayName: "Local terminal",
@@ -349,6 +446,7 @@ const connector = await startConnector(
       surfaceKind: "web",
       capabilities: { translucency: true, optionTap: true },
     },
+    agentSessions,
     approvalUrl: `${origin}/`,
     async getSurface() {
       return { ...surface, cookie: { ...surface.cookie, value: secret } };

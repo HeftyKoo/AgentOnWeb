@@ -1,3 +1,4 @@
+import { surfaceShortcut } from "@agentonweb/connector-contract";
 import { OptionTapTracker } from "@agentonweb/connector-contract";
 import { Terminal } from "@xterm/xterm";
 import { splitInput } from "./input.js";
@@ -52,6 +53,8 @@ function setConnectionState(state: ConnectionState) {
   if (sessionId) sessionStates.set(sessionId, state);
   updateTabs();
 }
+let requestedTerminal: { id: string; requestId: string } | undefined;
+let lastActivation = "";
 let sessionId = sessionStorage.getItem("agentonweb-terminal") || "";
 const apiHeaders = {
   "X-AgentOnWeb-Terminal": "1",
@@ -146,6 +149,15 @@ function applySessionNames(list: { id: string; name: string }[]) {
 async function refreshSessions(current: number) {
   const list: { id: string; name: string }[] = await api("/api/terminals");
   if (current !== generation) return;
+  if (requestedTerminal) {
+    const target = requestedTerminal;
+    requestedTerminal = undefined;
+    lastActivation = target.requestId;
+    const exists = list.some(item => item.id === target.id);
+    parent.postMessage({ source: "agentonweb-surface", type: "terminal.activated", nonce, requestId: target.requestId, ok: exists }, "*");
+    if (!exists) throw new Error("This terminal has closed. Choose another session.");
+    sessionId = target.id;
+  }
   if (!list.some((item) => item.id === sessionId)) sessionId = list[0]?.id || "";
   hideFolderTooltip();
   closeTabMenu();
@@ -575,13 +587,30 @@ window.addEventListener("message", (event) => {
     authorizedParent = true;
     void connect();
   }
+  if (m.type === "terminal.activate" && authorizedParent && typeof m.terminalId === "string" && m.terminalId.length <= 100
+    && typeof m.requestId === "string" && m.requestId.length <= 100 && m.requestId !== lastActivation && m.requestId !== requestedTerminal?.requestId) {
+    requestedTerminal = { id: m.terminalId, requestId: m.requestId };
+    focusOnConnect = true;
+    void connect();
+  }
   if (m.type === "mode.set" && ["focus", "chill", "watch"].includes(m.mode)) mode = m.mode;
   if (m.type === "opacity.set" && typeof m.opacity === "number" && m.opacity >= 0 && m.opacity <= 1)
     opacity = m.opacity;
   presentation();
 });
 const optionTap = new OptionTapTracker();
-window.addEventListener("keydown", (event) => optionTap.keydown(event), true);
+window.addEventListener("keydown", (event) => {
+  optionTap.keydown(event);
+  if (!nonce || parent === window || !authorizedParent) return;
+  const action = surfaceShortcut(event);
+  if (action !== "runtime.toggle" || event.defaultPrevented) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (!event.repeat) parent.postMessage({ source: "agentonweb-surface", type: "surface.shortcut", nonce, action }, "*");
+}, true);
+window.addEventListener("pointerdown", () => {
+  if (nonce && parent !== window && authorizedParent) parent.postMessage({ source: "agentonweb-surface", type: "surface.pointerdown", nonce }, "*");
+}, true);
 window.addEventListener(
   "keyup",
   (event) => {

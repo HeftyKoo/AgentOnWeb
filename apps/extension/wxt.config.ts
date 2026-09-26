@@ -10,29 +10,29 @@ const releaseContract = JSON.parse(readFileSync(resolve(import.meta.dirname, "..
 const commands = {
   _execute_action: {
     suggested_key: {
-      default: "Alt+Shift+O",
-      mac: "MacCtrl+Shift+O",
+      default: "Alt+0",
+      mac: "MacCtrl+0",
     },
     description: "Show or hide AgentOnWeb",
   },
   "mode-chill": {
     suggested_key: {
-      default: "Alt+Shift+1",
-      mac: "MacCtrl+Shift+1",
+      default: "Alt+1",
+      mac: "MacCtrl+1",
     },
     description: "Switch to Chill mode",
   },
   "mode-focus": {
     suggested_key: {
-      default: "Alt+Shift+2",
-      mac: "MacCtrl+Shift+2",
+      default: "Alt+2",
+      mac: "MacCtrl+2",
     },
     description: "Switch to Focus mode",
   },
   "mode-watch": {
     suggested_key: {
-      default: "Alt+Shift+3",
-      mac: "MacCtrl+Shift+3",
+      default: "Alt+3",
+      mac: "MacCtrl+3",
     },
     description: "Switch to Watch mode",
   },
@@ -54,6 +54,7 @@ export default defineConfig({
     },
     permissions: [
       "alarms",
+      ...(browser === "chrome" ? ["nativeMessaging"] : []),
       "cookies",
       "storage",
       "tabs",

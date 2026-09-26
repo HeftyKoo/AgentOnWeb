@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PROTOCOL_VERSION } from "@agentonweb/connector-contract";
 import { ConnectionCoordinator } from "./connection-coordinator.js";
 import type { ConnectorCallbacks } from "./connector-client.js";
@@ -22,6 +22,32 @@ const surface = {
   url: "http://localhost:3080/",
   cookie: { name: "session", value: "private", maxAgeSeconds: 60 },
 };
+
+afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
+
+it("retries a disconnected authorized runtime after 3 seconds, backs off while offline, and stops after revocation", async () => {
+  vi.useFakeTimers();
+  const callbacks: ConnectorCallbacks[] = [];
+  const discover = vi.fn(async () => [available]);
+  const coordinator = new ConnectionCoordinator({
+    discover,
+    createTransport(next) { callbacks.push(next); return { connect() {}, close() {}, request: async () => surface }; },
+    effects: { changed() {}, saveCredentials: async () => {}, openApproval: async () => {}, revokeDelegation: async () => {} },
+  });
+  await coordinator.connect(); callbacks[0]!.ready('credential'); await coordinator.idle();
+  callbacks[0]!.closed(); await coordinator.idle();
+  discover.mockResolvedValue([]);
+  await vi.advanceTimersByTimeAsync(2999); expect(discover).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1); await coordinator.idle(); expect(discover).toHaveBeenCalledTimes(2);
+  discover.mockResolvedValue([available]);
+  await vi.advanceTimersByTimeAsync(5999); expect(discover).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(1); await coordinator.idle(); expect(callbacks).toHaveLength(2);
+  callbacks[1]!.ready(); await coordinator.idle();
+  await vi.advanceTimersByTimeAsync(30_000); expect(discover).toHaveBeenCalledTimes(3);
+  callbacks[1]!.closed(); await coordinator.idle();
+  callbacks[1]!.rejected('REVOKED', 'Revoked'); await coordinator.idle();
+  await vi.advanceTimersByTimeAsync(30_000); expect(discover).toHaveBeenCalledTimes(3);
+});
 
 describe("ConnectionCoordinator", () => {
   it("owns pairing, credential persistence and surface acquisition behind its Interface", async () => {
@@ -322,4 +348,19 @@ describe("ConnectionCoordinator", () => {
     expect(coordinator.snapshot.surface?.runtimeId).toBe(runtime.id);
     expect(coordinator.snapshots.get("terminal")?.surface).toBeUndefined();
   });
+});
+
+it("aggregates semantic sessions independently of selection and removes them on disconnect", async () => {
+  let callbacks!: ConnectorCallbacks;
+  const coordinator = new ConnectionCoordinator({
+    discover: async () => [available],
+    createTransport(next) { callbacks = next; return { connect() {}, close() {}, request: async () => surface }; },
+    effects: { changed() {}, saveCredentials: async () => {}, openApproval: async () => {}, revokeDelegation: async () => {} },
+  });
+  await coordinator.connect(); callbacks.ready("credential"); await coordinator.idle();
+  const item = { id: "session", runtimeId: runtime.id, terminalId: "one", agent: "Codex", title: "Private prompt", detail: "", status: "running" as const, updatedAt: 1, attentionId: "" };
+  callbacks.sessions?.([item, { ...item, runtimeId: "foreign" }]); await coordinator.idle();
+  expect(coordinator.snapshot.view.agentSessions).toEqual([item]);
+  callbacks.closed(); await coordinator.idle();
+  expect(coordinator.snapshot.view.agentSessions).toEqual([]);
 });

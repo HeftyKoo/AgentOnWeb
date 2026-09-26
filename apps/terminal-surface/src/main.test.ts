@@ -428,3 +428,73 @@ it("renames a background terminal without reconnecting and updates its close lab
   expect(dom.window.document.querySelector('.terminal-tab[data-session="two"] .tab-name')!.textContent).toBe("API server");
   expect(dom.window.document.querySelector('.terminal-tab[data-session="two"] .tab-close')!.getAttribute("aria-label")).toBe("Close API server");
 });
+
+it("reserves only the runtime switch in an authorized embedded terminal", async () => {
+  dom = new JSDOM(await readFile(new URL("./index.html", import.meta.url), "utf8"), {
+    url: "http://localhost:1234/#agentonweb=frame-nonce",
+  });
+  for (const key of ["window", "document", "location", "sessionStorage"]) vi.stubGlobal(key, (dom.window as any)[key]);
+  vi.stubGlobal("navigator", { platform: "MacIntel" });
+  const parent = { postMessage: vi.fn() };
+  vi.stubGlobal("parent", parent);
+  vi.stubGlobal("ResizeObserver", class { observe() {} });
+  vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+  await import("./main.js");
+  const delivered = vi.fn();
+  dom.window.document.addEventListener("keydown", delivered);
+  const key = (code: string) => {
+    const event = new dom.window.KeyboardEvent("keydown", { code, ctrlKey: true, bubbles: true, cancelable: true });
+    dom.window.document.body.dispatchEvent(event);
+    return event;
+  };
+  expect(key("Backquote").defaultPrevented).toBe(false);
+  dom.window.dispatchEvent(new dom.window.MessageEvent("message", {
+    source: parent as any, origin: "chrome-extension://test-extension",
+    data: { source: "agentonweb-extension", type: "surface.ready", nonce: "frame-nonce" },
+  }));
+  delivered.mockClear();
+  for (const code of ["Digit1", "Digit2", "Digit3"]) expect(key(code).defaultPrevented).toBe(false);
+  expect(delivered).toHaveBeenCalledTimes(3);
+  expect(key("Backquote").defaultPrevented).toBe(true);
+  expect(delivered).toHaveBeenCalledTimes(3);
+  expect(parent.postMessage).toHaveBeenCalledWith({ source: "agentonweb-surface", type: "surface.shortcut", nonce: "frame-nonce", action: "runtime.toggle" }, "*");
+});
+
+it("activates an authenticated target before the initial list resolves and rejects missing terminal targets", async () => {
+  dom = new JSDOM(await readFile(new URL("./index.html", import.meta.url), "utf8"), { url: "http://localhost:1234/#agentonweb=nonce" });
+  for (const key of ["window", "document", "location", "sessionStorage"]) vi.stubGlobal(key, (dom.window as any)[key]);
+  const parent = { postMessage: vi.fn() };
+  vi.stubGlobal("parent", parent);
+  vi.stubGlobal("ResizeObserver", class { observe() {} });
+  vi.useFakeTimers({ toFake: ["setInterval"] });
+  vi.stubGlobal("WebSocket", class { static OPEN = 1; readyState = 1; send() {} close() {} });
+  let resolveFirst!: (response: Response) => void;
+  let lists = 0;
+  const tickets: string[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+    if (path === "/api/connections") return new Response("", { status: 403 });
+    if (path === "/api/terminals") {
+      if (++lists === 1) return new Promise<Response>(resolve => { resolveFirst = resolve; });
+      return Response.json([{ id: "one", name: "One" }, { id: "two", name: "Two" }]);
+    }
+    tickets.push(path);
+    return Response.json({ token: "token", executable: "/bin/sh", cwd: "/" });
+  }));
+  await import("./main.js");
+  const emit = (type: string, extra = {}, origin = "chrome-extension://test") => dom.window.dispatchEvent(new dom.window.MessageEvent("message", {
+    source: parent as unknown as Window, origin, data: { source: "agentonweb-extension", nonce: "nonce", type, ...extra },
+  }));
+  emit("surface.ready");
+  emit("terminal.activate", { terminalId: "two", requestId: "select-two" }, "https://attacker.example");
+  expect(lists).toBe(1);
+  emit("terminal.activate", { terminalId: "two", requestId: "select-two" });
+  await vi.waitFor(() => expect(tickets).toEqual(["/ticket?session=two"]));
+  resolveFirst(Response.json([{ id: "one", name: "One" }]));
+  await Promise.resolve();
+  expect(dom.window.sessionStorage.getItem("agentonweb-terminal")).toBe("two");
+  emit("terminal.activate", { terminalId: "two", requestId: "select-two" });
+  expect(lists).toBe(2);
+  emit("terminal.activate", { terminalId: "gone", requestId: "select-gone" });
+  await vi.waitFor(() => expect(parent.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "terminal.activated", requestId: "select-gone", ok: false }), "*"));
+  expect(tickets).toEqual(["/ticket?session=two"]);
+});

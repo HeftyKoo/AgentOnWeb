@@ -6,11 +6,14 @@ import { DEFAULT_SURFACE_OPACITY, normalizeSurfaceOpacity } from "./interaction.
 import { PartitionLeaseManager } from "./partition-leases.js";
 import { SafariCookieLeaseManager } from "./safari-cookie-leases.js";
 import { COOKIE_SCOPES_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, isContentRequest, type ContentRequest, type StateUpdate, type SurfaceCommand, type SurfaceViewState } from "./shared.js";
+import { nativeSetup, probeNativeSetup } from "./native-setup.js";
 import { topLevelSite } from "./surface-cookie.js";
 
 let state: SurfaceViewState = { mode: "chill", opacity: DEFAULT_SURFACE_OPACITY, connection: "disconnected" };
 let surface: NativeSurface | undefined;
 let publication: Promise<void> = Promise.resolve();
+let broadcastQueued = false;
+let savedPreferences: string | undefined;
 const frameNames = new Map<string, string>();
 const tabRuntimes = new Map<number, string>();
 let surfaces = new Map<string, NativeSurface>();
@@ -147,8 +150,13 @@ browser.tabs.onRemoved.addListener((id) => {
   tabRuntimes.delete(id);
   if (targetBrowser === "safari") (sessionLeases as HeaderLeaseManager).removeTab(id);
 });
+// Hidden tabs catch up once selected; each window's visible tab gets live updates.
+browser.tabs.onActivated.addListener(() => { void initialized.then(enqueueBroadcast); });
+browser.windows.onFocusChanged.addListener((id) => {
+  if (id !== browser.windows.WINDOW_ID_NONE) void initialized.then(enqueueBroadcast);
+});
 browser.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "agentonweb-reconnect") initialized.then(() => coordinator.reconnectIfNeeded());
+  if (alarm.name === "agentonweb-reconnect") initialized.then(async () => { await coordinator.reconnectIfNeeded(); await autoConnectTerminal(); });
 });
 
 async function initialize(): Promise<void> {
@@ -170,14 +178,23 @@ async function initialize(): Promise<void> {
     mode: storedState?.mode === "watch" || storedState?.mode === "focus" ? storedState.mode : "chill",
     dismissed: storedState?.dismissed === true,
     opacity: normalizeSurfaceOpacity(storedState?.opacity),
+    ...(Array.isArray(storedState?.readAttentionIds) ? {
+      readAttentionIds: [...new Set(storedState.readAttentionIds.filter((id): id is string =>
+        typeof id === "string" && id.length > 0 && id.length <= 200))].slice(-256),
+    } : {}),
   };
   await coordinator.restore(storedState?.runtimeId, credentials);
+  await autoConnectTerminal();
   await coordinator.idle();
   await publication;
 }
 
 async function handleRequest(request: ContentRequest, tab?: Browser.tabs.Tab): Promise<unknown> {
   switch (request.type) {
+    case "agent.attention.read":
+      patch({ readAttentionIds: [...new Set([...(state.readAttentionIds ?? []), request.attentionId])].slice(-256) });
+      await publication;
+      return { ok: true };
     case "state.get": return viewForTab(tab);
     case "visibility.set":
       patch({ dismissed: !request.visible });
@@ -228,7 +245,14 @@ async function handleSafariSession(message: object, sender: Browser.runtime.Mess
   throw new Error("Invalid session request.");
 }
 
+async function autoConnectTerminal(): Promise<void> {
+  if (targetBrowser !== "chrome" || coordinator.snapshots.has("terminal")) return;
+  const result = await probeNativeSetup();
+  if (result.ok && result.canPair) await coordinator.connect("terminal");
+}
+
 async function openApproval(url: string): Promise<void> {
+  if (targetBrowser === "chrome" && (await nativeSetup("pair", url)).ok) return;
   const tabs = await browser.tabs.query({});
   const found = tabs.find((tab) => tab.url?.startsWith(url));
   if (found?.id !== undefined) {
@@ -259,6 +283,7 @@ async function presentInTab(tab: Browser.tabs.Tab | undefined, type: SurfaceComm
 
 function applyConnectionView(view: ConnectionView): void {
   patch({
+    agentSessions: view.agentSessions,
     connection: view.connection,
     runtimeId: view.runtimeId,
     runtime: view.runtime,
@@ -280,16 +305,29 @@ function patch(next: StatePatch): void {
 }
 
 function enqueueBroadcast(): Promise<void> {
-  const stateSnapshot = { ...state };
-  const surfaceSnapshot = surface;
-  const next = publication.catch(() => {}).then(() => broadcast(stateSnapshot, surfaceSnapshot));
-  publication = next;
-  return next;
+  if (broadcastQueued) return publication;
+  broadcastQueued = true;
+  publication = publication.catch(() => {}).then(async () => {
+    broadcastQueued = false;
+    await broadcast({ ...state }, surface);
+  });
+  return publication;
 }
 
 async function broadcast(stateSnapshot: SurfaceViewState, surfaceSnapshot?: NativeSurface): Promise<void> {
-  await browser.storage.local.set({ [STATE_STORAGE_KEY]: stateSnapshot });
-  const tabs = await browser.tabs.query({});
+  // Persist presentation preferences, never prompts, approval details or live sessions.
+  const preferences = {
+    mode: stateSnapshot.mode, opacity: stateSnapshot.opacity,
+    ...(stateSnapshot.dismissed !== undefined ? { dismissed: stateSnapshot.dismissed } : {}),
+    ...(stateSnapshot.runtimeId ? { runtimeId: stateSnapshot.runtimeId } : {}),
+    ...(stateSnapshot.readAttentionIds ? { readAttentionIds: stateSnapshot.readAttentionIds } : {}),
+  };
+  const serialized = JSON.stringify(preferences);
+  if (serialized !== savedPreferences) {
+    await browser.storage.local.set({ [STATE_STORAGE_KEY]: preferences });
+    savedPreferences = serialized;
+  }
+  const tabs = await browser.tabs.query({ active: true });
   await Promise.allSettled(tabs.map(async (tab) => {
     if (tab.id === undefined) return;
     await browser.tabs.sendMessage(tab.id, {
@@ -315,6 +353,7 @@ async function viewForTab(
     // A queued broadcast can still contain the removed runtime's connection
     // fields. Keep presentation preferences and use the current fallback view.
     stateSnapshot = { mode: stateSnapshot.mode, opacity: stateSnapshot.opacity,
+      ...(stateSnapshot.readAttentionIds ? { readAttentionIds: stateSnapshot.readAttentionIds } : {}),
       ...(stateSnapshot.dismissed === undefined ? {} : { dismissed: stateSnapshot.dismissed }), ...connectionSnapshot.view };
   }
   if (selectedId && !tabRuntimes.has(tab.id)) tabRuntimes.set(tab.id, selectedId);

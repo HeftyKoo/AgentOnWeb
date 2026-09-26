@@ -15,10 +15,10 @@ const adapter: SurfaceAdapter = {
   approvalUrl: "http://127.0.0.1:3080/",
   getSurface: vi.fn(async () => ({ runtimeId: "test-native-runtime", displayName: "Test native runtime", url: "http://localhost:3080/", cookie: { name: "native-test", value: "private-cookie", maxAgeSeconds: 60 } })),
 };
-async function setup() {
+async function setup(surfaceAdapter = adapter) {
   const dir = await mkdtemp(join(tmpdir(), "agentonweb-connector-")); directories.push(dir);
   const authority = await Authorization.open(dir);
-  const server = await startConnector(adapter, authority, [0]); servers.push(server);
+  const server = await startConnector(surfaceAdapter, authority, [0]); servers.push(server);
   return { authority, server };
 }
 async function connect(server: Connector, headers = { Origin: origin }) {
@@ -37,6 +37,43 @@ afterEach(async () => {
 });
 
 describe("runtime-independent connector", () => {
+  it("only sends session snapshots to subscribers and merges a burst into the latest snapshot", async () => {
+    let changed = () => {};
+    let sessions: any[] = [];
+    const snapshot = vi.fn(() => sessions);
+    const unsubscribe = vi.fn();
+    const { server, authority } = await setup({ ...adapter, agentSessions: {
+      snapshot, subscribe(listener) { changed = listener; return unsubscribe; },
+    } });
+    const legacy = await connect(server);
+    const legacyFrames: ServerFrame[] = [];
+    legacy.on("message", data => legacyFrames.push(JSON.parse(String(data))));
+    hello(legacy, { intent: "pair" }); await frame(legacy);
+    const accepted = frame(legacy);
+    await authority.decide(authority.snapshot().pending[0]!.id, true);
+    const grant = await accepted;
+    if (grant.kind !== "hello") throw new Error("Expected hello");
+    const subscriber = await connect(server);
+    const received: ServerFrame[] = [];
+    subscriber.on("message", data => received.push(JSON.parse(String(data))));
+    hello(subscriber, { credential: grant.credential, agentSessions: true });
+    await vi.waitFor(() => expect(received.some(item => item.kind === "agent.sessions")).toBe(true));
+    expect(legacyFrames.some(item => item.kind === "agent.sessions")).toBe(false);
+    received.length = 0; snapshot.mockClear();
+    for (let index = 0; index < 20; index++) {
+      sessions = [{ id: "session", title: `Update ${index}` }];
+      changed();
+    }
+    expect(snapshot).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(received).toEqual([{ kind: "agent.sessions", sessions }]));
+    expect(snapshot).toHaveBeenCalledOnce();
+    expect(legacyFrames.some(item => item.kind === "agent.sessions")).toBe(false);
+    const closed = once(subscriber, "close");
+    subscriber.close(); await closed;
+    snapshot.mockClear(); changed();
+    await new Promise(resolve => setTimeout(resolve, 120));
+    expect(snapshot).not.toHaveBeenCalled();
+  });
   it("rejects undiscoverable authorization URLs before listening", async () => {
     const { authority } = await setup();
     await expect(startConnector({ ...adapter, approvalUrl: "http://localhost:3080/approve" }, authority, [0])).rejects.toThrow("Invalid native authorization URL");

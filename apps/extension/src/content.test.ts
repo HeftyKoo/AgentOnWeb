@@ -117,6 +117,24 @@ async function page(
 }
 
 describe("page-local AgentOnWeb visibility", () => {
+  it("refreshes a wrapper's lost authorization after worker restart and rejects forged retry messages", async () => {
+    const ui = await page(connected);
+    const recovered = { ...connected, surface: { ...connected.surface!, frameName: 'agentonweb:fresh-nonce' } };
+    ui.sendMessage.mockResolvedValue({ ok: true, result: recovered });
+    ui.sendMessage.mockClear();
+    const retry = (origin: string, nonce: string, sender: unknown = ui.frame.contentWindow) =>
+      ui.window.dispatchEvent(new ui.window.MessageEvent('message', { origin, source: sender as Window,
+        data: { source: 'agentonweb-surface', type: 'surface.wrapper-retry', nonce } }));
+    retry('https://attacker.example', 'test-nonce');
+    retry('chrome-extension://test-extension', 'wrong');
+    retry('chrome-extension://test-extension', 'test-nonce', ui.window);
+    expect(ui.sendMessage).not.toHaveBeenCalled();
+    retry('chrome-extension://test-extension', 'test-nonce');
+    await vi.waitFor(() => expect(ui.frame.name).toBe('agentonweb:fresh-nonce'));
+    expect(new URLSearchParams(new URL(ui.frame.src).hash.slice(1)).get('nonce')).toBe('fresh-nonce');
+    expect(ui.sendMessage).toHaveBeenCalledExactlyOnceWith({ source: 'agentonweb-content', type: 'state.get' });
+  });
+
   it("remembers Close across reloads and cross-site navigation until explicitly reopened", async () => {
     let saved = { ...idle, dismissed: false };
     const openPage = (url: string) =>
@@ -432,6 +450,81 @@ describe("page-local AgentOnWeb visibility", () => {
     expect(dock.dataset.expanded).toBe("true");
   });
 
+  it("handles physical platform shortcuts and authenticates iframe shortcuts and outside clicks", async () => {
+    const p = await page({ ...connected, runtimeId: "terminal", runtimes: [
+      { id: "deepseek-harness", displayName: "DSH" }, { id: "terminal", displayName: "Local terminal" },
+    ] });
+    const dock = p.shadow.querySelector<HTMLElement>(".surface-dock")!;
+    const toggle = p.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!;
+    toggle.click();
+    p.shadow.querySelector(".surface-mode")!.dispatchEvent(new p.window.Event("pointerdown", { bubbles: true, composed: true }));
+    expect(dock.dataset.expanded).toBe("true");
+    p.websiteControl.dispatchEvent(new p.window.Event("pointerdown", { bubbles: true }));
+    expect(dock.dataset.expanded).toBe("false");
+    const key = new p.window.KeyboardEvent("keydown", { key: "`", code: "Backquote", altKey: true, bubbles: true, cancelable: true });
+    p.websiteControl.dispatchEvent(key);
+    expect(key.defaultPrevented).toBe(true);
+    expect(p.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "runtime.activate", runtimeId: "deepseek-harness" }));
+    p.emit("state.update", { ...connected, runtimeId: "deepseek-harness", runtimes: [
+      { id: "deepseek-harness", displayName: "DSH" }, { id: "terminal", displayName: "Local terminal" },
+    ] });
+    p.sendMessage.mockClear();
+    Object.defineProperty(p.frame, "contentWindow", { configurable: true, value: { postMessage: vi.fn() } });
+    const message = (nonce: string, type: string, action?: string) => p.window.dispatchEvent(new p.window.MessageEvent("message", {
+      source: p.frame.contentWindow, origin: "chrome-extension://test-extension",
+      data: { source: "agentonweb-surface", nonce, type, action },
+    }));
+    message("wrong", "surface.shortcut", "runtime.toggle");
+    expect(p.sendMessage).not.toHaveBeenCalled();
+    message("test-nonce", "surface.shortcut", "runtime.toggle");
+    expect(p.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "runtime.activate", runtimeId: "terminal" }));
+    toggle.click();
+    message("wrong", "surface.pointerdown");
+    expect(dock.dataset.expanded).toBe("true");
+    message("test-nonce", "surface.pointerdown");
+    expect(dock.dataset.expanded).toBe("false");
+  });
+
+  it("leaves mode keys and inactive or editable website shortcuts alone", async () => {
+    const state = { ...connected, runtimeId: "terminal", runtimes: [
+      { id: "terminal", displayName: "Terminal" }, { id: "deepseek-harness", displayName: "DSH" },
+    ] };
+    const p = await page(state);
+    const key = (code: string, target: Element = p.websiteControl) => {
+      const event = new p.window.KeyboardEvent("keydown", { code, altKey: true, bubbles: true, composed: true, cancelable: true });
+      target.dispatchEvent(event);
+      return event;
+    };
+    p.sendMessage.mockClear();
+    for (const code of ["Digit1", "Digit2", "Digit3"]) expect(key(code).defaultPrevented).toBe(false);
+    expect(p.sendMessage).not.toHaveBeenCalled();
+    const input = p.window.document.createElement("textarea");
+    p.window.document.body.append(input);
+    expect(key("Backquote", input).defaultPrevented).toBe(false);
+    p.emit("state.update", { ...state, mode: "watch" });
+    expect(key("Backquote").defaultPrevented).toBe(false);
+    Object.defineProperty(p.frame, "contentWindow", { configurable: true, value: { postMessage: vi.fn() } });
+    p.window.dispatchEvent(new p.window.MessageEvent("message", {
+      source: p.frame.contentWindow, origin: "chrome-extension://test-extension",
+      data: { source: "agentonweb-surface", nonce: "test-nonce", type: "surface.shortcut", action: "runtime.toggle" },
+    }));
+    expect(p.sendMessage).not.toHaveBeenCalled();
+    p.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!.click();
+    expect(key("Backquote").defaultPrevented).toBe(true);
+    expect(p.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "runtime.activate", runtimeId: "deepseek-harness" }));
+  });
+
+  it("does not install a mode-key fallback when the workspace is dismissed or unconnected", async () => {
+    const p = await page({ ...idle, dismissed: true });
+    p.sendMessage.mockClear();
+    for (const code of ["Digit1", "Digit2", "Digit3", "Backquote"]) {
+      const event = new p.window.KeyboardEvent("keydown", { code, altKey: true, bubbles: true, cancelable: true });
+      p.websiteControl.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    }
+    expect(p.sendMessage).not.toHaveBeenCalled();
+  });
+
   it("collapses runtime choices and keeps the current trigger stable across updates", async () => {
     const state = {
       ...connected,
@@ -444,7 +537,7 @@ describe("page-local AgentOnWeb visibility", () => {
     const p = await page(state);
     const trigger = p.shadow.querySelector<HTMLButtonElement>(".runtime-current")!;
     const options = p.shadow.querySelector<HTMLElement>(".runtime-options")!;
-    expect(trigger.textContent).toBe("Local terminal");
+    expect(trigger.querySelector(".runtime-name")!.textContent).toBe("Local terminal");
     expect(options.hidden).toBe(true);
     p.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!.click();
     trigger.click();
@@ -455,10 +548,10 @@ describe("page-local AgentOnWeb visibility", () => {
     expect(p.shadow.querySelector<HTMLElement>(".surface-dock")!.dataset.expanded).toBe("true");
     expect(p.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "runtime.activate", runtimeId: "deepseek-harness" }));
     // Don't claim activation until the background confirms it.
-    expect(trigger.textContent).toBe("Local terminal");
+    expect(trigger.querySelector(".runtime-name")!.textContent).toBe("Local terminal");
     p.emit("state.update", { ...state, runtimeId: "deepseek-harness" });
     expect(p.shadow.querySelector(".runtime-current")).toBe(trigger);
-    expect(trigger.textContent).toBe("DeepSeek Harness");
+    expect(trigger.querySelector(".runtime-name")!.textContent).toBe("DeepSeek Harness");
     expect(options.hidden).toBe(true);
     trigger.click();
     p.emit("state.update", { ...state, runtimeId: "deepseek-harness" });
@@ -558,4 +651,41 @@ describe("page-local AgentOnWeb visibility", () => {
     p.emit("state.update", state);
     expect(p.shadow.querySelector('[aria-label="Native test, new output"]')).toBeNull();
   });
+});
+
+it("opens the session list from the page icon and buffers an exact terminal jump until wrapper readiness", async () => {
+  const session = { id: "a:codex", runtimeId: "native-test", terminalId: "a", agent: "Codex", status: "running" as const,
+    title: "Fix login", detail: "/project", attentionId: "", updatedAt: 1 };
+  const state = { ...connected, runtimeId: "native-test", agentSessions: [session] };
+  const ui = await page(state);
+  ui.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!.click();
+  expect(ui.shadow.querySelector<HTMLElement>(".surface-dock")!.dataset.view).toBe("sessions");
+  ui.shadow.querySelector<HTMLButtonElement>(".agent-session")!.click();
+  expect(ui.sendMessage).toHaveBeenCalledWith({ source: "agentonweb-content", type: "runtime.activate", runtimeId: "native-test" });
+  const frame = ui.shadow.querySelector<HTMLIFrameElement>("iframe")!;
+  const post = vi.fn();
+  Object.defineProperty(frame, "contentWindow", { configurable: true, value: { postMessage: post } });
+  ui.ready(frame);
+  expect(post).toHaveBeenCalledWith(expect.objectContaining({ type: "terminal.activate", terminalId: "a", requestId: expect.any(String) }), "chrome-extension://test-extension");
+});
+
+it("notifies approval and completion once and does not render session text as markup", async () => {
+  const session = { id: "a:codex", runtimeId: "native-test", terminalId: "a", agent: "Codex", status: "running" as const,
+    title: "<img src=x onerror=alert(1)>", detail: "/project", attentionId: "", updatedAt: 1 };
+  const ui = await page({ ...connected, agentSessions: [session] });
+  const approval = { ...connected, agentSessions: [{ ...session, status: "approval" as const, attentionId: "approval-1" }] };
+  ui.emit("state.update", approval);
+  const toast = ui.shadow.querySelector<HTMLElement>(".agent-notification")!;
+  expect(toast.hidden).toBe(false);
+  expect(toast.textContent).toContain("Needs approval");
+  expect(toast.querySelector("img")).toBeNull();
+  toast.querySelector<HTMLButtonElement>('[aria-label="Dismiss notification"]')!.click();
+  ui.emit("state.update", approval);
+  expect(toast.hidden).toBe(true);
+  const complete = { ...connected, agentSessions: [{ ...session, status: "completed" as const, attentionId: "complete-1" }] };
+  ui.emit("state.update", complete);
+  expect(toast.hidden).toBe(false);
+  expect(toast.textContent).toContain("Completed");
+  ui.emit("state.update", { ...connected, agentSessions: [] });
+  expect(toast.hidden).toBe(true);
 });

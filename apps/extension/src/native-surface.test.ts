@@ -101,3 +101,50 @@ describe("native workspace extension document", () => {
 });
 
 it("does not load an iframe forged by a webpage without the background lease", async () => { expect((await page("chrome-extension", "http://localhost:3080/", false)).document.querySelector("iframe")).toBeNull(); });
+
+it("shows a recoverable authorization failure and requires approval again on retry", async () => {
+  const window = await page("chrome-extension", "http://localhost:3080/", false);
+  expect(window.document.body.textContent).toContain('authorization');
+  const sendMessage = vi.fn(async () => ({ ok: true }));
+  Object.assign(window, { chrome: { runtime: { sendMessage } } });
+  window.document.querySelector<HTMLButtonElement>('button')!.click();
+  await vi.waitFor(() => expect(window.document.querySelector('iframe')).not.toBeNull());
+  expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'surface.authorize', nonce: 'test-nonce' }));
+  expect(window.parent.postMessage).toHaveBeenCalledWith({ source: 'agentonweb-surface', type: 'surface.wrapper-retry', nonce: 'test-nonce' }, 'https://example.org');
+  expect(window.document.querySelector('button')).toBeNull();
+});
+
+it("keeps the workspace blocked when retry is denied or the background is unavailable", async () => {
+  const window = await page("chrome-extension", "http://localhost:3080/", false);
+  for (const sendMessage of [async () => ({ ok: false }), async () => { throw new Error('Worker unavailable'); }]) {
+    Object.assign(window, { chrome: { runtime: { sendMessage } } });
+    const button = window.document.querySelector<HTMLButtonElement>('button')!;
+    button.click();
+    await vi.waitFor(() => expect(button.disabled).toBe(false));
+    expect(window.document.body.textContent).toContain('authorization');
+    expect(window.document.querySelector('iframe')).toBeNull();
+  }
+});
+
+it("buffers terminal activation until native load and forwards authenticated acknowledgements", async () => {
+  const window = await page("chrome-extension");
+  const frame = window.document.querySelector("iframe")!;
+  const native = { postMessage: vi.fn() };
+  Object.defineProperty(frame, "contentWindow", { value: native });
+  const activation = { source: "agentonweb-extension", type: "terminal.activate", terminalId: "two", requestId: "click-2", nonce: "test-nonce" };
+  const emit = (data: object, origin: string, source: unknown) => window.dispatchEvent(new window.MessageEvent("message", { data, origin, source: source as Window }));
+  emit(activation, "https://attacker.example", window.parent);
+  frame.dispatchEvent(new window.Event("load"));
+  expect(native.postMessage).not.toHaveBeenCalledWith(activation, expect.anything());
+  emit(activation, "https://example.org", window.parent);
+  expect(native.postMessage).toHaveBeenCalledWith(activation, "http://localhost:3080");
+  const parentPost = vi.spyOn(window.parent, "postMessage").mockImplementation(() => {});
+  const ack = { source: "agentonweb-surface", type: "terminal.activated", nonce: "test-nonce", requestId: "click-2", ok: true };
+  emit(ack, "https://attacker.example", native);
+  expect(parentPost).not.toHaveBeenCalled();
+  emit(ack, "http://localhost:3080", native);
+  expect(parentPost).toHaveBeenCalledWith(ack, "https://example.org");
+  native.postMessage.mockClear();
+  frame.dispatchEvent(new window.Event("load"));
+  expect(native.postMessage).not.toHaveBeenCalledWith(activation, expect.anything());
+});

@@ -1,6 +1,6 @@
 import { createConnection } from "node:net";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { mkdir, mkdtemp, realpath, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, stat, readFile, writeFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { once } from "node:events";
@@ -247,7 +247,7 @@ it("rejects unknown commands before creating a host", () => {
     encoding: "utf8",
   });
   expect(result.status).not.toBe(0);
-  expect(result.stderr).toContain("Usage: aow terminal");
+  expect(result.stderr).toContain("Usage: aow setup");
 });
 
 it("reports a lock release failure and exits after closing the host", async () => {
@@ -312,7 +312,15 @@ it("refreshes other authorized browsers after revocation without stopping their 
       headers,
       body: JSON.stringify({ action, id }),
     });
-  const frame = async (socket: WebSocket) => JSON.parse(String((await once(socket, "message"))[0]));
+  const frame = (socket: WebSocket): Promise<any> => new Promise(resolve => {
+    const receive = (raw: WebSocket.RawData) => {
+      const message = JSON.parse(String(raw));
+      if (message.kind === "agent.sessions") return;
+      socket.off("message", receive);
+      resolve(message);
+    };
+    socket.on("message", receive);
+  });
   const connect = async (extensionOrigin: string, credential?: string) => {
     const socket = new WebSocket(connectorUrl, {
       headers: { Origin: extensionOrigin },
@@ -379,3 +387,134 @@ it("refreshes other authorized browsers after revocation without stopping their 
     restored.socket.close();
   }
 }, 15000);
+
+it("delivers authenticated Codex hooks without a terminal viewer and restores the latest snapshot", async () => {
+  directory = await mkdtemp(join(tmpdir(), "aow-agent-events-"));
+  const cli = resolve("packages/terminal-host/lib/cli.js");
+  host = spawn(process.execPath, [cli, "terminal"], {
+    env: { ...process.env, HOME: directory, SHELL: "/bin/sh", ENV: undefined, BASH_ENV: undefined, ZDOTDIR: undefined },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let output = "";
+  host.stdout!.on("data", chunk => { output += String(chunk); });
+  await expect.poll(() => output.includes("Open once:"), { timeout: 10000 }).toBe(true);
+  const launchUrl = /Open once: (http:\/\/[^\s]+)/u.exec(output)![1]!;
+  const origin = new URL(launchUrl).origin;
+  const launch = await fetch(launchUrl);
+  const Cookie = launch.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+  const headers = { Cookie, "X-AgentOnWeb-Terminal": "1", Origin: origin };
+  const connectorUrl = `ws://127.0.0.1:${/Connector: (\d+)/u.exec(output)![1]}`;
+  const extensionOrigin = "chrome-extension://" + "c".repeat(32);
+  const socket = new WebSocket(connectorUrl, { headers: { Origin: extensionOrigin } });
+  const frames: any[] = [];
+  socket.on("message", raw => frames.push(JSON.parse(String(raw))));
+  await once(socket, "open");
+  socket.send(JSON.stringify({ kind: "hello", protocolVersion: 1, intent: "pair", agentSessions: true }));
+  await expect.poll(() => frames.some(frame => frame.kind === "pending")).toBe(true);
+  expect(frames.some(frame => frame.kind === "agent.sessions")).toBe(false);
+  const connections = await (await fetch(origin + "/api/connections", { headers })).json();
+  await fetch(origin + "/api/connections", { method: "POST", headers, body: JSON.stringify({ action: "allow", id: connections.pending[0].id }) });
+  await expect.poll(() => frames.some(frame => frame.kind === "agent.sessions")).toBe(true);
+  const credential = frames.find(frame => frame.kind === "hello").credential;
+  const hookUrl = origin.replace("localhost", "127.0.0.1") + "/agent-event";
+  for (const h of [{}, { Cookie }, { authorization: "Bearer invalid" }, { Origin: origin }])
+    expect((await fetch(hookUrl, { method: "POST", headers: h, body: "{}" })).status).toBe(403);
+  const terminals = await (await fetch(origin + "/api/terminals", { headers })).json();
+  const terminalId = terminals[0].id;
+  const ticket = await (await fetch(origin + "/ticket?session=" + terminalId, { headers })).json();
+  const terminal = new WebSocket(origin.replace("http:", "ws:") + "/terminal", ticket.token, { headers });
+  let epoch = "";
+  terminal.on("message", raw => { const m = JSON.parse(String(raw)); if (m.type === "snapshot") epoch = m.epoch; });
+  await expect.poll(() => Boolean(epoch)).toBe(true);
+  const quote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'";
+  const report = (event: string) => `printf %s ${quote(JSON.stringify({ hook_event_name: event, session_id: "actual-hook-session", turn_id: "turn-one", prompt: "Verify hook transport", tool_name: "Bash" }))} | ${quote(process.execPath)} ${quote(cli)} agent-event`;
+  terminal.send(JSON.stringify({ type: "input", epoch, data: `${report("UserPromptSubmit")}\nsleep 0.2\n${report("PermissionRequest")}\nsleep 0.2\n${quote(process.execPath)} ${quote(cli)} agent-notify ${quote(JSON.stringify({ type: "agent-turn-complete", "thread-id": "actual-hook-session", "turn-id": "turn-one" }))}\n` }));
+  // Semantic notifications must outlive the xterm viewing connection.
+  terminal.close();
+  await expect.poll(() => frames.filter(frame => frame.kind === "agent.sessions").some(frame => frame.sessions[0]?.status === "completed"), { timeout: 5000 }).toBe(true);
+  const updates = frames.filter(frame => frame.kind === "agent.sessions").flatMap(frame => frame.sessions);
+  expect(updates.map(item => item.status)).toEqual(expect.arrayContaining(["running", "approval", "completed"]));
+  expect(updates.every(item => item.terminalId === terminalId)).toBe(true);
+  socket.close();
+  const restored = new WebSocket(connectorUrl, { headers: { Origin: extensionOrigin } });
+  const snapshots: any[] = [];
+  restored.on("message", raw => { const frame = JSON.parse(String(raw)); if (frame.kind === "agent.sessions") snapshots.push(frame.sessions); });
+  await once(restored, "open");
+  restored.send(JSON.stringify({ kind: "hello", protocolVersion: 1, credential, agentSessions: true }));
+  await expect.poll(() => snapshots[0]?.[0]?.status).toBe("completed");
+  await fetch(origin + "/api/terminals", { method: "POST", headers, body: JSON.stringify({ action: "close", id: terminalId }) });
+  await expect.poll(() => snapshots.at(-1)).toEqual([]);
+  restored.close();
+}, 15000);
+
+
+it("installs packaged Codex hooks and notify without changing permissions, models or existing integrations", async () => {
+  directory = await mkdtemp(join(tmpdir(), "aow-codex-install-"));
+  const before = '# Keep this comment\nmodel = "custom-model"\napproval_policy = "on-request"\nnotify = ["old-notifier", "fixed argument"]\n';
+  await writeFile(join(directory, "config.toml"), before);
+  await writeFile(join(directory, "hooks.json"), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: "command", command: "my-stop-hook" }] }] } }));
+  const install = () => spawnSync(process.execPath, [resolve("packages/terminal-host/lib/cli.js"), "codex-hooks", "install"], {
+    env: { ...process.env, CODEX_HOME: directory }, encoding: "utf8",
+  });
+  const first = install();
+  expect(first.status).toBe(0);
+  expect(first.stdout).toContain("/hooks");
+  const config = await readFile(join(directory, "config.toml"), "utf8");
+  expect(config).toContain('# Keep this comment\nmodel = "custom-model"\napproval_policy = "on-request"\n');
+  expect(config).toContain("agent-notify");
+  const hooks = JSON.parse(await readFile(join(directory, "hooks.json"), "utf8"));
+  expect(hooks.hooks.Stop[0].hooks[0].command).toBe("my-stop-hook");
+  expect(hooks.hooks.PermissionRequest[0].hooks[0].command).toContain("agent-event");
+  expect((await readdir(directory)).some(name => name.startsWith("config.toml.agentonweb-") && name.endsWith(".bak"))).toBe(true);
+  expect(install().status).toBe(0);
+  expect(await readFile(join(directory, "config.toml"), "utf8")).toBe(config);
+  expect(JSON.parse(await readFile(join(directory, "hooks.json"), "utf8"))).toEqual(hooks);
+  const removed = spawnSync(process.execPath, [resolve("packages/terminal-host/lib/cli.js"), "codex-hooks", "uninstall"], {
+    env: { ...process.env, CODEX_HOME: directory }, encoding: "utf8",
+  });
+  expect(removed.status).toBe(0);
+  expect(await readFile(join(directory, "config.toml"), "utf8")).toBe(before.replace('["old-notifier", "fixed argument"]', '["old-notifier","fixed argument"]'));
+  expect(JSON.parse(await readFile(join(directory, "hooks.json"), "utf8"))).toEqual({ hooks: { Stop: [{ hooks: [{ type: "command", command: "my-stop-hook" }] }] } });
+});
+
+it('pairs through the native bridge once, rejects web callers and preserves revocation', async () => {
+  const { installNativeBridge, nativeRequest, encodeNativeMessage } = await import('./native-bridge.js');
+  directory = await mkdtemp(join(tmpdir(), 'aow-native-pair-'));
+  const id = 'd'.repeat(32), extension = `chrome-extension://${id}`;
+  const cli = resolve('packages/terminal-host/lib/cli.js');
+  await installNativeBridge(cli, [id], directory);
+  host = spawn(process.execPath, [cli, 'terminal'], { env: { ...process.env, HOME: directory, SHELL: '/bin/sh', ENV: undefined }, stdio: ['pipe', 'pipe', 'pipe'] });
+  let output = ''; host.stdout!.on('data', chunk => { output += chunk; });
+  await expect.poll(() => output.includes('Open once:'), { timeout: 10000 }).toBe(true);
+  const launchUrl = /Open once: (http:\/\/[^\s]+)/u.exec(output)![1]!;
+  const origin = new URL(launchUrl).origin;
+  const state = join(directory, '.agentonweb/terminal');
+  const endpoint = JSON.parse(await readFile(join(state, 'endpoint.json'), 'utf8'));
+  expect(await nativeRequest(state, extension, { type: 'probe' })).toEqual({ ok: true, canPair: true });
+  const native = spawn(process.execPath, [cli, 'native-host', extension + '/'], { env: { ...process.env, HOME: directory }, stdio: ['pipe', 'pipe', 'pipe'] });
+  const nativeChunks: Buffer[] = []; native.stdout.on('data', chunk => nativeChunks.push(chunk));
+  native.stdin.end(encodeNativeMessage({ type: 'probe' }));
+  await once(native, 'exit');
+  const nativeOutput = Buffer.concat(nativeChunks);
+  expect(nativeOutput.readUInt32LE(0)).toBe(nativeOutput.length - 4);
+  expect(JSON.parse(nativeOutput.subarray(4).toString())).toEqual({ ok: true, canPair: true });
+  for (const headers of [{}, { Origin: 'https://example.com', authorization: `Bearer ${endpoint.nativeToken}` }])
+    expect((await fetch(origin + '/native-pair', { method: 'POST', headers, body: '{}' })).status).toBe(403);
+  await expect(nativeRequest(state, extension, { type: 'pair', expectedOrigin: 'http://localhost:1' })).rejects.toThrow('Different runtime');
+  const port = /Connector: (\d+)/u.exec(output)![1];
+  const socket = new WebSocket(`ws://127.0.0.1:${port}`, { headers: { Origin: extension } });
+  const frames: any[] = []; socket.on('message', raw => frames.push(JSON.parse(raw.toString())));
+  try {
+    await once(socket, 'open'); socket.send(JSON.stringify({ kind: 'hello', protocolVersion: 1, intent: 'pair' }));
+    await expect.poll(() => frames.some(f => f.kind === 'pending')).toBe(true);
+    expect(await nativeRequest(state, extension, { type: 'pair', expectedOrigin: origin })).toEqual({ ok: true });
+    await expect.poll(() => frames.some(f => f.kind === 'hello' && f.credential)).toBe(true);
+    expect(await nativeRequest(state, extension, { type: 'probe' })).toEqual({ ok: true, canPair: false });
+    const launch = await fetch(launchUrl);
+    const Cookie = launch.headers.getSetCookie().map(v => v.split(';')[0]).join('; ');
+    const headers = { Cookie, Origin: origin, 'X-AgentOnWeb-Terminal': '1' };
+    const connections = await (await fetch(origin + '/api/connections', { headers })).json();
+    expect((await fetch(origin + '/api/connections', { method: 'POST', headers, body: JSON.stringify({ action: 'revoke', id: connections.grants[0].id }) })).ok).toBe(true);
+    expect(await nativeRequest(state, extension, { type: 'probe' })).toEqual({ ok: true, canPair: false });
+  } finally { socket.close(); }
+}, 20000);

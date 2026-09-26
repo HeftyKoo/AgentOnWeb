@@ -1,8 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
 import { PROTOCOL_VERSION } from "@agentonweb/connector-contract";
-import { discoverRuntimes, isLocalSurfaceUrl, isNativeSurface, isRuntimeDescriptor } from "./connector-client.js";
+import { ConnectorClient, discoverRuntimes, isLocalSurfaceUrl, isNativeSurface, isRuntimeDescriptor } from "./connector-client.js";
 import { isContentRequest } from "./shared.js";
 describe("native surface trust", () => {
+  it("opts in to session updates only when the client consumes them", () => {
+    const sent: unknown[] = [];
+    let socket: TestSocket;
+    class TestSocket {
+      onopen?: () => void;
+      constructor() { socket = this; }
+      send(value: string) { sent.push(JSON.parse(value)); }
+      close() {}
+    }
+    vi.stubGlobal("WebSocket", TestSocket);
+    const callbacks = { pending: vi.fn(), ready: vi.fn(), closed: vi.fn(), rejected: vi.fn() };
+    const subscriber = new ConnectorClient({ ...callbacks, sessions: vi.fn() });
+    const base = new ConnectorClient(callbacks);
+    try {
+      subscriber.connect("ws://127.0.0.1:3847", "credential"); socket!.onopen!();
+      base.connect("ws://127.0.0.1:3847", "credential"); socket!.onopen!();
+      expect(sent[0]).toEqual({ kind: "hello", protocolVersion: PROTOCOL_VERSION, credential: "credential", agentSessions: true });
+      expect(sent[1]).not.toHaveProperty("agentSessions");
+    } finally { subscriber.close(); base.close(); vi.unstubAllGlobals(); }
+  });
   it("requires an explicit surface contract and declared capabilities", () => {
     expect(isRuntimeDescriptor({ id: "example", displayName: "Example", surfaceKind: "web", capabilities: { translucency: false, optionTap: false } })).toBe(true);
     expect(isRuntimeDescriptor({ id: "example", displayName: "Example", surfaceKind: "web" })).toBe(false);

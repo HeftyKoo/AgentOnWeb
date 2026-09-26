@@ -18,7 +18,7 @@ export async function verifyTerminalArchive(archive, root) {
   try {
     const listing = (await execute('tar', ['-tf', archive])).stdout.trim().split('\n').sort();
     assert.deepEqual(listing, [
-      'package/LICENSE', 'package/README.md', 'package/package.json', 'package/fix-pty-permissions.mjs',
+      'package/LICENSE', 'package/README.md', 'package/package.json', 'package/postinstall.mjs', 'package/fix-pty-permissions.mjs',
       'package/lib/cli.js', 'package/lib/public/index.html', 'package/lib/public/main.js', 'package/lib/public/main.css',
     ].sort(), 'Unexpected terminal archive contents');
     await execute('npm', ['install', '--prefix', directory, '--omit=dev', '--no-package-lock', '--no-audit', '--no-fund', archive], { timeout: 120000, maxBuffer: 4 * 1024 * 1024 });

@@ -10,7 +10,8 @@
   "files": [
     "lib",
     "README.md",
-    "fix-pty-permissions.mjs"
+    "fix-pty-permissions.mjs",
+    "postinstall.mjs"
   ],
   "engines": {
     "node": ">=22.19.0"
@@ -18,19 +19,20 @@
   "scripts": {
     "build": "node ../../scripts/build-terminal-host.mjs",
     "prepack": "pnpm run build",
-    "postinstall": "node fix-pty-permissions.mjs"
+    "postinstall": "node postinstall.mjs"
   },
   "dependencies": {
-    "node-pty": "^1.1.0",
-    "@xterm/headless": "^5.5.0",
     "@xterm/addon-serialize": "^0.13.0",
+    "@xterm/headless": "^5.5.0",
+    "node-pty": "^1.1.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {
-    "@agentonweb/connector-host": "workspace:*",
     "@agentonweb/connector-contract": "workspace:*",
+    "@agentonweb/connector-host": "workspace:*",
     "@agentonweb/terminal-core": "workspace:*",
     "@agentonweb/terminal-surface": "workspace:*",
-    "@types/ws": "^8.18.1"
+    "@types/ws": "^8.18.1",
+    "smol-toml": "1.8.0"
   }
 }

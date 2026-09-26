@@ -1,4 +1,4 @@
-import { isNativeSurface, type NativeSurface, type RuntimeDescriptor } from "@agentonweb/connector-contract";
+import { isNativeSurface, type NativeSurface, type RuntimeDescriptor, type AgentSession } from "@agentonweb/connector-contract";
 import {
   ConnectorClient,
   discoverRuntimes,
@@ -8,6 +8,7 @@ import {
 import type { SurfaceConnection } from "./shared.js";
 
 export interface ConnectionView {
+  readonly agentSessions?: readonly AgentSession[];
   readonly connection: SurfaceConnection;
   readonly runtimeId?: string;
   readonly runtime?: RuntimeDescriptor;
@@ -46,6 +47,7 @@ export interface ConnectionCoordinatorOptions {
 }
 
 interface Entry {
+  sessions?: readonly AgentSession[];
   view: ConnectionView;
   surface?: NativeSurface;
   transport: ConnectorTransport;
@@ -61,6 +63,8 @@ export class ConnectionCoordinator {
   #fallback: ConnectionView = { connection: "disconnected" };
   #generation = 0;
   #operations: Promise<unknown> = Promise.resolve();
+  #retryTimer: ReturnType<typeof setTimeout> | undefined;
+  #retryDelay = 3000;
   constructor(readonly options: ConnectionCoordinatorOptions) {}
 
   get snapshots(): ReadonlyMap<string, ConnectionSnapshot> {
@@ -97,6 +101,7 @@ export class ConnectionCoordinator {
         ...(entry?.view ?? this.#fallback),
         runtimes: [...runtimes.values()],
         nativeOrigins: [...nativeOrigins],
+        agentSessions: [...this.#entries.values()].flatMap(item => item.view.connection === "connected" ? item.sessions ?? [] : []),
       },
       ...(entry?.surface ? { surface: entry.surface } : {}),
     };
@@ -194,6 +199,10 @@ export class ConnectionCoordinator {
       });
     };
     const transport = (this.options.createTransport ?? ((callbacks) => new ConnectorClient(callbacks)))({
+      sessions: sessions => run(entry => {
+        entry.sessions = sessions.filter(item => item.runtimeId === runtimeId);
+        this.#emit();
+      }),
       pending: (url) =>
         run(async (entry) => {
           entry.view = {
@@ -277,6 +286,29 @@ export class ConnectionCoordinator {
     transport.connect(target.endpoint, this.#credentials[runtimeId]);
   }
   #emit(): void {
+    this.#scheduleReconnect();
     this.options.effects.changed(this.snapshot);
+  }
+
+  #scheduleReconnect(): void {
+    const needed = Object.keys(this.#credentials).some(id => {
+      const connection = this.#entries.get(id)?.view.connection;
+      return !connection || connection === "reconnecting" || connection === "disconnected";
+    });
+    if (!needed) {
+      clearTimeout(this.#retryTimer);
+      this.#retryTimer = undefined;
+      this.#retryDelay = 3000;
+      return;
+    }
+    if (this.#retryTimer !== undefined) return;
+    // Fast recovery while the worker lives; the persistent alarm still wakes
+    // a suspended worker. Back off when the local runtime remains offline.
+    this.#retryTimer = setTimeout(() => {
+      this.#retryTimer = undefined;
+      this.#retryDelay = Math.min(this.#retryDelay * 2, 30_000);
+      void this.reconnectIfNeeded().catch(() => {}).finally(() => this.#scheduleReconnect());
+    }, this.#retryDelay);
+    this.#retryTimer.unref?.();
   }
 }

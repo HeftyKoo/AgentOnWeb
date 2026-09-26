@@ -33,10 +33,10 @@ function createChrome() {
     permissions: { request: vi.fn(async () => true), contains: vi.fn(async () => true) },
     commands: { onCommand: event() }, action: { onClicked: event() },
     alarms: { create: vi.fn(async () => {}), onAlarm: event() },
-    tabs: { query: vi.fn(async () => [tab]), sendMessage: vi.fn(async (_id: number, _message: StateUpdate | SurfaceCommand) => {}), onRemoved: event(),
+    tabs: { query: vi.fn(async () => [tab]), sendMessage: vi.fn(async (_id: number, _message: StateUpdate | SurfaceCommand) => {}), onRemoved: event(), onActivated: event(),
       update: vi.fn(async () => {}), create: vi.fn(async () => {}) },
-    windows: { update: vi.fn(async () => {}) },
-    storage: { local: {
+    windows: { update: vi.fn(async () => {}), onFocusChanged: event(), WINDOW_ID_NONE: -1 },
+    storage: { session: { get: vi.fn(async () => ({})), set: vi.fn(async () => {}), remove: vi.fn(async () => {}) }, local: {
       setAccessLevel: vi.fn(async () => {}), get: vi.fn(async () => structuredClone(data)),
       set: vi.fn(async (values: Record<string, unknown>) => { Object.assign(data, structuredClone(values)); }),
     } },
@@ -66,6 +66,16 @@ beforeEach(() => {
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("cross-browser native connection lifecycle", () => {
+  it("persists bounded read attention IDs before acknowledging and restores them after a worker restart", async () => {
+    data = { [STATE_STORAGE_KEY]: { readAttentionIds: [null, 12, '', 'x'.repeat(201), 'already-read'] } };
+    await boot();
+    expect((await message("state.get")).result.readAttentionIds).toEqual(['already-read']);
+    await message("agent.attention.read", undefined, { attentionId: 'new-read' });
+    expect(data[STATE_STORAGE_KEY]).toMatchObject({ readAttentionIds: ['already-read', 'new-read'] });
+    vi.resetModules(); chromeMock = createChrome(); vi.stubGlobal("chrome", chromeMock);
+    await boot();
+    expect((await message("state.get")).result.readAttentionIds).toEqual(['already-read', 'new-read']);
+  });
   it.each([undefined, "invalid", "chill", "focus", "watch"])("defaults to Chill and preserves saved mode %s", async (mode) => {
     data = { [STATE_STORAGE_KEY]: { mode } };
     await boot();
