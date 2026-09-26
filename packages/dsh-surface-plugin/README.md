@@ -74,8 +74,9 @@ Use the lower-right dock to choose **Chill**, **Focus**, or **Watch**. Chill ope
 
 | Action | macOS | Windows / Linux |
 | --- | --- | --- |
-| Show or hide AgentOnWeb | `Control+Shift+O` | `Alt+Shift+O` |
-| Chill / Focus / Watch | `Control+Shift+1 / 2 / 3` | `Alt+Shift+1 / 2 / 3` |
+| Show or hide AgentOnWeb | `Control+0` | `Alt+0` |
+| Chill / Focus / Watch | `Control+1 / 2 / 3` | `Alt+1 / 2 / 3` |
+| Terminal ↔ DSH | `` Control+` `` | `` Alt+` `` |
 | Switch interaction between DSH and the website in Chill | Double-tap `Option` | Double-tap `Alt` |
 
 Shortcut availability depends on the browser and existing key bindings. You can adjust them in your browser's extension-shortcut settings. AgentOnWeb works on normal HTTP(S) websites; protected browser pages such as extension settings cannot host the workspace.
@@ -132,3 +133,11 @@ See the [release guide](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/re
 ## Links
 
 [Report an issue](https://github.com/HeftyKoo/AgentOnWeb/issues) · [Privacy policy](https://heftykoo.github.io/AgentOnWeb/privacy.html)
+
+### Shortcut scope
+
+The table shows default bindings. Show/hide and mode keys run only through browser extension commands; remap or clear them in the browser's extension shortcut settings to keep those keys available to terminal applications. There is no hard-coded page or iframe fallback for mode keys. Existing installations may retain their previous bindings.
+
+The runtime-switch key is reserved inside embedded Terminal/DSH inputs. On the host website it works only while the workspace is active or the dock is expanded, and leaves editable website fields alone. Hidden workspaces cannot forward shortcut actions. Standalone native runtime pages do not capture it. With more than two runtimes, it cycles their displayed order.
+
+Firefox on Linux uses Alt+digits to select browser tabs; choose different extension command bindings there. Windows and macOS use different browser tab shortcuts.

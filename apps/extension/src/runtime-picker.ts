@@ -1,3 +1,5 @@
+import { isMacPlatform } from "@agentonweb/connector-contract";
+import { nextRuntimeId } from "./runtime-navigation.js";
 import terminalIcon from "@phosphor-icons/core/regular/terminal.svg?raw";
 import brainIcon from "@phosphor-icons/core/regular/brain.svg?raw";
 import caretIcon from "@phosphor-icons/core/regular/caret-up.svg?raw";
@@ -11,6 +13,8 @@ const RUNTIME_ICONS = new Map([
 
 /** Presentation only: activation remains owned by the background runtime. */
 export function createRuntimePicker(onSelect: (id: string) => void, onOpen: (open: boolean) => void) {
+  const mac = isMacPlatform();
+  const toggleHint = (mac ? "⌃" : "Alt+") + "`";
   const element = document.createElement("div");
   element.className = "runtime-switch";
   element.hidden = true;
@@ -28,7 +32,8 @@ export function createRuntimePicker(onSelect: (id: string) => void, onOpen: (ope
   caret.className = "runtime-caret";
   caret.innerHTML = caretIcon;
   caret.setAttribute("aria-hidden", "true");
-  trigger.append(icon, label, caret);
+  const hint = document.createElement("kbd");
+  trigger.append(icon, label, hint, caret);
   const options = document.createElement("div");
   options.id = "agentonweb-runtime-options";
   options.className = "runtime-options";
@@ -67,6 +72,11 @@ export function createRuntimePicker(onSelect: (id: string) => void, onOpen: (ope
       if (previousId !== current?.id || !icon.childElementCount) {
         icon.innerHTML = (current && RUNTIME_ICONS.get(current.id)) ?? workspaceIcon;
       }
+      const nextId = nextRuntimeId(runtimes, state.runtimeId);
+      const canToggle = nextId !== undefined;
+      hint.textContent = toggleHint;
+      hint.hidden = !canToggle;
+      hint.title = "Switch workspace: " + (mac ? "Control" : "Alt") + " + `";
       label.textContent = name;
       trigger.title = name;
       trigger.setAttribute("aria-label", `${name}${current?.newOutput ? ", new output" : ""}`);
@@ -96,9 +106,17 @@ export function createRuntimePicker(onSelect: (id: string) => void, onOpen: (ope
             trigger.focus({ preventScroll: true });
             if (runtime.id !== previousId) onSelect(runtime.id);
           });
+          const name = document.createElement("span");
+          name.className = "runtime-option-name";
+          const hint = document.createElement("kbd");
+          hint.textContent = toggleHint;
+          button.append(name, hint);
           optionButtons.set(runtime.id, button);
         }
-        button.textContent = `${runtime.displayName}${runtime.newOutput ? " •" : ""}`;
+        button.querySelector(".runtime-option-name")!.textContent = `${runtime.displayName}${runtime.newOutput ? " •" : ""}`;
+        button.querySelector("kbd")!.hidden = runtime.id !== nextId;
+        if (runtime.id === nextId) button.setAttribute("aria-keyshortcuts", (mac ? "Control" : "Alt") + "+`");
+        else button.removeAttribute("aria-keyshortcuts");
         button.setAttribute("aria-label", `${runtime.displayName}${runtime.newOutput ? ", new output" : ""}`);
         button.setAttribute("aria-pressed", String(runtime.id === state.runtimeId));
         // Metadata updates must not detach a focused option. Move nodes only

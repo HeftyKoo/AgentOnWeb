@@ -29,6 +29,10 @@ export interface SurfaceAdapter {
   readonly runtime: RuntimeDescriptor;
   readonly approvalUrl: string;
   getSurface(): Promise<NativeSurface>;
+  agentSessions?: {
+    snapshot(): readonly import("./agent-sessions.js").AgentSession[];
+    subscribe(listener: () => void): () => void;
+  };
 }
 
 export interface ClientHello {
@@ -36,6 +40,8 @@ export interface ClientHello {
   readonly protocolVersion: typeof PROTOCOL_VERSION;
   readonly credential?: string;
   readonly intent?: "discover" | "pair";
+  /** Opt in to session updates; absent clients receive only the base protocol. */
+  readonly agentSessions?: boolean;
 }
 
 export interface ServerHello {
@@ -83,4 +89,5 @@ export type ServerResponse =
   | { readonly kind: "response"; readonly id: string; readonly ok: false; readonly error: ProtocolFailure };
 
 export type ClientFrame = ClientHello | ClientRequest;
-export type ServerFrame = ServerHello | ServerReject | ServerResponse | ServerAvailable | ServerPending;
+export type ServerFrame = ServerHello | ServerReject | ServerResponse | ServerAvailable | ServerPending
+  | { readonly kind: "agent.sessions"; readonly sessions: readonly import("./agent-sessions.js").AgentSession[] };

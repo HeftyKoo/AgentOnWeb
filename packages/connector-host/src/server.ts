@@ -26,6 +26,22 @@ async function listen(port: number, adapter: SurfaceAdapter, authority: Authoriz
   const server = new WebSocketServer({ host: "127.0.0.1", port, maxPayload: 16_384, perMessageDeflate: false });
   await new Promise<void>((resolve, reject) => { server.once("listening", resolve); server.once("error", reject); });
   const grants = new Map<WebSocket, string>();
+  const subscribers = new Map<WebSocket, { origin: string; credential: string }>();
+  let sessionTimer: ReturnType<typeof setTimeout> | undefined;
+  const unsubscribe = adapter.agentSessions?.subscribe(() => {
+    if (sessionTimer || !subscribers.size) return;
+    // A fixed window bounds traffic even during continuous tool activity.
+    sessionTimer = setTimeout(() => {
+      sessionTimer = undefined;
+      if (!subscribers.size) return;
+      const frame: ServerFrame = { kind: "agent.sessions", sessions: adapter.agentSessions!.snapshot() };
+      for (const [socket, client] of subscribers) {
+        try { authority.authenticate(client.origin, client.credential); }
+        catch { continue; }
+        send(socket, frame);
+      }
+    }, 75);
+  });
   const off = authority.onRevoke((id) => {
     for (const [socket, grant] of grants) if (id === grant) {
       send(socket, { kind: "error", code: "REVOKED", message: "Connection authorization was revoked in the runtime." });
@@ -52,7 +68,7 @@ async function listen(port: number, adapter: SurfaceAdapter, authority: Authoriz
       socket.close(4401, code);
     };
     socket.on("error", () => {});
-    socket.on("close", () => { phase = "closed"; clearTimeout(timeout); clearInterval(pendingHeartbeat); cancel(); grants.delete(socket); });
+    socket.on("close", () => { phase = "closed"; clearTimeout(timeout); clearInterval(pendingHeartbeat); cancel(); subscribers.delete(socket); grants.delete(socket); });
     socket.on("message", (raw, binary) => {
       (async () => {
         if (binary) throw new Error("Binary frames are not supported.");
@@ -84,6 +100,10 @@ async function listen(port: number, adapter: SurfaceAdapter, authority: Authoriz
           phase = "ready";
           send(socket, { kind: "hello", protocolVersion: PROTOCOL_VERSION, runtime: adapter.runtime,
             ...(frame.intent === "pair" && credential ? { credential } : {}) });
+          if (adapter.agentSessions && frame.agentSessions && credential) {
+            subscribers.set(socket, { origin, credential });
+            send(socket, { kind: "agent.sessions", sessions: adapter.agentSessions.snapshot() });
+          }
           return;
         }
         if (phase !== "ready" || !credential) throw new Error("Wait for native runtime approval.");
@@ -105,6 +125,7 @@ async function listen(port: number, adapter: SurfaceAdapter, authority: Authoriz
       for (const socket of grants.keys()) if (socket.readyState === WebSocket.OPEN) socket.close(1012, "Surface credentials changed");
     },
     async close() {
+      clearTimeout(sessionTimer); unsubscribe?.(); subscribers.clear();
       off(); authority.close();
       for (const socket of server.clients) socket.terminate();
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

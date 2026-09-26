@@ -1,4 +1,4 @@
-import { OptionTapTracker } from "@agentonweb/connector-contract";
+import { OptionTapTracker, isSurfaceShortcut } from "@agentonweb/connector-contract";
 import { createDock } from "./dock.js";
 import { browser } from "./browser-api.js";
 import { DEFAULT_SURFACE_OPACITY, DoubleTapLatch } from "./interaction.js";
@@ -32,7 +32,9 @@ if (!document.getElementById(HOST_ID)) {
   frame.title = "Native coding workspace";
   frame.allow = "clipboard-read; clipboard-write";
   const setup = createSetup();
-  const dock = createDock();
+  const dock = createDock({ runtimeShortcutEnabled: () =>
+    visible && !host.hidden && !!state.surface && state.mode !== "watch" && !sitePassActive,
+  });
   const passLabel = document.createElement("div");
   passLabel.className = "site-pass-label";
   passLabel.textContent = "WEBSITE  ⌥⌥";
@@ -50,6 +52,7 @@ if (!document.getElementById(HOST_ID)) {
   };
   let surfaceOrigin: string | undefined;
   let frameNonce: string | undefined;
+  let pendingTerminal: { runtimeId: string; terminalId: string; requestId: string } | undefined;
   let sitePassActive = false;
   // Restore the shared dismissal preference on first state delivery. Later
   // broadcasts never reopen a page; the dock remains its explicit entry point.
@@ -70,10 +73,22 @@ if (!document.getElementById(HOST_ID)) {
   setup.onClose = () => setVisible(false);
   dock.onDiscover = () => send({ source: "agentonweb-content", type: "runtime.connect" });
   dock.onRuntime = (runtimeId) => {
+    optionTap.reset();
     setVisible(true);
     send({ source: "agentonweb-content", type: "runtime.activate", runtimeId });
   };
+  dock.onSession = (session) => {
+    pendingTerminal = { runtimeId: session.runtimeId, terminalId: session.terminalId, requestId: crypto.randomUUID() };
+    setSitePass(false);
+    setVisible(true);
+    if (state.mode === "watch") send({ source: "agentonweb-content", type: "mode.set", mode: "chill" });
+    send({ source: "agentonweb-content", type: "runtime.activate", runtimeId: session.runtimeId });
+    dock.setExpanded(false);
+    postPresentation();
+  };
+  dock.onAttentionRead = attentionId => send({ source: "agentonweb-content", type: "agent.attention.read", attentionId });
   dock.onMode = (mode) => {
+    optionTap.reset();
     setSitePass(false);
     optionLatch.reset();
     setVisible(true);
@@ -104,6 +119,8 @@ if (!document.getElementById(HOST_ID)) {
   const postPresentation = () => {
     postMode();
     postOpacity(state.opacity);
+    if (pendingTerminal && pendingTerminal.runtimeId === state.surface?.runtimeId)
+      postToSurface({ type: "terminal.activate", terminalId: pendingTerminal.terminalId, requestId: pendingTerminal.requestId });
   };
   const render = (next: SurfaceViewState) => {
     state = next;
@@ -247,13 +264,29 @@ if (!document.getElementById(HOST_ID)) {
   };
 
   window.addEventListener("message", (event) => {
-    const message = event.data as { source?: unknown; type?: unknown; nonce?: unknown } | null;
+    const message = event.data as { source?: unknown; type?: unknown; nonce?: unknown; action?: unknown; requestId?: unknown } | null;
     if (!message || message.source !== "agentonweb-surface") return;
-    if (message.type === "surface.output" || message.type === "surface.wrapper-ready") {
+    if (message.type === "surface.output" || message.type === "surface.wrapper-ready" || message.type === "surface.wrapper-retry") {
       const entry = [...frames].find(([, saved]) => saved.contentWindow === event.source);
       if (!entry || !entry[1].src) return;
       const expected = new URL(entry[1].src);
       if (event.origin !== `${expected.protocol}//${expected.host}` || message.nonce !== entry[1].name.replace(/^agentonweb:/u, "")) return;
+      if (message.type === "surface.wrapper-retry") {
+        const previousState = state;
+        const previousSource = entry[1].src;
+        // A restarted worker issues a new tab-bound nonce. Only the trusted
+        // top-level content script can request and install that fresh state.
+        void browser.runtime.sendMessage({ source: "agentonweb-content", type: "state.get" } satisfies ContentRequest)
+          .then((response: { ok?: boolean; result?: SurfaceViewState } | undefined) => {
+            if (!response?.ok || !response.result || state !== previousState || frames.get(entry[0]) !== entry[1]) return;
+            render(response.result);
+            if (entry[1].isConnected && entry[1].src === previousSource) {
+              readyFrames.delete(entry[1]);
+              entry[1].src = previousSource;
+            }
+          }).catch(() => {});
+        return;
+      }
       if (message.type === "surface.wrapper-ready") {
         readyFrames.add(entry[1]);
         if (entry[1] === frame) postPresentation();
@@ -266,8 +299,18 @@ if (!document.getElementById(HOST_ID)) {
       return;
     }
     if (!frame.contentWindow || event.source !== frame.contentWindow || event.origin !== surfaceOrigin) return;
-    if (message.type !== "site-pass.option-tap") return;
     if (message.nonce !== frameNonce) return;
+    if (message.type === "terminal.activated" && pendingTerminal?.requestId === message.requestId) {
+      pendingTerminal = undefined;
+      return;
+    }
+    if (message.type === "surface.pointerdown") { dock.setExpanded(false); return; }
+    if (message.type === "surface.shortcut") {
+      if (isSurfaceShortcut(message.action) && message.action === "runtime.toggle" &&
+        visible && !host.hidden && !!state.surface && state.mode !== "watch" && !sitePassActive) dock.shortcut(message.action);
+      return;
+    }
+    if (message.type !== "site-pass.option-tap") return;
     if (state.runtime?.capabilities.optionTap !== false) handleOptionTap();
   });
 

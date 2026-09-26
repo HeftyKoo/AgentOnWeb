@@ -57,7 +57,7 @@ DSH is optional and connects independently of Local terminal. You need **Node.js
 
 ```sh
 npm install -g @deepseek-ai/dsh@0.1.2-alpha.3
-dsh plugin --profile web add @agentonweb/dsh-surface@0.1.1
+dsh plugin --profile web add @agentonweb/dsh-surface@0.1.2
 dsh web
 ```
 
@@ -71,8 +71,9 @@ Use the dock to choose Chill, Focus or Watch, switch connected workspaces, or ad
 
 | Action | macOS | Windows / Linux |
 | --- | --- | --- |
-| Show or hide AgentOnWeb | `Control+Shift+O` | `Alt+Shift+O` |
-| Chill / Focus / Watch | `Control+Shift+1 / 2 / 3` | `Alt+Shift+1 / 2 / 3` |
+| Show or hide AgentOnWeb | `Control+0` | `Alt+0` |
+| Chill / Focus / Watch | `Control+1 / 2 / 3` | `Alt+1 / 2 / 3` |
+| Terminal ↔ DSH | `` Control+` `` | `` Alt+` `` |
 | Switch between the workspace and website in Chill | Double-tap `Option` | Double-tap `Alt` |
 
 Browser shortcuts can take precedence over terminal keys. Adjust extension shortcuts in your browser settings. Normal HTTP(S) websites are supported; protected browser pages such as extension settings cannot host the workspace.
@@ -119,3 +120,21 @@ pnpm release:audit
 For an offline presentation sample, run `pnpm build:preview` and `pnpm preview`. The sample does not execute commands. See the [architecture](docs/architecture.md) and [release guide](docs/releasing.md) for implementation and packaging details.
 
 [Report an issue](https://github.com/HeftyKoo/AgentOnWeb/issues) · [Privacy policy](https://heftykoo.github.io/AgentOnWeb/privacy.html)
+
+### Shortcut scope
+
+The table shows default bindings. Show/hide and mode keys run only through browser extension commands; remap or clear them in the browser's extension shortcut settings to keep those keys available to terminal applications. There is no hard-coded page or iframe fallback for mode keys.
+
+The runtime-switch key is reserved inside embedded Terminal/DSH inputs. On the host website it works only while the workspace is active or the dock is expanded, and leaves editable website fields alone. Hidden workspaces cannot forward shortcut actions. Standalone native runtime pages do not capture it. With more than two runtimes, it cycles their displayed order.
+
+Firefox on Linux uses Alt+digits to select browser tabs; choose different extension command bindings there. Windows and macOS use different browser tab shortcuts.
+
+### Codex session activity
+
+The page launcher lists running Codex sessions and opens their exact terminal tabs. Completion and approval requests produce page notifications; approve or deny in the native Codex terminal. Enable the integration once with `aow codex-hooks install`, review/trust its hooks in Codex `/hooks`, and start a new Codex session in a terminal created by the updated host. See [setup, event flow and limits](docs/agent-notifications.md).
+
+## One-command setup (macOS + Chrome)
+
+The new `aow setup` entry configures the service, Chrome native pairing and Codex notifications together. Global npm installs run it when lifecycle scripts are permitted; the release shell installer calls it explicitly. Codex hook trust remains a first-use user action. The package and installer are not published yet. See [One-command setup (macOS + Chrome)](docs/one-command-setup.md).
+
+**Installation changes:** global installation starts a per-user service at login, registers a Chrome native host, and updates Codex hooks/notify with backups. Use `AOW_SKIP_SETUP=1` to skip automatic setup. To remove these integrations, finish active terminal work and run `aow uninstall` **before** `npm uninstall -g @agentonweb/terminal-host`; service terminals will stop. User settings, CLI history and backups remain.

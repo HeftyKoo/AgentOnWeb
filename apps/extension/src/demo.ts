@@ -42,7 +42,7 @@ document.querySelectorAll<HTMLElement>("[data-page]").forEach(button => button.a
 const root = document.querySelector<HTMLElement>(".agentonweb-root")!;
 const frame = document.querySelector<HTMLElement>(".demo-workspace")!;
 let state: SurfaceViewState = { mode: "focus", opacity: DEFAULT_SURFACE_OPACITY, connection: "disconnected" };
-const dock = createDock();
+const dock = createDock({ localModeShortcuts: true });
 function render(): void {
   root.dataset.mode = state.mode;
   root.dataset.sitePass = "false";
@@ -63,10 +63,7 @@ document.querySelector("#counter")!.addEventListener("click", event => { (event.
 const optionLatch = new DoubleTapLatch();
 document.addEventListener("keydown", event => {
   if (event.key === "Escape") dock.onMode("watch");
-  if (event.ctrlKey && event.shiftKey && ["1", "2", "3"].includes(event.key)) {
-    event.preventDefault();
-    dock.onMode(event.key === "1" ? "chill" : event.key === "2" ? "focus" : "watch");
-  }
+
   if (event.key === "Alt" && !event.repeat && state.mode === "chill") {
     const pass = optionLatch.tap(event.timeStamp);
     if (pass !== undefined) root.dataset.sitePass = String(pass);

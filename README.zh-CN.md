@@ -57,7 +57,7 @@ DSH 为可选功能，与本机终端独立连接。你需要 **Node.js 22.19+**
 
 ```sh
 npm install -g @deepseek-ai/dsh@0.1.2-alpha.3
-dsh plugin --profile web add @agentonweb/dsh-surface@0.1.1
+dsh plugin --profile web add @agentonweb/dsh-surface@0.1.2
 dsh web
 ```
 
@@ -71,8 +71,9 @@ dsh web
 
 | 操作 | macOS | Windows / Linux |
 | --- | --- | --- |
-| 显示或隐藏 AgentOnWeb | `Control+Shift+O` | `Alt+Shift+O` |
-| Chill / Focus / Watch | `Control+Shift+1 / 2 / 3` | `Alt+Shift+1 / 2 / 3` |
+| 显示或隐藏 AgentOnWeb | `Control+0` | `Alt+0` |
+| Chill / Focus / Watch | `Control+1 / 2 / 3` | `Alt+1 / 2 / 3` |
+| Terminal ↔ DSH | `` Control+` `` | `` Alt+` `` |
 | 在 Chill 下切换工作区与网页交互 | 双击 `Option` | 双击 `Alt` |
 
 浏览器快捷键可能优先于终端按键。可在浏览器设置中调整扩展快捷键。支持普通 HTTP(S) 网页；扩展设置等受保护页面无法承载工作区。
@@ -119,3 +120,21 @@ pnpm release:audit
 离线演示可运行 `pnpm build:preview` 和 `pnpm preview`；演示不会执行命令。实现与打包细节见[架构说明](docs/architecture.md)和[发布指南](docs/releasing.md)。
 
 [报告问题](https://github.com/HeftyKoo/AgentOnWeb/issues) · [隐私政策](https://heftykoo.github.io/AgentOnWeb/privacy.html)
+
+### 快捷键作用范围
+
+表格显示默认按键。显示/隐藏与模式快捷键只通过浏览器扩展命令执行；如果与终端应用冲突，可在浏览器的扩展快捷键设置中改绑或清除。网页和 iframe 不再另行拦截数字模式键。
+
+运行时切换键在嵌入的 Terminal / DSH 输入区中保留。宿主网页上仅在工作区启用或控制面板展开时处理，并放行网页的可编辑输入区域；隐藏的工作区不能转发切换操作。单独打开的原生运行时页面不拦截该键。超过两个运行时时，按面板显示顺序循环切换。
+
+Firefox 在 Linux 上使用 Alt+数字切换浏览器标签页，需要在扩展快捷键设置中另选绑定；这不是 Windows / macOS Firefox 的统一行为。
+
+### Codex 会话状态与通知
+
+点击页面图标可查看 Codex 会话列表，点击会话或通知可打开对应的 terminal tab。任务完成、需要权限审批时会出现页面通知；批准或拒绝仍在原生 Codex 终端中完成。首次运行 `aow codex-hooks install`，在 Codex `/hooks` 中审查并信任这些 hooks，再在更新后的 Host 新建的终端中启动 Codex。详见[接入步骤、事件链路与边界](docs/agent-notifications.md)。
+
+## 一键配置（macOS + Chrome）
+
+新安装入口 `aow setup` 自动配置本机服务、Chrome 配对桥接和 Codex 通知。全局 npm 安装在允许安装脚本时自动执行；推荐发布时提供统一 shell 安装器。Codex 首次 hooks 信任仍需用户确认。终端包和安装器尚未发布。详见[一键配置（macOS + Chrome）](docs/one-command-setup.md).
+
+**安装会修改的内容：**启动当前用户的登录常驻服务、注册 Chrome 原生消息桥接、备份并更新 Codex hooks/notify。可用 `AOW_SKIP_SETUP=1` 跳过自动配置。卸载前请先结束终端工作，执行 `aow uninstall`，再执行 `npm uninstall -g @agentonweb/terminal-host`；服务中的终端会停止，用户设置、CLI 历史与备份会保留。

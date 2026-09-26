@@ -60,14 +60,14 @@ button { cursor: pointer; }
 }
 
 /* The 48px launcher is the fixed anchor; all larger surfaces float above it. */
-.surface-dock { position:absolute; right:14px; bottom:14px; z-index:4; width:min(292px,calc(100vw - 28px)); height:52px; color:#dbe8e0; pointer-events:none; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; isolation:isolate; }
+.surface-dock { --surface-panel-height:264px; position:absolute; right:14px; bottom:14px; z-index:4; width:min(292px,calc(100vw - 28px)); height:52px; color:#dbe8e0; pointer-events:none; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; isolation:isolate; }
 .surface-dock[hidden], .surface-dock [hidden] { display:none !important; }
 .surface-dock button { color:inherit; font:inherit; background:transparent; border:0; }
 .surface-dock button:focus-visible, .surface-dock input:focus-visible { outline:2px solid #72edb6; outline-offset:2px; }
 .surface-dock svg { width:18px; height:18px; fill:currentColor; flex:none; }
-.surface-plate { position:absolute; inset:auto 0 0; height:246px; background:#0b1410; border:1px solid #375849; border-radius:11px; box-shadow:0 12px 36px #0006; transform-origin:right bottom; transform:scale(.1644,.1951); opacity:0; transition:transform 320ms cubic-bezier(.2,.8,.2,1),opacity 240ms; z-index:-1; }
+.surface-plate { position:absolute; inset:auto 0 0; height:var(--surface-panel-height); background:#0b1410; border:1px solid #375849; border-radius:11px; box-shadow:0 12px 36px #0006; transform-origin:right bottom; transform:scale(.1644,.1951); opacity:0; transition:transform 320ms cubic-bezier(.2,.8,.2,1),opacity 240ms; z-index:-1; }
 .surface-dock[data-expanded="true"] .surface-plate { transform:none; opacity:1; }
-.surface-palette { position:absolute; left:0; right:0; bottom:52px; height:194px; padding:13px 14px 14px; opacity:0; transform:translateY(12px); transition:opacity 180ms,transform 320ms; pointer-events:none; }
+.surface-palette { position:absolute; left:0; right:0; bottom:52px; height:212px; padding:13px 14px 14px; opacity:0; transform:translateY(12px); transition:opacity 180ms,transform 320ms; pointer-events:none; }
 .surface-dock[data-expanded="true"] .surface-palette { opacity:1; transform:none; pointer-events:auto; }
 .surface-heading { height:28px; display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; color:#91a99b; font-size:11px; letter-spacing:1.3px; }
 .surface-heading button { display:grid; place-items:center; width:30px; height:28px; padding:0; color:#72edb6; border-radius:4px; }
@@ -75,7 +75,7 @@ button { cursor: pointer; }
 .surface-controls { transition:opacity 180ms,transform 180ms; }
 .surface-dock[data-view="workspaces"] .surface-controls { opacity:0; transform:translateY(7px); pointer-events:none; }
 .surface-modes { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; position:relative; }
-.surface-dock .surface-mode { position:relative; z-index:1; display:flex; height:66px; align-items:center; justify-content:center; flex-direction:column; gap:7px; border:1px solid #243b2e; border-radius:7px; color:#8fa69a; font-size:11px; letter-spacing:.6px; }
+.surface-dock .surface-mode { position:relative; z-index:1; display:flex; height:84px; align-items:center; justify-content:center; flex-direction:column; gap:7px; border:1px solid #243b2e; border-radius:7px; color:#8fa69a; font-size:11px; letter-spacing:.6px; }
 .surface-dock .surface-mode[aria-pressed="true"] { color:#72edb6; }
 .surface-mode-light { position:absolute; inset:0 auto 0 0; width:calc((100% - 12px)/3); border:1px solid #5fb790; border-radius:7px; background:#13271c; box-shadow:inset 0 -1px #72edb6; transition:transform 320ms cubic-bezier(.2,.8,.2,1); }
 .surface-opacity { display:block; margin-top:14px; }
@@ -91,7 +91,7 @@ button { cursor: pointer; }
 .surface-dock[data-expanded="true"] .surface-toggle::before { opacity:1; }
 .surface-toggle[data-unread="true"]::after { content:""; position:absolute; top:7px; right:7px; width:5px; height:5px; border-radius:50%; background:#ffc978; }
 .runtime-switch { position:static; }
-.runtime-current { position:absolute; left:6px; right:48px; bottom:4px; height:44px; padding:0 9px; display:grid; grid-template-columns:20px minmax(0,1fr) 12px; align-items:center; gap:9px; border-radius:6px; opacity:0; transform:translateX(16px); transition:opacity 160ms,transform 320ms; pointer-events:none; }
+.runtime-current { position:absolute; left:6px; right:48px; bottom:4px; height:44px; padding:0 9px; display:grid; grid-template-columns:18px minmax(0,1fr) auto 12px; align-items:center; gap:9px; border-radius:6px; opacity:0; transform:translateX(16px); transition:opacity 160ms,transform 320ms; pointer-events:none; }
 .surface-dock[data-expanded="true"] .runtime-current { opacity:1; transform:none; pointer-events:auto; }
 .runtime-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; }
 .runtime-symbol, .runtime-caret { display:flex; color:#72edb6; }
@@ -106,10 +106,10 @@ button { cursor: pointer; }
 .runtime-options button[aria-pressed="true"]::after { content:"✓"; position:absolute; right:8px; top:12px; }
 .runtime-current::after { content:"01 ア 10 カ 01 ウ"; position:absolute; inset:0; display:grid; place-items:center; background:#0b1410; color:#72edb6; opacity:0; pointer-events:none; letter-spacing:3px; border-radius:6px; }
 .is-switching .runtime-current::after { animation:runtime-decode 520ms steps(6,end) both; }
-.surface-sweep { position:absolute; inset:auto 0 0; height:246px; overflow:hidden; border-radius:11px; pointer-events:none; }
+.surface-sweep { position:absolute; inset:auto 0 0; height:var(--surface-panel-height); overflow:hidden; border-radius:11px; pointer-events:none; }
 .surface-sweep::after { content:""; position:absolute; top:0; left:8px; right:8px; height:1px; background:#72edb6; box-shadow:0 0 12px #72edb6; opacity:0; }
 .surface-dock[data-expanded="true"].is-pulsing .surface-sweep::after { animation:surface-scan 620ms ease-out; }
-@keyframes surface-scan { 0% { transform:translateY(2px); opacity:0; } 20% { opacity:.6; } 100% { transform:translateY(244px); opacity:0; } }
+@keyframes surface-scan { 0% { transform:translateY(2px); opacity:0; } 20% { opacity:.6; } 100% { transform:translateY(calc(var(--surface-panel-height) - 2px)); opacity:0; } }
 @keyframes runtime-decode { from { opacity:1; } to { opacity:0; } }
 @media(prefers-reduced-motion:reduce) { .surface-dock *, .surface-dock *::after { transition:none !important; animation:none !important; } }
 
@@ -184,3 +184,27 @@ button { cursor: pointer; }
 
 :host([data-site-pass="true"]) .surface-dock *,
 .agentonweb-root[data-site-pass="true"] .surface-dock * { pointer-events:none !important; }
+
+.surface-dock kbd { font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:0; color:#9cb3a5; border:1px solid #375849; border-radius:4px; padding:1px 5px; white-space:nowrap; }
+.runtime-options button { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+
+/* Agent activity shares the launcher and the existing palette. */
+.surface-dock[data-view="sessions"] .surface-controls { display:none; }
+.agent-sessions { height:148px; overflow:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+.surface-dock .agent-session { display:block; width:100%; padding:9px 8px; margin-bottom:5px; text-align:left; border:1px solid #294333; border-radius:6px; background:#112017; }
+.surface-dock .agent-session:hover { background:#1b3023; border-color:#72edb6; }
+.agent-session-meta { display:flex; justify-content:space-between; gap:8px; color:#9cb3a5; font-size:10px; }
+.agent-session strong, .agent-notification strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:4px 0 2px; font-size:12px; font-weight:500; }
+.agent-session small, .agent-notification small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#91a99b; font-size:10px; }
+.agent-status { color:#72edb6; }
+[data-status="approval"] .agent-status { color:#ffc978; }
+.surface-dock .agent-session[data-status="approval"] { border-color:#725c36; background:#252015; }
+.agent-empty { color:#9cb3a5; font-size:11px; line-height:1.7; margin:4px 0; }
+.agent-count { position:absolute; right:2px; top:1px; min-width:16px; padding:0 3px; border-radius:8px; background:#72edb6; color:#0b1410; font-size:10px; line-height:16px; }
+[data-approval="true"] .agent-count { background:#ffc978; }
+.surface-dock .agent-notification { position:absolute; bottom:62px; right:0; width:min(292px,calc(100vw - 28px)); display:flex; align-items:flex-start; padding:12px; gap:8px; border:1px solid #4b7960; border-radius:10px; background:#0f1e15; box-shadow:0 8px 28px #0005; pointer-events:auto; }
+.surface-dock[data-expanded="true"] .agent-notification { bottom:274px; }
+.surface-dock .agent-notification[data-status="approval"] { border-color:#997844; }
+.agent-notification button:first-of-type { flex:1; min-width:0; text-align:left; padding:0; }
+.agent-notification button:last-of-type { flex:none; width:24px; height:24px; font-size:18px; }
+.agent-announcement { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
