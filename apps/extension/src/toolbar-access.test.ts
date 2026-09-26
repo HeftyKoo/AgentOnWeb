@@ -15,14 +15,15 @@ it("gives a visible fallback when a toolbar click cannot reach a page", async ()
   vi.stubGlobal("browser", {
     runtime: { id: "test", getURL: (path: string) => `safari-web-extension://test/${path}`, onMessage: event() },
     storage: { local: { get: async () => ({}), set: async () => {} } },
+    declarativeNetRequest: { getSessionRules: async () => [], updateSessionRules: async () => {} },
     alarms: { create: async () => {}, onAlarm: event() },
     commands: { onCommand: event() },
     browserAction: { onClicked: { addListener: (handler: typeof clicked) => { clicked = handler; } } },
     permissions: { request: async () => true },
-    tabs: { create, query: async () => [], onRemoved: event(), sendMessage: async () => { throw new Error("No receiving end"); } },
+    tabs: { create, query: async () => [], onRemoved: event(), onActivated: event(), sendMessage: async () => { throw new Error("No receiving end"); } },
+    windows: { onFocusChanged: event(), WINDOW_ID_NONE: -1 },
   });
   await import("./background.js");
   clicked({ id: 1, url: "https://example.org/" });
-  await new Promise(resolve => setTimeout(resolve, 20));
-  expect(create).toHaveBeenCalled();
+  await vi.waitFor(() => expect(create).toHaveBeenCalled());
 });

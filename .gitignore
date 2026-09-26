@@ -68,3 +68,5 @@ docs/verification/local/
 
 # Generated offline demo shared with the extension.
 apps/safari/AgentOnWeb/AgentOnWeb/Resources/Demo/
+
+packages/terminal-host/lib/

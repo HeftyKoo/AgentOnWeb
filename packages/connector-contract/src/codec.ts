@@ -7,6 +7,7 @@ import {
   type RuntimeDescriptor,
   type ServerFrame,
 } from "./types.js";
+import { parseAgentSessions } from "./agent-sessions.js";
 
 /** Raised only when untrusted wire data violates the connector contract. */
 export class ProtocolError extends Error {}
@@ -97,10 +98,12 @@ export function parseClientFrame(value: unknown): ClientFrame {
     const intent = frame.intent;
     if (intent !== undefined && intent !== "discover" && intent !== "pair") throw new ProtocolError("Invalid connection intent.");
     if (credential && intent) throw new ProtocolError("A credential and connection intent are mutually exclusive.");
+    if (frame.agentSessions !== undefined && typeof frame.agentSessions !== "boolean") throw new ProtocolError("Invalid session subscription.");
     return {
       kind: "hello", protocolVersion: PROTOCOL_VERSION,
       ...(credential ? { credential } : {}),
       ...(intent ? { intent } : {}),
+      ...(frame.agentSessions === true ? { agentSessions: true } : {}),
     };
   }
   if (frame.kind === "request") {
@@ -114,6 +117,7 @@ export function parseClientFrame(value: unknown): ClientFrame {
 
 export function parseServerFrame(value: unknown): ServerFrame {
   const frame = record(value, "Invalid server frame.");
+  if (frame.kind === "agent.sessions") return { kind: "agent.sessions", sessions: parseAgentSessions(frame.sessions) };
   if (frame.kind === "hello") {
     if (frame.protocolVersion !== PROTOCOL_VERSION) throw new ProtocolError("Connector protocol mismatch.");
     const credential = optionalCredential(frame.credential);

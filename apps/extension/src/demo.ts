@@ -24,7 +24,7 @@ const pages: Record<string, string> = {
 }</pre></details><details><summary>Sample test result · 2 tests passed</summary><pre>average([]) → 0        PASS
 average([2, 4]) → 3    PASS</pre><p>This is bundled example output; no command is executed on your Mac.</p></details>`,
   scratchpad: `<p class="eyebrow">LOCAL INTERACTIVE SCRATCHPAD</p><h1>Try editing while the website stays visible</h1><p>Changes stay in this demo tab and reset when it closes. Nothing is sent to a model or written to your files.</p><label for="notes">Notes</label><textarea id="notes" rows="10"></textarea><p id="note-count" role="status"></p><button id="reset-notes">Reset sample notes</button>`,
-  about: `<p class="eyebrow">CONNECTION &amp; HELP</p><h1>From the demo to your own workspace</h1><p><strong>Current connection:</strong> Offline demonstration. No model provider is connected.</p><p>The demo uses AgentOnWeb's presentation controls with bundled sample content. Live conversations, models, tools, approvals, and plugins are provided by the native DeepSeek Harness interface after you connect.</p><ol><li>Enable AgentOnWeb in Safari Settings → Extensions.</li><li>Install DeepSeek Harness and add the AgentOnWeb plugin:<pre>dsh plugin --profile web add @agentonweb/dsh-surface@0.1.0</pre></li><li>Configure your provider in DSH, then run <code>dsh web</code>.</li><li>Visit a normal website and allow the extension access. Use the toolbar's Allow local workspace access button, then Connect in the page dock.</li><li>Approve the connection in DSH and follow Safari's local-session prompts.</li></ol><p>If the toolbar looks grey, open its menu and choose Try interactive demo. Protected Safari pages cannot host a page overlay.</p><a href="https://heftykoo.github.io/AgentOnWeb/">Get support and setup instructions</a>`,
+  about: `<p class="eyebrow">CONNECTION &amp; HELP</p><h1>From the demo to your own workspace</h1><p><strong>Current connection:</strong> Offline demonstration. No model provider is connected.</p><p>The demo uses AgentOnWeb's presentation controls with bundled sample content. This sample illustrates the DSH workspace. Connect DeepSeek Harness for its live conversations, models, tools, approvals and plugins. The source build also supports Local terminal for running your installed command-line tools; it requires a separate local host.</p><ol><li>Enable AgentOnWeb in Safari Settings → Extensions.</li><li>Install DeepSeek Harness and add the AgentOnWeb plugin:<pre>dsh plugin --profile web add @agentonweb/dsh-surface@0.1.1</pre></li><li>Configure your provider in DSH, then run <code>dsh web</code>.</li><li>Visit a normal website and allow the extension access. Use the toolbar's Allow local workspace access button, then Connect in the page dock.</li><li>Approve the connection in DSH and follow Safari's local-session prompts.</li></ol><p>If the toolbar looks grey, open its menu and choose Try interactive demo. Protected Safari pages cannot host a page overlay.</p><a href="https://heftykoo.github.io/AgentOnWeb/">Get support and setup instructions</a>`,
 };
 let notes = "Pricing page review\n\n- Keep the plan name above the price.\n- Place the primary action near the feature list.\n- Test the empty-list case before calculating averages.";
 const initialNotes = notes;
@@ -42,7 +42,7 @@ document.querySelectorAll<HTMLElement>("[data-page]").forEach(button => button.a
 const root = document.querySelector<HTMLElement>(".agentonweb-root")!;
 const frame = document.querySelector<HTMLElement>(".demo-workspace")!;
 let state: SurfaceViewState = { mode: "focus", opacity: DEFAULT_SURFACE_OPACITY, connection: "disconnected" };
-const dock = createDock();
+const dock = createDock({ localModeShortcuts: true });
 function render(): void {
   root.dataset.mode = state.mode;
   root.dataset.sitePass = "false";
@@ -63,10 +63,7 @@ document.querySelector("#counter")!.addEventListener("click", event => { (event.
 const optionLatch = new DoubleTapLatch();
 document.addEventListener("keydown", event => {
   if (event.key === "Escape") dock.onMode("watch");
-  if (event.ctrlKey && event.shiftKey && ["1", "2", "3"].includes(event.key)) {
-    event.preventDefault();
-    dock.onMode(event.key === "1" ? "chill" : event.key === "2" ? "focus" : "watch");
-  }
+
   if (event.key === "Alt" && !event.repeat && state.mode === "chill") {
     const pass = optionLatch.tap(event.timeStamp);
     if (pass !== undefined) root.dataset.sitePass = String(pass);

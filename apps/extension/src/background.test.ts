@@ -33,10 +33,10 @@ function createChrome() {
     permissions: { request: vi.fn(async () => true), contains: vi.fn(async () => true) },
     commands: { onCommand: event() }, action: { onClicked: event() },
     alarms: { create: vi.fn(async () => {}), onAlarm: event() },
-    tabs: { query: vi.fn(async () => [tab]), sendMessage: vi.fn(async (_id: number, _message: StateUpdate | SurfaceCommand) => {}), onRemoved: event(),
+    tabs: { query: vi.fn(async () => [tab]), sendMessage: vi.fn(async (_id: number, _message: StateUpdate | SurfaceCommand) => {}), onRemoved: event(), onActivated: event(),
       update: vi.fn(async () => {}), create: vi.fn(async () => {}) },
-    windows: { update: vi.fn(async () => {}) },
-    storage: { local: {
+    windows: { update: vi.fn(async () => {}), onFocusChanged: event(), WINDOW_ID_NONE: -1 },
+    storage: { session: { get: vi.fn(async () => ({})), set: vi.fn(async () => {}), remove: vi.fn(async () => {}) }, local: {
       setAccessLevel: vi.fn(async () => {}), get: vi.fn(async () => structuredClone(data)),
       set: vi.fn(async (values: Record<string, unknown>) => { Object.assign(data, structuredClone(values)); }),
     } },
@@ -44,7 +44,7 @@ function createChrome() {
       getPartitionKey: vi.fn(async () => ({ partitionKey: { topLevelSite: "https://example.org" } })),
       set: vi.fn(async (_details: unknown) => ({ name: "native-session" })), remove: vi.fn(async () => ({})),
     },
-    declarativeNetRequest: { updateSessionRules: vi.fn(async (_update: { addRules?: unknown[]; removeRuleIds?: number[] }) => {}) },
+    declarativeNetRequest: { getSessionRules: vi.fn(async () => []), updateSessionRules: vi.fn(async (_update: { addRules?: unknown[]; removeRuleIds?: number[] }) => {}) },
   };
 }
 async function boot() {
@@ -66,6 +66,16 @@ beforeEach(() => {
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("cross-browser native connection lifecycle", () => {
+  it("persists bounded read attention IDs before acknowledging and restores them after a worker restart", async () => {
+    data = { [STATE_STORAGE_KEY]: { readAttentionIds: [null, 12, '', 'x'.repeat(201), 'already-read'] } };
+    await boot();
+    expect((await message("state.get")).result.readAttentionIds).toEqual(['already-read']);
+    await message("agent.attention.read", undefined, { attentionId: 'new-read' });
+    expect(data[STATE_STORAGE_KEY]).toMatchObject({ readAttentionIds: ['already-read', 'new-read'] });
+    vi.resetModules(); chromeMock = createChrome(); vi.stubGlobal("chrome", chromeMock);
+    await boot();
+    expect((await message("state.get")).result.readAttentionIds).toEqual(['already-read', 'new-read']);
+  });
   it.each([undefined, "invalid", "chill", "focus", "watch"])("defaults to Chill and preserves saved mode %s", async (mode) => {
     data = { [STATE_STORAGE_KEY]: { mode } };
     await boot();
@@ -148,6 +158,66 @@ describe("cross-browser native connection lifecycle", () => {
     expect(chromeMock.cookies.set).toHaveBeenCalledWith(expect.objectContaining({ httpOnly: true, secure: true, partitionKey: { topLevelSite: "https://example.org" } }));
   });
 
+  it("publishes an unpaired runtime's management origin while another runtime stays selected", async () => {
+    await boot();
+    await message("runtime.connect");
+    transport.callbacks!.ready("installation-credential");
+    await vi.waitFor(() => expect(chromeMock.cookies.set).toHaveBeenCalled());
+    transport.discover.mockResolvedValue([available, { ...available,
+      runtime: { ...runtime, id: "terminal", displayName: "Local terminal" },
+      endpoint: "ws://127.0.0.1:3848", approvalUrl: "http://localhost:49827/",
+    }]);
+    await message("runtime.connect");
+    const response = await message("state.get");
+    expect(response.result).toMatchObject({ runtimeId: runtime.id, nativeOrigins: expect.arrayContaining(["http://localhost:49827"]) });
+    expect(response.result.surfaces).toEqual([expect.objectContaining({ runtimeId: runtime.id })]);
+    expect(transport.connect).toHaveBeenCalledOnce();
+  });
+
+  it("returns a tab from a removed revoked runtime to an already connected workspace", async () => {
+    const temporary = { ...available, runtime: { ...runtime, id: "temporary", displayName: "Local terminal · acceptance" },
+      endpoint: "ws://127.0.0.1:3848", approvalUrl: "http://localhost:49827/" };
+    transport.discover.mockResolvedValue([available, temporary]);
+    await boot();
+    await message("runtime.connect", undefined, { runtimeId: runtime.id });
+    transport.callbacks!.ready("primary-credential");
+    await vi.waitFor(() => expect(chromeMock.cookies.set).toHaveBeenCalled());
+    transport.request.mockResolvedValue({ ...nativeSurface, runtimeId: "temporary", url: temporary.approvalUrl,
+      cookie: { ...nativeSurface.cookie, name: "temporary-session" } });
+    await message("runtime.connect", undefined, { runtimeId: "temporary" });
+    transport.callbacks!.ready("temporary-credential");
+    await vi.waitFor(async () => expect((await message("state.get")).result.surface?.runtimeId).toBe("temporary"));
+    transport.callbacks!.rejected("REVOKED", "Connection revoked.");
+    transport.callbacks!.closed();
+    await vi.waitFor(async () => expect((await message("state.get")).result.connection).toBe("disconnected"));
+    transport.discover.mockResolvedValue([available]);
+    await message("runtime.connect");
+    const response = await message("state.get");
+    expect(response.result).toMatchObject({ connection: "connected", runtimeId: runtime.id,
+      surface: { runtimeId: runtime.id }, runtimes: [{ id: runtime.id, displayName: runtime.displayName }] });
+    expect(transport.connect).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows a selection after removing the tab's revoked runtime without pairing another runtime", async () => {
+    await boot();
+    await message("runtime.connect");
+    transport.callbacks!.ready("temporary-credential");
+    await vi.waitFor(() => expect(chromeMock.cookies.set).toHaveBeenCalled());
+    transport.callbacks!.rejected("REVOKED", "Connection revoked.");
+    transport.callbacks!.closed();
+    await vi.waitFor(async () => expect((await message("state.get")).result.connection).toBe("disconnected"));
+    const other = { ...available, runtime: { ...runtime, id: "other", displayName: "Other workspace" }, endpoint: "ws://127.0.0.1:3848" };
+    transport.discover.mockResolvedValue([other]);
+    await message("runtime.connect");
+    const response = await message("state.get");
+    expect(response.result).toMatchObject({ connection: "disconnected", error: "Choose a local workspace to connect.",
+      runtimes: [{ id: "other", displayName: "Other workspace" }] });
+    expect(response.result.runtimeId).toBeUndefined();
+    expect(response.result.surface).toBeUndefined();
+    expect(transport.connect).toHaveBeenCalledOnce();
+    expect(chromeMock.tabs.create).not.toHaveBeenCalled();
+  });
+
   it("uses a tab-bound HTTP lease and a local HttpOnly cookie for Safari WebSockets", async () => {
     vi.stubEnv("BROWSER", "safari");
     await boot();
@@ -169,6 +239,24 @@ describe("cross-browser native connection lifecycle", () => {
       action: { type: "modifyHeaders", requestHeaders: [{ header: "Cookie", operation: "set", value: "native-session=private-session-cookie" }] },
       condition: { regexFilter: "^http://localhost:3080/", tabIds: [tab.id] },
     }] });
+  });
+
+  it("keeps Safari native management tabs on first-party cookies after pairing", async () => {
+    vi.stubEnv("BROWSER", "safari");
+    const managementTab = { ...tab, id: 2, url: nativeSurface.url };
+    chromeMock.tabs.query.mockResolvedValue([tab, managementTab]);
+    await boot();
+    await message("runtime.connect");
+    transport.callbacks!.ready("private-safari-credential");
+    await vi.waitFor(() => expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(managementTab.id, expect.objectContaining({
+      state: expect.objectContaining({ surface: expect.objectContaining({ url: nativeSurface.url }) }),
+    })));
+    const rules = chromeMock.declarativeNetRequest.updateSessionRules.mock.calls.flatMap(([update]) => update.addRules ?? []);
+    expect(rules).toEqual([expect.objectContaining({ condition: expect.objectContaining({ tabIds: [tab.id] }) })]);
+    // Still identify the native origin in content state so its own page hides
+    // the overlay, while the website retains its delegated iframe session.
+    const response = await message("state.get", { id: "extension-test", frameId: 0, tab: managementTab });
+    expect(response.result.surfaces).toEqual([expect.objectContaining({ url: nativeSurface.url })]);
   });
 
   it("cleans persisted cookie scopes after a cold start and revoked authorization", async () => {
@@ -198,6 +286,20 @@ describe("cross-browser native connection lifecycle", () => {
     transport.discover.mockResolvedValue([available]);
     onAlarm({ name: "agentonweb-reconnect" });
     await vi.waitFor(() => expect(transport.connect).toHaveBeenCalledWith(available.endpoint, "saved-credential"));
+  });
+
+  it("restores matching surface and dock selection after the persisted runtime was removed", async () => {
+    data = { [STATE_STORAGE_KEY]: { runtimeId: "removed-acceptance-runtime", mode: "chill", opacity: 0.6 },
+      [CREDENTIAL_STORAGE_KEY]: { [runtime.id]: "saved-credential" } };
+    await boot();
+    transport.callbacks!.ready();
+    await vi.waitFor(() => expect(chromeMock.cookies.set).toHaveBeenCalled());
+    const response = await message("state.get");
+    expect(response.result).toMatchObject({ connection: "connected", runtimeId: runtime.id,
+      runtime, surface: { runtimeId: runtime.id }, runtimes: [{ id: runtime.id, displayName: runtime.displayName }] });
+    expect(transport.connect).toHaveBeenCalledExactlyOnceWith(available.endpoint, "saved-credential");
+    expect(chromeMock.tabs.create).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(data[STATE_STORAGE_KEY]).toMatchObject({ runtimeId: runtime.id }));
   });
 
   it("rejects privileged requests from another extension or an iframe", async () => {

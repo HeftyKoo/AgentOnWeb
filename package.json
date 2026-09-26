@@ -1,7 +1,7 @@
 {
   "name": "agentonweb",
-  "description": "Agent On Web: native coding agents on real websites. Current edition: DSH On Web.",
-  "version": "0.1.1",
+  "description": "Your local terminal and DSH workspace on the website you are using.",
+  "version": "0.1.2",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -20,7 +20,7 @@
     "package:extension": "node scripts/package-extension.mjs",
     "preview": "node scripts/serve-preview.mjs",
     "release:audit": "pnpm check && node scripts/release-audit.mjs",
-    "test": "pnpm --filter @agentonweb/dsh-surface build && vitest run",
+    "test": "pnpm --filter @agentonweb/dsh-surface build && pnpm --filter @agentonweb/terminal-host build && vitest run",
     "typecheck": "tsc -b --pretty false",
     "prepare:safari": "node scripts/prepare-safari.mjs"
   },

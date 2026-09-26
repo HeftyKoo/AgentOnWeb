@@ -26,6 +26,7 @@ interface SessionRule {
 }
 
 export interface SessionRuleUpdater {
+  getSessionRules?(): Promise<readonly { readonly id: number }[]>;
   updateSessionRules(update: {
     readonly removeRuleIds?: readonly number[];
     readonly addRules?: readonly SessionRule[];
@@ -46,12 +47,24 @@ interface HeaderLease {
  * HttpOnly cookie required by Safari WebSocket handshakes.
  */
 export class HeaderLeaseManager {
-  readonly #leases = new Map<number, HeaderLease>();
+  readonly #leases = new Map<string, HeaderLease>();
+  #nextRuleId = RULE_ID_BASE;
   #updates: Promise<unknown> = Promise.resolve();
 
   constructor(readonly updater: SessionRuleUpdater) {}
 
   restore(_value: unknown): void {}
+
+  /** Browser session rules outlive a suspended/restarted extension background. */
+  resetAfterRestart(): Promise<void> {
+    return this.#enqueue(async () => {
+      const existing = await this.updater.getSessionRules?.() ?? [];
+      const staleIds = existing.filter(rule => rule.id >= RULE_ID_BASE).map(rule => rule.id);
+      if (staleIds.length) await this.updater.updateSessionRules({ removeRuleIds: staleIds });
+      this.#leases.clear();
+      this.#nextRuleId = RULE_ID_BASE;
+    });
+  }
 
   async ensure(tabId: number, pageUrl: string, surface: NativeSurface, isCurrent: () => boolean): Promise<boolean> {
     if (!topLevelSite(pageUrl) || !isCurrent()) return false;
@@ -59,11 +72,20 @@ export class HeaderLeaseManager {
     const surfaceOrigin = surfaceUrl.origin;
     if (surfaceOrigin !== `http://localhost:${surfaceUrl.port}`) return false;
 
-    const existing = this.#leases.get(tabId);
+    const key = `${tabId}:${surface.runtimeId}`;
+    const existing = this.#leases.get(key);
+    if (new URL(pageUrl).origin === surfaceOrigin) {
+      // First-party runtime pages already receive their native cookies. Replacing
+      // that header would discard the separate terminal administrator cookie.
+      // Remove a previous website lease when this tab navigates to the runtime.
+      if (existing) this.#leases.delete(key);
+      await this.#remove(existing ? [existing.ruleId] : []);
+      return isCurrent();
+    }
     if (existing?.surface === surface) return await existing.ready && isCurrent();
-    const lease: HeaderLease = { ruleId: ruleIdForTab(tabId), runtimeId: surface.runtimeId,
+    const lease: HeaderLease = { ruleId: existing?.ruleId ?? ++this.#nextRuleId, runtimeId: surface.runtimeId,
       surface, ready: Promise.resolve(false) };
-    this.#leases.set(tabId, lease);
+    this.#leases.set(key, lease);
     const rule: SessionRule = {
       id: lease.ruleId,
       priority: 1,
@@ -83,13 +105,13 @@ export class HeaderLeaseManager {
       },
     };
     lease.ready = this.#enqueue(async () => {
-      if (this.#leases.get(tabId) !== lease || !isCurrent()) return false;
+      if (this.#leases.get(key) !== lease || !isCurrent()) return false;
       await this.updater.updateSessionRules({ removeRuleIds: [lease.ruleId], addRules: [rule] });
-      if (this.#leases.get(tabId) !== lease || !isCurrent()) {
+      if (this.#leases.get(key) !== lease || !isCurrent()) {
         // A newer lease replaces this rule, and revoke/removeTab already queues
         // its removal. Never delete a successor's rule after it is installed.
-        if (this.#leases.get(tabId) === lease) {
-          this.#leases.delete(tabId);
+        if (this.#leases.get(key) === lease) {
+          this.#leases.delete(key);
           await this.updater.updateSessionRules({ removeRuleIds: [lease.ruleId] });
         }
         return false;
@@ -98,16 +120,16 @@ export class HeaderLeaseManager {
     });
     try { return await lease.ready; }
     catch (error) {
-      if (this.#leases.get(tabId) === lease) this.#leases.delete(tabId);
+      if (this.#leases.get(key) === lease) this.#leases.delete(key);
       throw error;
     }
   }
 
   async revoke(runtimeId: string): Promise<void> {
     const ruleIds: number[] = [];
-    for (const [tabId, lease] of this.#leases) {
+    for (const [key, lease] of this.#leases) {
       if (lease.runtimeId !== runtimeId) continue;
-      this.#leases.delete(tabId);
+      this.#leases.delete(key);
       ruleIds.push(lease.ruleId);
     }
     await this.#remove(ruleIds);
@@ -120,10 +142,9 @@ export class HeaderLeaseManager {
   }
 
   removeTab(tabId: number): void {
-    const lease = this.#leases.get(tabId);
-    if (!lease) return;
-    this.#leases.delete(tabId);
-    this.#remove([lease.ruleId]);
+    const ids: number[] = [];
+    for (const [key, lease] of this.#leases) if (key.startsWith(`${tabId}:`)) { this.#leases.delete(key); ids.push(lease.ruleId); }
+    void this.#remove(ids);
   }
 
   idle(): Promise<unknown> {
@@ -140,11 +161,6 @@ export class HeaderLeaseManager {
     this.#updates = next;
     return next;
   }
-}
-
-function ruleIdForTab(tabId: number): number {
-  if (!Number.isSafeInteger(tabId) || tabId < 0 || tabId >= 1_000_000_000) throw new Error("Invalid Safari tab id.");
-  return RULE_ID_BASE + tabId;
 }
 
 function escapeRegex(value: string): string {

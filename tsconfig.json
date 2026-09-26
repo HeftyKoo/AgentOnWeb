@@ -1,9 +1,26 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/connector-contract" },
-    { "path": "packages/connector-host" },
-    { "path": "packages/dsh-surface-plugin" },
-    { "path": "apps/extension" }
+    {
+      "path": "packages/connector-contract"
+    },
+    {
+      "path": "packages/connector-host"
+    },
+    {
+      "path": "packages/dsh-surface-plugin"
+    },
+    {
+      "path": "apps/extension"
+    },
+    {
+      "path": "packages/terminal-core"
+    },
+    {
+      "path": "packages/terminal-host"
+    },
+    {
+      "path": "apps/terminal-surface"
+    }
   ]
 }
