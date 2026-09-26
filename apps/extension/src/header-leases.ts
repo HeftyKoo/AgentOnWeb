@@ -26,6 +26,7 @@ interface SessionRule {
 }
 
 export interface SessionRuleUpdater {
+  getSessionRules(): Promise<readonly { readonly id: number }[]>;
   updateSessionRules(update: {
     readonly removeRuleIds?: readonly number[];
     readonly addRules?: readonly SessionRule[];
@@ -40,28 +41,42 @@ interface HeaderLease {
 }
 
 /**
- * Safari does not support blocking webRequest responses. Keep the delegated
- * HTTP cookie in a tab-scoped declarativeNetRequest session rule, so content
- * scripts never receive it. SafariCookieLeaseManager separately owns the
- * HttpOnly cookie required by Safari WebSocket handshakes.
+ * Send exactly one current native session cookie. Otherwise a stale first-party
+ * cookie can precede the delegated partitioned cookie and DSH rejects the request.
+ * Rules stay in the extension, scoped to one tab and localhost port. Browsers
+ * also need their cookie lease for WebSocket handshakes that bypass these rules.
  */
 export class HeaderLeaseManager {
   readonly #leases = new Map<number, HeaderLease>();
   #updates: Promise<unknown> = Promise.resolve();
+  #nextRuleId = RULE_ID_BASE;
 
   constructor(readonly updater: SessionRuleUpdater) {}
 
-  restore(_value: unknown): void {}
+  reset(): Promise<void> {
+    this.#leases.clear();
+    return this.#enqueue(async () => {
+      // Session rules outlive MV3 worker suspension. Drop any old delegation
+      // before reconnecting and obtaining a fresh authorized surface.
+      const rules = await this.updater.getSessionRules();
+      const removeRuleIds = rules.map(({ id }) => id)
+        .filter((id) => id >= RULE_ID_BASE && id < RULE_ID_BASE + 1_000_000_000);
+      if (removeRuleIds.length) await this.updater.updateSessionRules({ removeRuleIds });
+    });
+  }
 
   async ensure(tabId: number, pageUrl: string, surface: NativeSurface, isCurrent: () => boolean): Promise<boolean> {
     if (!topLevelSite(pageUrl) || !isCurrent()) return false;
+    if (!Number.isSafeInteger(tabId) || tabId < 0) throw new Error("Invalid native surface tab id.");
     const surfaceUrl = new URL(surface.url);
     const surfaceOrigin = surfaceUrl.origin;
     if (surfaceOrigin !== `http://localhost:${surfaceUrl.port}`) return false;
 
     const existing = this.#leases.get(tabId);
     if (existing?.surface === surface) return await existing.ready && isCurrent();
-    const lease: HeaderLease = { ruleId: ruleIdForTab(tabId), runtimeId: surface.runtimeId,
+    // Chromium tab ids may exceed a billion. Allocate small rule ids instead
+    // of deriving them from tab ids (DNR ids must remain positive int32s).
+    const lease: HeaderLease = { ruleId: existing?.ruleId ?? ++this.#nextRuleId, runtimeId: surface.runtimeId,
       surface, ready: Promise.resolve(false) };
     this.#leases.set(tabId, lease);
     const rule: SessionRule = {
@@ -76,7 +91,7 @@ export class HeaderLeaseManager {
         }],
       },
       condition: {
-        regexFilter: `^${escapeRegex(`${surfaceOrigin}/`)}`,
+        regexFilter: `^(http|ws)://${escapeRegex(`${surfaceUrl.host}/`)}`,
         isUrlFilterCaseSensitive: true,
         resourceTypes: RESOURCE_TYPES,
         tabIds: [tabId],
@@ -140,11 +155,6 @@ export class HeaderLeaseManager {
     this.#updates = next;
     return next;
   }
-}
-
-function ruleIdForTab(tabId: number): number {
-  if (!Number.isSafeInteger(tabId) || tabId < 0 || tabId >= 1_000_000_000) throw new Error("Invalid Safari tab id.");
-  return RULE_ID_BASE + tabId;
 }
 
 function escapeRegex(value: string): string {
