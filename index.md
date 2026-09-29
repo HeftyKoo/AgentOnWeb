@@ -12,7 +12,7 @@ Include your macOS and Safari versions, the AgentOnWeb version, what you expecte
 
 See the [dedicated support page](support.html) for troubleshooting and contact instructions.
 
-Your native coding agent, on the page you are using. Current edition: DSH On Web.
+Your local workspace, on the page you are using. The Safari release instructions below describe the DSH edition. Version 0.2.0 also includes a separately installed local terminal; see the setup and platform limits below.
 
 AgentOnWeb displays the complete DeepSeek Harness workspace over normal websites. Use **Chill** for a translucent workspace, **Focus** for an opaque workspace, or **Watch** to keep the website fully interactive with a small mode dock. Conversations, models, tools, approvals, and plugins stay in DSH's native interface.
 
@@ -24,10 +24,16 @@ In build 5 or later, open the AgentOnWeb macOS app and choose **Try Interactive 
 
 - macOS 15.4 or later with Safari 18.4 or later.
 - Node.js 22.19 or later.
-- DeepSeek Harness `0.1.2-alpha.3` and the AgentOnWeb DSH plugin `0.1.0` running locally.
+- DeepSeek Harness `0.1.7-rc.2` and the AgentOnWeb DSH plugin `0.2.0` running locally.
 - Your own model-provider credentials for DSH. Provider usage may incur separate charges.
 
-The Safari extension does not include or start DSH, and does not include a model-service subscription. This edition supports DSH; other agent runtimes are not supported.
+The Safari extension does not include or start DSH, and does not include a model-service subscription. DSH and Local terminal are separate installation paths.
+
+## Use Codex with Chrome
+
+For Codex, use AgentOnWeb with macOS + Chrome. Install the store extension and run the [one-command installer](https://github.com/HeftyKoo/AgentOnWeb#use-codex) to configure your terminal and notifications.
+
+Run `aow service open` to manage terminal browser approvals. DSH authorization remains in DSH Settings → AgentOnWeb. Closing a terminal view does not stop its shell; stopping the terminal service does.
 
 ## Setup
 
@@ -35,7 +41,7 @@ The Safari extension does not include or start DSH, and does not include a model
 2. Add the AgentOnWeb plugin to DSH's Web profile:
 
    ```sh
-   dsh plugin --profile web add @agentonweb/dsh-surface@0.1.0
+   dsh plugin --profile web add @agentonweb/dsh-surface@0.2.0
    ```
 
 3. Start or restart DSH with `dsh web` and keep it running.
