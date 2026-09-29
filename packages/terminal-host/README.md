@@ -1,29 +1,23 @@
-# Your local terminal on AgentOnWeb
+# AgentOnWeb terminal for Codex
 
-Open your real interactive login shell in the browser. Type `cd`, use Tab completion, aliases and history, and run installed command-line tools such as `codex`. Exiting a tool returns to the same shell. The host starts a new shell; it does not mirror an existing desktop terminal window. No specific coding CLI is required.
+Run Codex in your browser, keep several project terminals open, and return to the right session when a task finishes or needs approval.
 
-## One-time setup on macOS
+## Install on macOS
 
-From this checkout, build and install the package (Node.js 22.19+ and pnpm required):
+Install [the Chrome extension](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe), Node.js 22.19+ and Codex, then run:
 
 ```sh
-pnpm install
-pnpm --filter @agentonweb/terminal-host pack --pack-destination "$PWD/release"
-AOW_SKIP_SETUP=1 npm install -g ./release/agentonweb-terminal-host-0.2.0.tgz
-pnpm build:extension
-aow service install
+curl -fsSL https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh | bash
 ```
 
-Load `apps/extension/.output/chrome-mv3` through Chrome’s **Load unpacked** action in `chrome://extensions` (Developer mode). Use the matching 0.2.0 extension; earlier store builds only support DSH. Installation starts a per-user LaunchAgent and opens a private setup browser tab. On any website, open AgentOnWeb, click its discovery **+**, choose **Local terminal**, then approve the request in the setup tab. This pairing is remembered. Ordinary website pages cannot approve themselves.
-
-After setup, you do not need a desktop terminal window. The service starts at login. Use the terminal directly in AgentOnWeb:
+The installer configures the terminal service, Chrome connection and Codex notifications. Open a website, click AgentOnWeb and run:
 
 ```sh
-cd ~/Project/your-project
+cd ~/your-project
 codex
 ```
 
-The shell loads your normal login/interactive startup files. Those files can change its initial home directory, PATH or environment just as they do in a native terminal. Tools use your local installations, credentials and configuration. AgentOnWeb does not choose a model or override CLI permissions.
+For notifications, review and trust **AgentOnWeb session status** in Codex `/hooks`, then start a new Codex session. Your existing Codex settings are preserved.
 
 ## Terminal controls
 
@@ -53,20 +47,15 @@ Only one host may use a state directory. A dead PID is recovered automatically, 
 
 Automatic installation currently supports macOS. On other platforms, or when you want a foreground host, use `aow terminal`. Keep that host process running and approve through its printed private setup link. Windows/Linux and live Firefox/Safari have not been acceptance-tested.
 
-## Local connection boundary
+## Repair and uninstall
 
-The service binds only to IPv4 loopback. Connector discovery uses ports 3847–3850. HTTP validates Host; terminal WebSockets require exact Origin, a delegated HttpOnly cookie and a single-use expiring ticket tied to a terminal. Management writes require same-origin JSON requests. A separate administrator cookie, obtained only through the private one-time setup link, controls browser pairing and revocation. Extension-delegated terminal credentials cannot approve another extension.
+Run `aow setup` to repair configuration. Finish active terminal work before restarting the service. To remove AgentOnWeb:
 
-The private setup link is stored in an owner-only state directory and rotates when opened. Do not share it. Revoking a connection rotates the terminal secret and closes viewers of this host. Remaining authorized browsers reconnect with their existing grants to obtain a fresh surface credential. Shell processes continue, and DSH is unaffected. Browser-reserved shortcuts and terminal-emulator limitations still apply.
+```sh
+aow uninstall
+npm uninstall --global --prefix "$HOME/.local" @agentonweb/terminal-host
+```
 
-For release preparation, use the local 0.2.0 archive. After npm publication, install `@agentonweb/terminal-host@0.2.0` with the matching 0.2.0 extension. See the repository's verification records for actual platform and interaction coverage.
+If you installed through npm directly, uninstall from your original npm prefix instead. User settings, CLI history and backups remain.
 
-## Codex session notifications
-
-Run `aow codex-hooks install`, review/trust **AgentOnWeb session status** in Codex `/hooks`, then start Codex inside a new terminal created by the updated host. The page launcher lists sessions and notifies on completion or approval requests; clicking opens the exact terminal, where approvals remain native. Existing hook/notify configuration is preserved with backups. See [event setup and architecture](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/agent-notifications.md).
-
-## One-command setup (macOS + Chrome)
-
-The new `aow setup` entry configures the service, Chrome native pairing and Codex notifications together. Global npm installs run it when lifecycle scripts are permitted; the release shell installer calls it explicitly. Codex hook trust remains a first-use user action. For an unpacked Chrome extension, run `aow setup --extension-id YOUR_UNPACKED_CHROME_EXTENSION_ID` to enroll its ID explicitly. See [One-command setup (macOS + Chrome)](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md).
-
-Global setup starts a login service, registers a Chrome native host and updates Codex hooks/notify with backups. Set `AOW_SKIP_SETUP=1` to install without automatic configuration. Before `npm uninstall -g @agentonweb/terminal-host`, finish live terminal work and run `aow uninstall` to reverse these integrations. It stops service terminals, preserves user settings/history/backups, and restores the original notify command. `aow codex-hooks uninstall` removes only the Codex integration.
+[Setup and troubleshooting](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md) · [Codex notifications](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/agent-notifications.md) · [Source development](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/development.md)

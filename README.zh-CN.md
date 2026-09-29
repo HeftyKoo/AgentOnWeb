@@ -2,143 +2,65 @@
 
 **[English](README.md)** · **[简体中文](README.zh-CN.md)**
 
-**把本机终端带到你正在使用的网页上。**
+**在你正在浏览的网页上使用 Codex。**
 
-AgentOnWeb 在当前网页上显示本机工作区。你可以一边看视频、查阅文档，一边使用 Shell、运行 `codex` 等已安装的命令行工具，再切回网页；切换视图不会停止命令。
+一边看视频、查文档，一边让 Codex 写代码。AgentOnWeb 把 Codex 带到浏览器里，展示正在运行的会话，在任务完成或需要审批时提醒你。点击会话，就能回到对应的终端。
 
-**0.2.0** 提供两条独立连接：
+## 开始使用
 
-- **Local terminal（本机终端）**：Shell 进程运行在你的电脑上，通过 Web 终端显示和交互。直接输入 `cd`，使用 Shell 的补全、历史和别名，运行已安装的 CLI。退出 CLI 后返回同一 Shell。它会新建由本机服务管理的 Shell，不会镜像已有的 Terminal.app 窗口。
-- **DeepSeek Harness（DSH）**：显示 DSH 自带的 Web 工作区，保留会话、工具、审批、模型和插件界面。
+适用于 **macOS + Chrome**。请先安装 [Node.js 22.19+](https://nodejs.org/en/download)，并安装、登录 Codex。
 
-**0.2.0 上线准备中：**下方步骤可在正式发布前从源码安装。请配套使用 0.2.0 扩展和终端服务；npm 与浏览器商店是否已上架需要单独确认。终端实机验收覆盖 macOS 和 Chrome；Firefox、Safari 构建通过，但终端实机交互及 Windows/Linux 运行仍待验收。
+### 1. 安装浏览器扩展
 
-| 模式 | 功能 |
+[**从 Chrome 应用商店安装 AgentOnWeb**](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe)
+
+### 2. 一键配置终端
+
+在 Mac 的“终端”中运行一次：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh | bash
+```
+
+安装器会配置本机终端、登录自动启动、Chrome 连接和 Codex 通知，并保留你已有的 Codex 设置。
+
+### 3. 在网页上使用 Codex
+
+打开任意网站，点击 AgentOnWeb，在它的终端中进入项目目录并启动 Codex：
+
+```sh
+cd ~/你的项目
+codex
+```
+
+要接收会话通知，在 Codex 中打开 `/hooks`，审查并信任 **AgentOnWeb session status**，然后新建一个 Codex 会话。已安装的 hooks 只需信任一次。
+
+## 写代码，也不离开当前网页
+
+- **Chill（轻松）：**透过 Codex 工作区看到网页，自由调整透明度。
+- **Focus（专注）：**使用不透明的工作区专注写代码。
+- **Watch（观看）：**回到网页，Codex 继续运行。
+
+在 Chill 下双击 **Option** 切换到网页交互，再次双击返回。你可以打开多个终端标签处理不同项目；点击会话通知返回对应标签，在 Codex 中完成审批。
+
+| macOS 快捷键 | 操作 |
 | --- | --- |
-| **Chill（轻松）** | 半透明工作区，背景透明度可调。 |
-| **Focus（专注）** | 为同一工作区切换不透明背景。 |
-| **Watch（观看）** | 隐藏工作区，正常使用网页，保留 dock 便于返回。 |
+| `Control+0` | 显示或隐藏 AgentOnWeb |
+| `Control+1 / 2 / 3` | Chill / Focus / Watch |
+| `` Control+` `` | 切换工作区 |
 
-切换模式或隐藏面板不会停止本机进程。在 Chill 下双击 **Option / Alt** 切换到网页交互，再次双击返回工作区。
+扩展快捷键可在 Chrome 设置中修改。
 
-## 开始使用本机终端
+## 也支持 DeepSeek Harness
 
-在 macOS 安装 **Node.js 22.19+** 和 **pnpm 11.5.0**，然后运行：
+习惯使用 DSH？你也可以接入它的会话、模型和工具，通过 dock 在 Codex 与 DSH 之间切换。参见 [DSH 安装指南](docs/dsh.md)。
 
-```sh
-git clone https://github.com/HeftyKoo/AgentOnWeb.git
-cd AgentOnWeb
-pnpm install
-pnpm --filter @agentonweb/terminal-host pack --pack-destination "$PWD/release"
-AOW_SKIP_SETUP=1 npm install -g ./release/agentonweb-terminal-host-0.2.0.tgz
-pnpm build:extension
-aow service install
-```
+[![观看 DSH 演示](docs/assets/agentonweb-demo-cover.png)](https://www.youtube.com/watch?v=DV8s9z-w4GE)
 
-1. 在 Chrome 打开 `chrome://extensions`，启用**开发者模式**，选择**加载已解压的扩展程序**，载入本仓库的 `apps/extension/.output/chrome-mv3`。
-2. 打开普通网站，点击 dock 的 **+** 查找工作区，选择 **Local terminal**，如出现连接按钮则点击 **Connect**。
-3. 在 `aow service install` 打开的私有设置标签页中，点击 **Allow connection**。需要重新打开时运行 `aow service open`。
-4. 返回网页，直接使用 Shell：
+**DSH 演示：**[中文](https://www.youtube.com/watch?v=DV8s9z-w4GE) · [English](https://www.youtube.com/watch?v=s083RpD38HU)
 
-   ```sh
-   cd ~/你的项目
-   codex
-   ```
+## 帮助
 
-Codex 只是使用示例，并非终端服务的依赖。请自行安装和配置所需 CLI。Shell 加载你自己的启动文件；工具使用本机凭据和权限，AgentOnWeb 不替你选择模型或覆盖 CLI 权限。
+[安装与常见问题](docs/one-command-setup.md) · [终端指南](packages/terminal-host/README.md) · [反馈问题](https://github.com/HeftyKoo/AgentOnWeb/issues) · [隐私政策](https://heftykoo.github.io/AgentOnWeb/privacy.html)
 
-终端标签栏的 **+** 新建 Shell（最多八个），点击标签切换，**×** 在确认后关闭终端。标签默认跟随当前目录，可双击、右键选择 **Rename** 或按 **F2** 重命名。多个视图可以直接向同一 Shell 输入，只有获得焦点的视图控制终端尺寸。刷新或关闭浏览器视图不会结束进程；停止服务、退出系统登录或重启电脑会结束正在运行的 Shell。
-
-macOS 服务随登录启动。需要前台运行时使用 `aow terminal` 并保持进程运行。安装、撤销授权、更新服务和平台限制见[本机终端指南](packages/terminal-host/README.md)。
-
-## 连接 DSH
-
-DSH 为可选功能，与本机终端独立连接。你需要 **Node.js 22.19+**、DeepSeek Harness，以及在 DSH 内配置好的模型服务商凭据。安装最新 DSH；本次发布已验证的 DSH 版本记录在 [release-contract.json](release-contract.json)。
-
-```sh
-npm install -g @deepseek-ai/dsh@latest
-pnpm install:dsh-surface
-dsh web
-```
-
-上述命令安装本仓库中的插件。npm 发布后可将 `pnpm install:dsh-surface` 换为 `dsh plugin --profile web add @agentonweb/dsh-surface@0.2.0`。
-
-保持 `dsh web` 运行，安装或更新插件后重启它。在 AgentOnWeb 中点击 dock 的 **+**，选择 **DeepSeek Harness**，然后在 DSH 页面批准 **Allow connection**。切换 DSH 与本机终端不会停止其中任意一个。
-
-模型凭据保存在 DSH 中。在 **DSH Settings → AgentOnWeb → Revoke connection** 撤销浏览器授权。Safari 可能请求本地工作区和会话存储权限，请按照提示操作。
-
-## 日常操作
-
-通过 dock 切换 Chill、Focus、Watch 或已连接的工作区，并调整 Chill 透明度。关闭面板或点击扩展工具栏图标可隐藏面板，dock 可以重新打开它。
-
-| 操作 | macOS | Windows / Linux |
-| --- | --- | --- |
-| 显示或隐藏 AgentOnWeb | `Control+0` | `Alt+0` |
-| Chill / Focus / Watch | `Control+1 / 2 / 3` | `Alt+1 / 2 / 3` |
-| Terminal ↔ DSH | `` Control+` `` | `` Alt+` `` |
-| 在 Chill 下切换工作区与网页交互 | 双击 `Option` | 双击 `Alt` |
-
-浏览器快捷键可能优先于终端按键。可在浏览器设置中调整扩展快捷键。支持普通 HTTP(S) 网页；扩展设置等受保护页面无法承载工作区。
-
-## 浏览器商店与 DSH 视频
-
-请检查已安装扩展的版本：旧商店版本仅提供 DSH 流程。商店上架 0.2.0 前，请使用上方源码安装步骤。以下视频演示 DSH。
-
-| 浏览器 | 商店安装 |
-| --- | --- |
-| Chrome | [Chrome 应用商店](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe) |
-| Firefox | [Firefox 附加组件](https://addons.mozilla.org/en-US/firefox/addon/agentonweb/) |
-| Safari | 仓库尚未提供公开商店链接。 |
-
-[![在 YouTube 上观看 AgentOnWeb DSH 演示](docs/assets/agentonweb-demo-cover.png)](https://www.youtube.com/watch?v=s083RpD38HU)
-
-**演示：**[中文](https://www.youtube.com/watch?v=DV8s9z-w4GE) · [English](https://www.youtube.com/watch?v=s083RpD38HU)
-
-**DSH 安装教程：**[中文](https://www.youtube.com/watch?v=kyeRpiG3asg) · [English](https://www.youtube.com/watch?v=CIfW76WAcwA)
-
-## 开发
-
-执行 `pnpm install` 后，为所用浏览器构建并载入扩展：
-
-| 浏览器 | 构建命令 | 输出目录 |
-| --- | --- | --- |
-| Chrome 132+ | `pnpm build:extension` | `apps/extension/.output/chrome-mv3` |
-| Firefox 140+ | `pnpm build:extension:firefox` | `apps/extension/.output/firefox-mv2` |
-| Safari 18.4+ | `pnpm build:extension:safari` | `apps/extension/.output/safari-mv2` |
-
-Firefox 在 `about:debugging#/runtime/this-firefox` 使用**临时载入附加组件**，选择输出目录中的 `manifest.json`。Safari 启用开发者功能后使用**添加临时扩展**。包含扩展的 macOS 应用参见 [Safari 构建指南](apps/safari/README.md)。
-
-开发终端时，先运行 `pnpm --filter @agentonweb/terminal-host build`，再运行 `node packages/terminal-host/lib/cli.js terminal`。同一用户的状态目录只能由一个终端服务占用；已安装并运行的服务会占用它。停止或更新含活动 Shell 的服务前，请参阅本机终端指南。
-
-开发 DSH 插件时，`pnpm install:dsh-surface` 构建并安装本仓库版本到 DSH 的 Web profile，然后重启 `dsh web`。
-
-```sh
-pnpm check
-pnpm release:audit
-```
-
-`check` 运行仓库检查、TypeScript、测试和浏览器构建。`release:audit` 额外验证扩展、DSH 插件和终端安装包可重复构建，并隔离安装终端包、验证真实 Shell。交互变更应使用真实扩展和对应工作区验证，构建通过不等于浏览器实机验收。
-
-离线演示可运行 `pnpm build:preview` 和 `pnpm preview`；演示不会执行命令。实现与打包细节见[架构说明](docs/architecture.md)和[发布指南](docs/releasing.md)。
-
-[报告问题](https://github.com/HeftyKoo/AgentOnWeb/issues) · [隐私政策](https://heftykoo.github.io/AgentOnWeb/privacy.html)
-
-### 快捷键作用范围
-
-表格显示默认按键。显示/隐藏与模式快捷键只通过浏览器扩展命令执行；如果与终端应用冲突，可在浏览器的扩展快捷键设置中改绑或清除。网页和 iframe 不再另行拦截数字模式键。
-
-运行时切换键在嵌入的 Terminal / DSH 输入区中保留。宿主网页上仅在工作区启用或控制面板展开时处理，并放行网页的可编辑输入区域；隐藏的工作区不能转发切换操作。单独打开的原生运行时页面不拦截该键。超过两个运行时时，按面板显示顺序循环切换。
-
-Firefox 在 Linux 上使用 Alt+数字切换浏览器标签页，需要在扩展快捷键设置中另选绑定；这不是 Windows / macOS Firefox 的统一行为。
-
-### Codex 会话状态与通知
-
-点击页面图标可查看 Codex 会话列表，点击会话或通知可打开对应的 terminal tab。任务完成、需要权限审批时会出现页面通知；批准或拒绝仍在原生 Codex 终端中完成。首次运行 `aow codex-hooks install`，在 Codex `/hooks` 中审查并信任这些 hooks，再在更新后的 Host 新建的终端中启动 Codex。详见[接入步骤、事件链路与边界](docs/agent-notifications.md)。
-
-## 一键配置（macOS + Chrome）
-
-新安装入口 `aow setup` 自动配置本机服务、Chrome 配对桥接和 Codex 通知。全局 npm 安装在允许安装脚本时自动执行；推荐发布时提供统一 shell 安装器。Codex 首次 hooks 信任仍需用户确认。正式发布后可安装 `@agentonweb/terminal-host@0.2.0` 并使用配套扩展；发布前请使用上方源码步骤。详见[一键配置（macOS + Chrome）](docs/one-command-setup.md).
-
-**安装会修改的内容：**启动当前用户的登录常驻服务、注册 Chrome 原生消息桥接、备份并更新 Codex hooks/notify。可用 `AOW_SKIP_SETUP=1` 跳过自动配置。卸载前请先结束终端工作，执行 `aow uninstall`，再执行 `npm uninstall -g @agentonweb/terminal-host`；服务中的终端会停止，用户设置、CLI 历史与备份会保留。
-
-升级步骤和发布验收项见 [0.2.0 更新记录](CHANGELOG.md)与[发布清单](docs/releasing.md)。
+[开发文档](docs/development.md) · [更新记录](CHANGELOG.md)
