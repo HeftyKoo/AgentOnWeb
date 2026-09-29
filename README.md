@@ -55,10 +55,6 @@ You can change extension shortcuts in Chrome's settings.
 
 Prefer DSH? Connect its conversations, models and tools alongside Codex, and switch between them from the dock. See the [DSH setup guide](docs/dsh.md).
 
-[![Watch the DSH demo](docs/assets/agentonweb-demo-cover.png)](https://www.youtube.com/watch?v=s083RpD38HU)
-
-**DSH demo:** [English](https://www.youtube.com/watch?v=s083RpD38HU) · [中文](https://www.youtube.com/watch?v=DV8s9z-w4GE)
-
 ## Help
 
 [Setup and troubleshooting](docs/one-command-setup.md) · [Terminal guide](packages/terminal-host/README.md) · [Report an issue](https://github.com/HeftyKoo/AgentOnWeb/issues) · [Privacy](https://heftykoo.github.io/AgentOnWeb/privacy.html)

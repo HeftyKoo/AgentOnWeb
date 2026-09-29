@@ -19,3 +19,9 @@ Use Chill, Focus or Watch to choose how your workspace appears. Switch between D
 Revoke access in **DSH Settings → AgentOnWeb → Revoke connection**. If no workspace appears, check that DSH is running on the same computer and restart it after adding the plugin. Model credentials and tool approvals are managed in DSH.
 
 [DSH plugin guide](../packages/dsh-surface-plugin/README.md) · [Back to AgentOnWeb](../README.md)
+
+## DSH demo
+
+[![Watch the DSH demo](assets/agentonweb-demo-cover.png)](https://www.youtube.com/watch?v=s083RpD38HU)
+
+[English](https://www.youtube.com/watch?v=s083RpD38HU) · [中文](https://www.youtube.com/watch?v=DV8s9z-w4GE)
