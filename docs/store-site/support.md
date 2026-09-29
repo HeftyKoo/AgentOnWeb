@@ -30,16 +30,20 @@ In build 5 or later, the toolbar opens a menu with **Try interactive demo**, **S
 
 ## Connect a live workspace
 
-For the released DSH edition, live agent features require DeepSeek Harness running on the same Mac with the AgentOnWeb plugin. Follow the [complete setup guide](index.html#setup). Provider credentials are configured in DSH, not in the extension. Provider usage may incur charges.
+For DSH, live agent features require DeepSeek Harness running on the same Mac with the AgentOnWeb plugin. Follow the [complete setup guide](index.html#setup). Provider credentials are configured in DSH, not in the extension. Provider usage may incur charges.
 
 If no runtime is found, check that `dsh web` is running and restart it after installing the plugin. Allow access to localhost and 127.0.0.1 from the toolbar menu. Approve the connection in DSH. Follow the local-session prompts when returning to your website.
 
 [Setup guide](index.html) · [Privacy policy](privacy.html) · [Source and releases](https://github.com/HeftyKoo/AgentOnWeb)
 
-## Local terminal from source
+## Local terminal (0.2.0)
 
-The source checkout also provides a real local shell. It needs the source-built extension and separately installed host archive, not just the published DSH extension. Follow the [local terminal guide](https://github.com/HeftyKoo/AgentOnWeb/blob/main/packages/terminal-host/README.md). Live acceptance currently covers macOS/Chrome; other platforms and live Firefox/Safari still need terminal acceptance testing.
+Version 0.2.0 provides a real local shell. Use matching extension and terminal-host versions. During release preparation, install from source; npm and store availability are confirmed separately. Follow the [local terminal guide](https://github.com/HeftyKoo/AgentOnWeb/blob/main/packages/terminal-host/README.md). Live acceptance currently covers macOS/Chrome; other platforms and live Firefox/Safari still need terminal acceptance testing.
 
-If Local terminal is missing, check `aow service status` or keep `aow terminal` running. Use `aow service open` to reopen private pairing/connection management. Type `cd` and your CLI commands inside the browser shell. If the terminal is read-only, use **Control here**. If the shell exited, use **+** to create another one. Refreshing a view preserves a running shell; a host or computer restart ends live shell processes.
+If Local terminal is missing, check `aow service status` or keep `aow terminal` running. Use `aow service open` to reopen private pairing/connection management. Type `cd` and your CLI commands inside the browser shell. All connected views can type into the same shell; focus its view to control terminal dimensions. If the shell exited, use **+** to create another one. Refreshing a view preserves a running shell; a host or computer restart ends live shell processes.
 
 Reinstalling a running service does not load new host code immediately. Finish your terminal work before stopping and reinstalling the service. Never include the private setup URL or raw service logs in public issues.
+
+## Setup, notifications and removal
+
+On macOS + Chrome, `aow setup` configures the service, native pairing and Codex hooks. Unpacked extensions need `aow setup --extension-id YOUR_UNPACKED_CHROME_EXTENSION_ID`. Review/trust hooks in Codex and launch a new Codex session in a new host terminal for session notifications. If an older host is running, finish terminal work, run `aow service uninstall`, then `aow setup`. Before removing the npm package run `aow uninstall`. See [setup, upgrade and uninstall](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md).

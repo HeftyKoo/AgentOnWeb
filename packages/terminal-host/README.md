@@ -9,12 +9,12 @@ From this checkout, build and install the package (Node.js 22.19+ and pnpm requi
 ```sh
 pnpm install
 pnpm --filter @agentonweb/terminal-host pack --pack-destination "$PWD/release"
-npm install -g ./release/agentonweb-terminal-host-0.1.0.tgz
+AOW_SKIP_SETUP=1 npm install -g ./release/agentonweb-terminal-host-0.2.0.tgz
 pnpm build:extension
 aow service install
 ```
 
-Load `apps/extension/.output/chrome-mv3` through Chrome’s **Load unpacked** action in `chrome://extensions` (Developer mode). The earlier store extension is the DSH edition; use the source build for Local terminal. Installation starts a per-user LaunchAgent and opens a private setup browser tab. On any website, open AgentOnWeb, click its discovery **+**, choose **Local terminal**, then approve the request in the setup tab. This pairing is remembered. Ordinary website pages cannot approve themselves.
+Load `apps/extension/.output/chrome-mv3` through Chrome’s **Load unpacked** action in `chrome://extensions` (Developer mode). Use the matching 0.2.0 extension; earlier store builds only support DSH. Installation starts a per-user LaunchAgent and opens a private setup browser tab. On any website, open AgentOnWeb, click its discovery **+**, choose **Local terminal**, then approve the request in the setup tab. This pairing is remembered. Ordinary website pages cannot approve themselves.
 
 After setup, you do not need a desktop terminal window. The service starts at login. Use the terminal directly in AgentOnWeb:
 
@@ -59,14 +59,14 @@ The service binds only to IPv4 loopback. Connector discovery uses ports 3847–3
 
 The private setup link is stored in an owner-only state directory and rotates when opened. Do not share it. Revoking a connection rotates the terminal secret and closes viewers of this host. Remaining authorized browsers reconnect with their existing grants to obtain a fresh surface credential. Shell processes continue, and DSH is unaffected. Browser-reserved shortcuts and terminal-emulator limitations still apply.
 
-This package is not published to npm yet. Use the local archive. See the repository's verification records for actual platform and interaction coverage.
+For release preparation, use the local 0.2.0 archive. After npm publication, install `@agentonweb/terminal-host@0.2.0` with the matching 0.2.0 extension. See the repository's verification records for actual platform and interaction coverage.
 
 ## Codex session notifications
 
-Run `aow codex-hooks install`, review/trust **AgentOnWeb session status** in Codex `/hooks`, then start Codex inside a new terminal created by the updated host. The page launcher lists sessions and notifies on completion or approval requests; clicking opens the exact terminal, where approvals remain native. Existing hook/notify configuration is preserved with backups. See [event setup and architecture](../../docs/agent-notifications.md).
+Run `aow codex-hooks install`, review/trust **AgentOnWeb session status** in Codex `/hooks`, then start Codex inside a new terminal created by the updated host. The page launcher lists sessions and notifies on completion or approval requests; clicking opens the exact terminal, where approvals remain native. Existing hook/notify configuration is preserved with backups. See [event setup and architecture](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/agent-notifications.md).
 
 ## One-command setup (macOS + Chrome)
 
-The new `aow setup` entry configures the service, Chrome native pairing and Codex notifications together. Global npm installs run it when lifecycle scripts are permitted; the release shell installer calls it explicitly. Codex hook trust remains a first-use user action. The package and installer are not published yet. See [One-command setup (macOS + Chrome)](../../docs/one-command-setup.md).
+The new `aow setup` entry configures the service, Chrome native pairing and Codex notifications together. Global npm installs run it when lifecycle scripts are permitted; the release shell installer calls it explicitly. Codex hook trust remains a first-use user action. For an unpacked Chrome extension, run `aow setup --extension-id YOUR_UNPACKED_CHROME_EXTENSION_ID` to enroll its ID explicitly. See [One-command setup (macOS + Chrome)](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md).
 
 Global setup starts a login service, registers a Chrome native host and updates Codex hooks/notify with backups. Set `AOW_SKIP_SETUP=1` to install without automatic configuration. Before `npm uninstall -g @agentonweb/terminal-host`, finish live terminal work and run `aow uninstall` to reverse these integrations. It stops service terminals, preserves user settings/history/backups, and restores the original notify command. `aow codex-hooks uninstall` removes only the Codex integration.

@@ -6,12 +6,12 @@
 
 AgentOnWeb 在当前网页上显示本机工作区。你可以一边看视频、查阅文档，一边使用 Shell、运行 `codex` 等已安装的命令行工具，再切回网页；切换视图不会停止命令。
 
-当前源码提供两条独立连接：
+**0.2.0** 提供两条独立连接：
 
 - **Local terminal（本机终端）**：Shell 进程运行在你的电脑上，通过 Web 终端显示和交互。直接输入 `cd`，使用 Shell 的补全、历史和别名，运行已安装的 CLI。退出 CLI 后返回同一 Shell。它会新建由本机服务管理的 Shell，不会镜像已有的 Terminal.app 窗口。
 - **DeepSeek Harness（DSH）**：显示 DSH 自带的 Web 工作区，保留会话、工具、审批、模型和插件界面。
 
-已发布扩展和 DSH 插件属于此前的 DSH 版本。**本机终端目前需要从本仓库构建扩展，并安装本地打包的终端服务。** 终端服务尚未发布到 npm。终端实机验收覆盖 macOS 和 Chrome；Firefox、Safari 构建通过，但终端实机交互及 Windows/Linux 运行仍待验收。
+**0.2.0 上线准备中：**下方步骤可在正式发布前从源码安装。请配套使用 0.2.0 扩展和终端服务；npm 与浏览器商店是否已上架需要单独确认。终端实机验收覆盖 macOS 和 Chrome；Firefox、Safari 构建通过，但终端实机交互及 Windows/Linux 运行仍待验收。
 
 | 模式 | 功能 |
 | --- | --- |
@@ -30,7 +30,7 @@ git clone https://github.com/HeftyKoo/AgentOnWeb.git
 cd AgentOnWeb
 pnpm install
 pnpm --filter @agentonweb/terminal-host pack --pack-destination "$PWD/release"
-npm install -g ./release/agentonweb-terminal-host-0.1.0.tgz
+AOW_SKIP_SETUP=1 npm install -g ./release/agentonweb-terminal-host-0.2.0.tgz
 pnpm build:extension
 aow service install
 ```
@@ -47,19 +47,21 @@ aow service install
 
 Codex 只是使用示例，并非终端服务的依赖。请自行安装和配置所需 CLI。Shell 加载你自己的启动文件；工具使用本机凭据和权限，AgentOnWeb 不替你选择模型或覆盖 CLI 权限。
 
-终端工具栏的 **+** 新建 Shell，选择器切换终端，**×** 在确认后关闭所选终端。多个标签页可以查看同一个 Shell，点击 **Control here** 转移输入控制权。刷新或关闭浏览器视图不会结束进程；停止服务、退出系统登录或重启电脑会结束正在运行的 Shell。
+终端标签栏的 **+** 新建 Shell（最多八个），点击标签切换，**×** 在确认后关闭终端。标签默认跟随当前目录，可双击、右键选择 **Rename** 或按 **F2** 重命名。多个视图可以直接向同一 Shell 输入，只有获得焦点的视图控制终端尺寸。刷新或关闭浏览器视图不会结束进程；停止服务、退出系统登录或重启电脑会结束正在运行的 Shell。
 
 macOS 服务随登录启动。需要前台运行时使用 `aow terminal` 并保持进程运行。安装、撤销授权、更新服务和平台限制见[本机终端指南](packages/terminal-host/README.md)。
 
 ## 连接 DSH
 
-DSH 为可选功能，与本机终端独立连接。你需要 **Node.js 22.19+**、DeepSeek Harness，以及在 DSH 内配置好的模型服务商凭据。仓库固定的 DSH 兼容基线记录在 [release-contract.json](release-contract.json)。
+DSH 为可选功能，与本机终端独立连接。你需要 **Node.js 22.19+**、DeepSeek Harness，以及在 DSH 内配置好的模型服务商凭据。安装最新 DSH；本次发布已验证的 DSH 版本记录在 [release-contract.json](release-contract.json)。
 
 ```sh
-npm install -g @deepseek-ai/dsh@0.1.2-alpha.3
-dsh plugin --profile web add @agentonweb/dsh-surface@0.1.2
+npm install -g @deepseek-ai/dsh@latest
+pnpm install:dsh-surface
 dsh web
 ```
+
+上述命令安装本仓库中的插件。npm 发布后可将 `pnpm install:dsh-surface` 换为 `dsh plugin --profile web add @agentonweb/dsh-surface@0.2.0`。
 
 保持 `dsh web` 运行，安装或更新插件后重启它。在 AgentOnWeb 中点击 dock 的 **+**，选择 **DeepSeek Harness**，然后在 DSH 页面批准 **Allow connection**。切换 DSH 与本机终端不会停止其中任意一个。
 
@@ -78,9 +80,9 @@ dsh web
 
 浏览器快捷键可能优先于终端按键。可在浏览器设置中调整扩展快捷键。支持普通 HTTP(S) 网页；扩展设置等受保护页面无法承载工作区。
 
-## DSH 版本：商店与视频
+## 浏览器商店与 DSH 视频
 
-以下商店链接和视频对应已发布的 DSH 使用流程。本机终端请使用上方源码安装步骤。
+请检查已安装扩展的版本：旧商店版本仅提供 DSH 流程。商店上架 0.2.0 前，请使用上方源码安装步骤。以下视频演示 DSH。
 
 | 浏览器 | 商店安装 |
 | --- | --- |
@@ -135,6 +137,8 @@ Firefox 在 Linux 上使用 Alt+数字切换浏览器标签页，需要在扩展
 
 ## 一键配置（macOS + Chrome）
 
-新安装入口 `aow setup` 自动配置本机服务、Chrome 配对桥接和 Codex 通知。全局 npm 安装在允许安装脚本时自动执行；推荐发布时提供统一 shell 安装器。Codex 首次 hooks 信任仍需用户确认。终端包和安装器尚未发布。详见[一键配置（macOS + Chrome）](docs/one-command-setup.md).
+新安装入口 `aow setup` 自动配置本机服务、Chrome 配对桥接和 Codex 通知。全局 npm 安装在允许安装脚本时自动执行；推荐发布时提供统一 shell 安装器。Codex 首次 hooks 信任仍需用户确认。正式发布后可安装 `@agentonweb/terminal-host@0.2.0` 并使用配套扩展；发布前请使用上方源码步骤。详见[一键配置（macOS + Chrome）](docs/one-command-setup.md).
 
 **安装会修改的内容：**启动当前用户的登录常驻服务、注册 Chrome 原生消息桥接、备份并更新 Codex hooks/notify。可用 `AOW_SKIP_SETUP=1` 跳过自动配置。卸载前请先结束终端工作，执行 `aow uninstall`，再执行 `npm uninstall -g @agentonweb/terminal-host`；服务中的终端会停止，用户设置、CLI 历史与备份会保留。
+
+升级步骤和发布验收项见 [0.2.0 更新记录](CHANGELOG.md)与[发布清单](docs/releasing.md)。

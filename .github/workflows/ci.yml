@@ -23,3 +23,32 @@ jobs:
         with:
           name: agentonweb-${{ github.sha }}
           path: release/
+
+  dsh-latest:
+    runs-on: ubuntu-latest
+    env:
+      DSH_TEST_PREFIX: ${{ runner.temp }}/agentonweb-dsh-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build extension and pack the actual DSH plugin
+        run: |
+          pnpm build
+          pnpm --filter @agentonweb/dsh-surface pack --pack-destination "$PWD/release"
+      - name: Install the latest DSH and an isolated test browser
+        run: |
+          npm install --prefix "$DSH_TEST_PREFIX" --no-audit --no-fund @deepseek-ai/dsh@latest playwright-core
+          node "$DSH_TEST_PREFIX/node_modules/playwright-core/cli.js" install --with-deps chromium
+      - name: Verify latest DSH plugin, settings UI and cookie authentication
+        run: |
+          chromium_executable=$(node -e 'console.log(require(process.env.DSH_TEST_PREFIX + "/node_modules/playwright-core").chromium.executablePath())')
+          DSH_CONNECTION_MODULE="$DSH_TEST_PREFIX/node_modules/@deepseek-ai/dsh-client-connection/lib/index.js" pnpm exec vitest run packages/dsh-surface-plugin/src/routes.test.ts
+          xvfb-run -a node scripts/check-dsh-plugin.mjs --deps "$DSH_TEST_PREFIX" --chromium "$chromium_executable"
+          xvfb-run -a node scripts/check-dsh-auth-browser.mjs --deps "$DSH_TEST_PREFIX" --chromium "$chromium_executable"

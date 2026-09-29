@@ -6,12 +6,12 @@
 
 AgentOnWeb puts a local workspace over the page you already have open. Use your shell while watching a video or reading documentation, run installed tools such as `codex`, and switch back to the website without stopping your commands.
 
-This checkout provides two independent connections:
+Version **0.2.0** provides two independent connections:
 
 - **Local terminal:** a real interactive login shell running on your computer, displayed through a Web terminal. Type `cd`, use your shell's completion, history and aliases, and run any installed CLI. Exiting a CLI returns to the shell. This starts a new host-owned shell; it does not mirror an existing Terminal.app window.
 - **DeepSeek Harness (DSH):** DSH's own Web workspace, including its conversations, tools, approvals, models and plugins.
 
-The published extension and DSH plugin are the earlier DSH edition. **Local terminal currently requires building this checkout and installing its local host archive.** The terminal host is not yet published to npm. Live terminal acceptance covers macOS and Chrome; Firefox/Safari builds pass, but live terminal use there and Windows/Linux execution still need acceptance testing.
+**0.2.0 release preparation:** the commands below work from this checkout before publication. Use the matching 0.2.0 extension and terminal host together; npm and store availability must be confirmed separately. Live terminal acceptance covers macOS and Chrome; Firefox/Safari builds pass, but live terminal use there and Windows/Linux execution still need acceptance testing.
 
 | Mode | What it does |
 | --- | --- |
@@ -30,7 +30,7 @@ git clone https://github.com/HeftyKoo/AgentOnWeb.git
 cd AgentOnWeb
 pnpm install
 pnpm --filter @agentonweb/terminal-host pack --pack-destination "$PWD/release"
-npm install -g ./release/agentonweb-terminal-host-0.1.0.tgz
+AOW_SKIP_SETUP=1 npm install -g ./release/agentonweb-terminal-host-0.2.0.tgz
 pnpm build:extension
 aow service install
 ```
@@ -47,19 +47,21 @@ aow service install
 
 Codex is an example, not a dependency of the terminal host. Install and configure your chosen CLI separately. Your shell loads its own startup files; tools use their local credentials and permissions. AgentOnWeb does not select a model or override CLI permissions.
 
-The terminal toolbar's **+** creates another shell; its selector switches between shells and **×** closes one after confirmation. Other tabs can view the same shell; **Control here** transfers typing control. Refreshing or closing the browser view does not stop the process. Stopping the host, logging out or restarting the computer ends live shells.
+The terminal tab bar's **+** creates another shell (up to eight); click a tab to switch and **×** to close it after confirmation. Tabs follow the current directory until renamed with a double-click, right-click → **Rename**, or **F2**. All connected views can type into the same shell; only the focused view controls its dimensions. Refreshing or closing the browser view does not stop the process. Stopping the host, logging out or restarting the computer ends live shells.
 
 The macOS service starts at login. For a foreground host, use `aow terminal` and keep it running. For setup, revocation, service updates and platform limits, see the [local terminal guide](packages/terminal-host/README.md).
 
 ## Connect DSH
 
-DSH is optional and connects independently of Local terminal. You need **Node.js 22.19+**, DeepSeek Harness and model-provider credentials configured in DSH. The repository's pinned DSH compatibility baseline is recorded in [release-contract.json](release-contract.json).
+DSH is optional and connects independently of Local terminal. You need **Node.js 22.19+**, DeepSeek Harness and model-provider credentials configured in DSH. Install the latest DSH; the version verified for this release is recorded in [release-contract.json](release-contract.json).
 
 ```sh
-npm install -g @deepseek-ai/dsh@0.1.2-alpha.3
-dsh plugin --profile web add @agentonweb/dsh-surface@0.1.2
+npm install -g @deepseek-ai/dsh@latest
+pnpm install:dsh-surface
 dsh web
 ```
+
+This uses the plugin from this checkout. After npm publication, replace `pnpm install:dsh-surface` with `dsh plugin --profile web add @agentonweb/dsh-surface@0.2.0`.
 
 Keep `dsh web` running. Restart it after installing or updating the plugin. In AgentOnWeb, discover workspaces with the dock's **+**, select **DeepSeek Harness**, and approve **Allow connection** in the DSH page. You can switch between DSH and Local terminal without stopping either.
 
@@ -78,9 +80,9 @@ Use the dock to choose Chill, Focus or Watch, switch connected workspaces, or ad
 
 Browser shortcuts can take precedence over terminal keys. Adjust extension shortcuts in your browser settings. Normal HTTP(S) websites are supported; protected browser pages such as extension settings cannot host the workspace.
 
-## DSH edition: stores and videos
+## Browser stores and DSH videos
 
-These store links and videos cover the released DSH workflow. For Local terminal, follow the source installation above.
+Check the installed extension version: older store builds only support the DSH workflow. Until 0.2.0 is available in your store, use the source installation above. The videos below demonstrate DSH.
 
 | Browser | Store installation |
 | --- | --- |
@@ -135,6 +137,8 @@ The page launcher lists running Codex sessions and opens their exact terminal ta
 
 ## One-command setup (macOS + Chrome)
 
-The new `aow setup` entry configures the service, Chrome native pairing and Codex notifications together. Global npm installs run it when lifecycle scripts are permitted; the release shell installer calls it explicitly. Codex hook trust remains a first-use user action. The package and installer are not published yet. See [One-command setup (macOS + Chrome)](docs/one-command-setup.md).
+The new `aow setup` entry configures the service, Chrome native pairing and Codex notifications together. Global npm installs run it when lifecycle scripts are permitted; the release shell installer calls it explicitly. Codex hook trust remains a first-use user action. After publication, install `@agentonweb/terminal-host@0.2.0` with the matching extension. Until then, use the source steps above. See [One-command setup (macOS + Chrome)](docs/one-command-setup.md).
 
 **Installation changes:** global installation starts a per-user service at login, registers a Chrome native host, and updates Codex hooks/notify with backups. Use `AOW_SKIP_SETUP=1` to skip automatic setup. To remove these integrations, finish active terminal work and run `aow uninstall` **before** `npm uninstall -g @agentonweb/terminal-host`; service terminals will stop. User settings, CLI history and backups remain.
+
+See [0.2.0 changes](CHANGELOG.md) and the [release checklist](docs/releasing.md) for upgrade steps and remaining publication gates.

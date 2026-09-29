@@ -27,7 +27,7 @@ A project or profile that overrides `notify`, disabled/untrusted hooks, or launc
 2. Codex command hooks call `aow agent-event`; official `notify` calls `aow agent-notify` on `agent-turn-complete`.
 3. The loopback ingress validates the per-terminal bearer token, rejects browser-origin requests, limits payload size, and maps the event to its host-owned terminal. No surface cookie can publish an event.
 4. `AgentSessions` keeps a bounded in-memory snapshot. The connector pushes `agent.sessions` only to authenticated extension connections that opt in with `agentSessions: true` in hello; reconnect sends a fresh snapshot. Updates merge over 75 ms windows. Clients without that subscription keep receiving only the base protocol. Revocation stops delivery. PTY exit/close removes its sessions.
-5. The extension coordinator aggregates all connected runtimes. Only the active tab in the last focused browser window receives live page updates; switching tabs or windows sends the latest snapshot, including read/dismiss state. Intermediate background-page states are not replayed. Terminal WebSocket viewers remain independent. Live session updates do not rewrite unchanged stored preferences.
+5. The extension coordinator aggregates all connected runtimes. The selected tab in each browser window receives live page updates; switching tabs or windows sends the latest snapshot, including read/dismiss state. Intermediate background-page states are not replayed. Terminal WebSocket viewers remain independent. Live session updates do not rewrite unchanged stored preferences.
 6. `terminal.activate` crosses the content script and authenticated native wrapper, with a request ID, nonce, source/origin checks and an acknowledgement. The terminal resolves the exact ID against a fresh host list. Missing terminals show an error instead of opening another one. Presentation never sends shell commands or keystrokes to approve a request.
 
 | Signal | Presentation |
@@ -60,4 +60,4 @@ Official schemas: [Codex hooks](https://learn.chatgpt.com/docs/hooks), [Codex no
 
 ## One-command setup (macOS + Chrome)
 
-The new `aow setup` entry configures the service, Chrome native pairing and Codex notifications together. Global npm installs run it when lifecycle scripts are permitted; the release shell installer calls it explicitly. Codex hook trust remains a first-use user action. The package and installer are not published yet. See [One-command setup (macOS + Chrome)](one-command-setup.md).
+The new `aow setup` entry configures the service, Chrome native pairing and Codex notifications together. Global npm installs run it when lifecycle scripts are permitted; the release shell installer calls it explicitly. Codex hook trust remains a first-use user action. Use matching 0.2.0 host and extension builds; release availability is tracked separately. See [One-command setup (macOS + Chrome)](one-command-setup.md).

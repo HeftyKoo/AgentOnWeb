@@ -1,4 +1,6 @@
-# DSH runtime baseline
+# Historical DSH alpha.3 runtime baseline
+
+This record describes the initial release, not the current compatibility target. For 0.2.0, install DSH `@latest` and consult [the 0.2.0 verification record](release-0.2.0.md). A fresh alpha.3 install on September 29 failed during startup because its transitive dependencies had changed.
 
 ## Supported runtime
 
