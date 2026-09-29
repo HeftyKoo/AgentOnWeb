@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
+const contract = JSON.parse(await readFile(resolve(root, "release-contract.json"), "utf8"));
 const output = resolve(root, "apps/extension/.output");
 const variants = {
   chrome: { directory: "chrome-mv3", manifestVersion: 3 },
@@ -11,6 +12,7 @@ const variants = {
 
 for (const [browser, expected] of Object.entries(variants)) {
   const manifest = JSON.parse(await readFile(resolve(output, expected.directory, "manifest.json"), "utf8"));
+  if (manifest.version !== contract.extensionVersion) throw new Error(`${browser} version differs from the release contract.`);
   const backgroundSource = await readFile(resolve(output, expected.directory, "background.js"), "utf8");
   const contentSource = await readFile(resolve(output, expected.directory, "content-scripts/agentonweb.js"), "utf8");
   if (manifest.manifest_version !== expected.manifestVersion) throw new Error(`${browser} manifest version is incorrect.`);

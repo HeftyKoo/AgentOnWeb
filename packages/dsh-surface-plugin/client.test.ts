@@ -28,7 +28,7 @@ describe("DeepSeek Harness surface client", () => {
       },
     };
 
-    runInNewContext(source, { window, URLSearchParams });
+    runInNewContext(source, { window, URLSearchParams, navigator: { platform: "MacIntel" } });
     expect(plugin).toBeDefined();
     plugin?.apply({
       theme: { overrideTokens },
@@ -38,6 +38,8 @@ describe("DeepSeek Harness surface client", () => {
     });
 
     listeners.get("keydown")?.({ key: "Alt", repeat: false });
+    expect(parent.postMessage).not.toHaveBeenCalled();
+    listeners.get("keyup")?.({ key: "Alt", repeat: false });
     expect(parent.postMessage).toHaveBeenCalledOnce();
     expect(parent.postMessage).toHaveBeenCalledWith({
       source: "agentonweb-surface",
@@ -47,7 +49,25 @@ describe("DeepSeek Harness surface client", () => {
 
     listeners.get("keydown")?.({ key: "Alt", repeat: true });
     expect(parent.postMessage).toHaveBeenCalledOnce();
-    expect(listeners.has("keyup")).toBe(false);
+    expect(listeners.has("keyup")).toBe(true);
+
+    parent.postMessage.mockClear();
+    const preventDefault = vi.fn();
+    const stopImmediatePropagation = vi.fn();
+    listeners.get("keydown")?.({ key: "Alt", repeat: false });
+    listeners.get("keydown")?.({ key: "`", code: "Backquote", ctrlKey: true, repeat: false, preventDefault, stopImmediatePropagation });
+    listeners.get("keyup")?.({ key: "Alt", repeat: false });
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(stopImmediatePropagation).toHaveBeenCalledOnce();
+    expect(parent.postMessage).toHaveBeenCalledExactlyOnceWith({ source: "agentonweb-surface", type: "surface.shortcut", nonce: "frame-nonce", action: "runtime.toggle" }, "*");
+
+    parent.postMessage.mockClear();
+    preventDefault.mockClear();
+    for (const code of ["Digit1", "Digit2", "Digit3"]) {
+      listeners.get("keydown")?.({ code, ctrlKey: true, preventDefault, stopImmediatePropagation });
+    }
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(parent.postMessage).not.toHaveBeenCalled();
 
     const forgedMessage = { source: "agentonweb-extension", type: "opacity.set", nonce: "frame-nonce", opacity: 0.2 };
     listeners.get("message")?.({ source: {}, data: forgedMessage });

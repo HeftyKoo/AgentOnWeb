@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: ["ext-v*", "dsh-v*"]
+    tags: ["ext-v*", "dsh-v*", "terminal-v*"]
 
 permissions:
   contents: write
@@ -28,24 +28,41 @@ jobs:
       - name: Verify DSH plugin tag version
         if: startsWith(github.ref_name, 'dsh-v')
         run: test "$GITHUB_REF_NAME" = "dsh-v$(node -p 'require("./release-contract.json").pluginVersion')"
+      - name: Verify terminal host tag version
+        if: startsWith(github.ref_name, 'terminal-v')
+        run: test "$GITHUB_REF_NAME" = "terminal-v$(node -p 'require("./release-contract.json").terminalHostVersion')"
+      - name: Publish terminal host to npm
+        if: startsWith(github.ref_name, 'terminal-v')
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          test -n "$NODE_AUTH_TOKEN"
+          npm publish "release/$(node -p 'require("./release-contract.json").artifacts.terminalHost')" --access public --ignore-scripts
       - name: Publish DSH plugin to npm
         if: startsWith(github.ref_name, 'dsh-v')
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           test -n "$NODE_AUTH_TOKEN"
-          pnpm --filter @agentonweb/dsh-surface publish --access public --no-git-checks
+          npm publish "release/$(node -p 'require("./release-contract.json").artifacts.dshPlugin')" --access public --ignore-scripts
       - name: Create extension GitHub release
         if: startsWith(github.ref_name, 'ext-v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           grep "agentonweb-extension-" release/SHA256SUMS > release/extension-SHA256SUMS
-          gh release create "$GITHUB_REF_NAME" release/agentonweb-extension-*.zip release/extension-SHA256SUMS --verify-tag --generate-notes
+          gh release create "$GITHUB_REF_NAME" release/agentonweb-extension-*.zip release/extension-SHA256SUMS --verify-tag --notes-file CHANGELOG.md
       - name: Create DSH plugin GitHub release
         if: startsWith(github.ref_name, 'dsh-v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           grep "agentonweb-dsh-surface-" release/SHA256SUMS > release/dsh-surface-SHA256SUMS
-          gh release create "$GITHUB_REF_NAME" release/agentonweb-dsh-surface-*.tgz release/dsh-surface-SHA256SUMS --verify-tag --generate-notes
+          gh release create "$GITHUB_REF_NAME" release/agentonweb-dsh-surface-*.tgz release/dsh-surface-SHA256SUMS --verify-tag --notes-file CHANGELOG.md
+      - name: Create terminal host GitHub release
+        if: startsWith(github.ref_name, 'terminal-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          grep -E 'agentonweb-terminal-host-|  install.sh$' release/SHA256SUMS > release/terminal-host-SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" release/agentonweb-terminal-host-*.tgz release/install.sh release/terminal-host-SHA256SUMS --verify-tag --notes-file CHANGELOG.md

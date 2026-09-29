@@ -38,7 +38,18 @@ try {
   assert.ok(launch, `DSH did not start: ${logs.replace(/token=[^\s]+/gu, "token=<redacted>").slice(-2000)}`);
   const launchUrl = new URL(launch);
   launchUrl.hostname = "localhost";
-  const exchange = await fetch(launchUrl, { redirect: "manual" });
+  // DSH can print its URL before the HTTP listener accepts connections.
+  let exchange;
+  for (let count = 0; count < 100; count++) {
+    try {
+      exchange = await fetch(launchUrl, { redirect: "manual", signal: AbortSignal.timeout(2000) });
+      break;
+    } catch {
+      if (runtime.exitCode !== null) break;
+      await delay(100);
+    }
+  }
+  assert.ok(exchange, `DSH HTTP listener did not become ready: ${logs.replace(/token=[^\s]+/gu, "token=<redacted>").slice(-2000)}`);
   assert.equal(exchange.status, 303);
   const cookie = exchange.headers.get("set-cookie");
   const [, name, value] = cookie.match(/^([^=;]+)=([^;]+);/u);
@@ -104,6 +115,8 @@ try {
   }
   assert.ok(pending, "connector must request native approval");
   await authority.decide(pending.id, true);
+  // Approval opens a native tab; the current extension broadcasts to selected tabs.
+  await page.bringToFront();
   const grant = authority.snapshot().grants.find((grant) => grant.origin === extensionOrigin);
   let frame;
   for (let count = 0; count < 150; count++) {

@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../connector-contract"
+    },
+    {
+      "path": "../connector-host"
+    },
+    {
+      "path": "../terminal-core"
+    }
+  ]
+}

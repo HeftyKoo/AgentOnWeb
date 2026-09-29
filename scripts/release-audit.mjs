@@ -6,6 +6,7 @@ import { basename, dirname, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
+import { verifyTerminalArchive } from "./verify-terminal-archive.mjs";
 
 const execute = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -40,6 +41,21 @@ async function normalizePackedDependencyOrder(archive) {
 const contract = await readJson(resolve(root, "release-contract.json"));
 const extensionPackage = await readJson(resolve(root, "apps/extension/package.json"));
 const pluginPackage = await readJson(resolve(root, "packages/dsh-surface-plugin/package.json"));
+const terminalPackage = await readJson(resolve(root, "packages/terminal-host/package.json"));
+const safariProject = await readFile(resolve(root, "apps/safari/AgentOnWeb/AgentOnWeb.xcodeproj/project.pbxproj"), "utf8");
+const safariVersions = [...safariProject.matchAll(/MARKETING_VERSION = ([^;]+);/g)].map(match => match[1]);
+const safariBuilds = [...safariProject.matchAll(/CURRENT_PROJECT_VERSION = ([^;]+);/g)].map(match => match[1]);
+if (safariVersions.length !== 4 || safariVersions.some(version => version !== contract.extensionVersion)
+  || safariBuilds.length !== 4 || new Set(safariBuilds).size !== 1 || !/^[1-9][0-9]*$/.test(safariBuilds[0])) {
+  throw new Error("Safari target versions/build numbers must agree with the extension release.");
+}
+const installer = await readFile(resolve(root, "scripts/install.sh"), "utf8");
+if (!installer.includes(`'@agentonweb/terminal-host@${contract.terminalHostVersion}'`)) {
+  throw new Error("The release installer must pin the terminal host version from the contract.");
+}
+if (terminalPackage.private !== false || terminalPackage.publishConfig?.access !== "public") {
+  throw new Error("The terminal host must be configured as a public npm package.");
+}
 const protocol = await import(pathToFileURL(resolve(root, "packages/connector-contract/dist/index.js")));
 
 if (extensionPackage.version !== contract.extensionVersion) {
@@ -47,6 +63,9 @@ if (extensionPackage.version !== contract.extensionVersion) {
 }
 if (pluginPackage.version !== contract.pluginVersion) {
   throw new Error(`DSH plugin version ${pluginPackage.version} differs from release-contract.json pluginVersion ${contract.pluginVersion}.`);
+}
+if (terminalPackage.version !== contract.terminalHostVersion) {
+  throw new Error("Terminal host version differs from release-contract.json terminalHostVersion.");
 }
 if (pluginPackage.private !== false || pluginPackage.publishConfig?.access !== "public") {
   throw new Error("The DSH plugin is not configured as a public npm package.");
@@ -59,7 +78,9 @@ if (protocol.PROTOCOL_VERSION !== contract.connectorProtocol) throw new Error("C
 
 await rm(releaseDirectory, { recursive: true, force: true });
 await mkdir(releaseDirectory, { recursive: true });
+await writeFile(resolve(releaseDirectory, "install.sh"), installer, { mode: 0o755 });
 await execute("pnpm", ["--filter", "@agentonweb/dsh-surface", "pack", "--pack-destination", releaseDirectory], { cwd: root });
+await execute("pnpm", ["--filter", terminalPackage.name, "pack", "--pack-destination", releaseDirectory], { cwd: root });
 await execute("node", [resolve(root, "scripts/package-extension.mjs")], { cwd: root });
 const generatedManifest = await readJson(resolve(releaseDirectory, "extension-unpacked/manifest.json"));
 if (generatedManifest.version !== contract.extensionVersion || generatedManifest.manifest_version !== 3) {
@@ -68,19 +89,26 @@ if (generatedManifest.version !== contract.extensionVersion || generatedManifest
 
 const pluginArchive = resolve(releaseDirectory, `agentonweb-dsh-surface-${contract.pluginVersion}.tgz`);
 const extensionArchive = resolve(releaseDirectory, `agentonweb-extension-${contract.extensionVersion}.zip`);
+const terminalArchive = resolve(releaseDirectory, contract.artifacts.terminalHost);
 await normalizePackedDependencyOrder(pluginArchive);
+await normalizePackedDependencyOrder(terminalArchive);
 const temporary = await mkdtemp(resolve(tmpdir(), "agentonweb-release-audit-"));
 try {
   const firstPluginDigest = createHash("sha256").update(await readFile(pluginArchive)).digest("hex");
   const firstExtensionDigest = createHash("sha256").update(await readFile(extensionArchive)).digest("hex");
+  const firstTerminalDigest = createHash("sha256").update(await readFile(terminalArchive)).digest("hex");
   const reproductionDirectory = resolve(temporary, "reproduction");
   await mkdir(reproductionDirectory, { recursive: true });
   await execute("pnpm", ["--filter", "@agentonweb/dsh-surface", "pack", "--pack-destination", reproductionDirectory], { cwd: root });
+  await execute("pnpm", ["--filter", terminalPackage.name, "pack", "--pack-destination", reproductionDirectory], { cwd: root });
   await execute("node", [resolve(root, "scripts/package-extension.mjs")], { cwd: root });
   const reproducedPlugin = resolve(reproductionDirectory, basename(pluginArchive));
   await normalizePackedDependencyOrder(reproducedPlugin);
   const reproducedPluginDigest = createHash("sha256").update(await readFile(reproducedPlugin)).digest("hex");
   const reproducedExtensionDigest = createHash("sha256").update(await readFile(extensionArchive)).digest("hex");
+  const reproducedTerminal = resolve(reproductionDirectory, basename(terminalArchive));
+  await normalizePackedDependencyOrder(reproducedTerminal);
+  const reproducedTerminalDigest = createHash("sha256").update(await readFile(reproducedTerminal)).digest("hex");
   const drift = [];
   if (firstPluginDigest !== reproducedPluginDigest) {
     drift.push(`DSH plugin ${firstPluginDigest} != ${reproducedPluginDigest}`);
@@ -88,6 +116,7 @@ try {
   if (firstExtensionDigest !== reproducedExtensionDigest) {
     drift.push(`Chrome extension ${firstExtensionDigest} != ${reproducedExtensionDigest}`);
   }
+  if (firstTerminalDigest !== reproducedTerminalDigest) drift.push(`Terminal host ${firstTerminalDigest} != ${reproducedTerminalDigest}`);
   if (drift.length) throw new Error(`Release artifacts are not reproducible from the same checkout:\n${drift.join("\n")}`);
 
   const tarListing = (await execute("tar", ["-tf", pluginArchive])).stdout.trim().split("\n").sort();
@@ -120,14 +149,15 @@ try {
     "agentonweb-16.png", "agentonweb-32.png", "agentonweb-48.png", "agentonweb-128.png",
   ].sort();
   if (JSON.stringify(zipListing) !== JSON.stringify(expectedZip)) throw new Error(`Unexpected extension archive contents:\n${zipListing.join("\n")}`);
+  await verifyTerminalArchive(terminalArchive, root);
 } finally {
   await rm(temporary, { recursive: true, force: true });
 }
 
 const hashes = [];
-for (const artifact of [pluginArchive, extensionArchive]) {
+for (const artifact of [pluginArchive, extensionArchive, terminalArchive, resolve(releaseDirectory, "install.sh")]) {
   const digest = createHash("sha256").update(await readFile(artifact)).digest("hex");
   hashes.push(`${digest}  ${basename(artifact)}`);
 }
 await writeFile(resolve(releaseDirectory, "SHA256SUMS"), `${hashes.join("\n")}\n`);
-console.log(`Release audit passed for extension ${contract.extensionVersion} and DSH plugin ${contract.pluginVersion}:\n${hashes.join("\n")}`);
+console.log(`Release audit passed for extension ${contract.extensionVersion}, DSH plugin ${contract.pluginVersion} and terminal host ${contract.terminalHostVersion}:\n${hashes.join("\n")}`);

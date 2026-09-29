@@ -27,7 +27,7 @@ it("opens populated content offline and preserves scratchpad edits across pages"
 });
 it("switches actual presentation controls and leaves the website interactive in Watch", () => {
   const dom = demo(); const doc = dom.window.document;
-  (doc.querySelector('[aria-label="Watch mode, shortcut Control Shift 3"]') as HTMLElement).click();
+  (doc.querySelector('[aria-label="Watch mode, shortcut Alt 3"]') as HTMLElement).click();
   expect(doc.querySelector(".agentonweb-root")?.getAttribute("data-mode")).toBe("watch");
   expect((doc.querySelector(".demo-workspace") as HTMLElement).inert).toBe(true);
   (doc.querySelector("#counter") as HTMLElement).click();

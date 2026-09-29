@@ -1,3 +1,4 @@
+import { surfaceShortcut, OptionTapTracker } from "@agentonweb/connector-contract";
 import type { AgentOnWebMode } from "@agentonweb/connector-contract";
 
 type ThemeTokens = Record<string, { light: string; dark: string }>;
@@ -173,16 +174,36 @@ export function apply(ctx: ClientContext): void {
     if (message.type === "mode.set") applyMode(message.mode);
     if (message.type === "opacity.set") applyOpacity(message.opacity);
   };
-  const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Alt" && !event.repeat) notifyOptionTap(); };
+  const optionTap = new OptionTapTracker();
+  const onKeyDown = (event: KeyboardEvent) => {
+    optionTap.keydown(event);
+    if (!nonce || window.parent === window) return;
+    const action = surfaceShortcut(event);
+    if (action !== "runtime.toggle" || event.defaultPrevented) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (!event.repeat) window.parent.postMessage({ source: "agentonweb-surface", type: "surface.shortcut", nonce, action }, "*");
+  };
+  const onKeyUp = (event: KeyboardEvent) => { if (optionTap.keyup(event)) notifyOptionTap(); };
+  const onBlur = () => optionTap.reset();
+  const onPointerDown = () => {
+    if (nonce && window.parent !== window) window.parent.postMessage({ source: "agentonweb-surface", type: "surface.pointerdown", nonce }, "*");
+  };
 
   ctx.effect(() => {
     if (nonce && window.parent !== window) applyMode(mode);
     window.addEventListener("message", onMessage);
     window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("pointerdown", onPointerDown, true);
     return () => {
       disposeTheme();
       window.removeEventListener("message", onMessage);
       window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp, true);
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("pointerdown", onPointerDown, true);
     };
   }, "agentonweb: transparent surface and double-Option website pass-through");
 
