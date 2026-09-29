@@ -55,10 +55,6 @@ codex
 
 习惯使用 DSH？你也可以接入它的会话、模型和工具，通过 dock 在 Codex 与 DSH 之间切换。参见 [DSH 安装指南](docs/dsh.md)。
 
-[![观看 DSH 演示](docs/assets/agentonweb-demo-cover.png)](https://www.youtube.com/watch?v=DV8s9z-w4GE)
-
-**DSH 演示：**[中文](https://www.youtube.com/watch?v=DV8s9z-w4GE) · [English](https://www.youtube.com/watch?v=s083RpD38HU)
-
 ## 帮助
 
 [安装与常见问题](docs/one-command-setup.md) · [终端指南](packages/terminal-host/README.md) · [反馈问题](https://github.com/HeftyKoo/AgentOnWeb/issues) · [隐私政策](https://heftykoo.github.io/AgentOnWeb/privacy.html)
