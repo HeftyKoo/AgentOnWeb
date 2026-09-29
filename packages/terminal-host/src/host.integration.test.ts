@@ -409,7 +409,15 @@ it("delivers authenticated Codex hooks without a terminal viewer and restores th
   await expect.poll(() => output.includes("Open once:"), { timeout: 10000 }).toBe(true);
   const launchUrl = /Open once: (http:\/\/[^\s]+)/u.exec(output)![1]!;
   const origin = new URL(launchUrl).origin;
+  // stdout is printed before the initial endpoint file is committed. Wait for
+  // the same readiness record used by service/native clients before launching.
+  await expect.poll(async () => {
+    try {
+      return JSON.parse(await readFile(join(directory, ".agentonweb", "terminal", "endpoint.json"), "utf8")).launchUrl;
+    } catch { return undefined; }
+  }, { timeout: 10000 }).toBe(launchUrl);
   const launch = await fetch(launchUrl);
+  expect(launch.status).toBe(200);
   const Cookie = launch.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
   const headers = { Cookie, "X-AgentOnWeb-Terminal": "1", Origin: origin };
   const connectorUrl = `ws://127.0.0.1:${/Connector: (\d+)/u.exec(output)![1]}`;
