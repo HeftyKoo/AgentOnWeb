@@ -29,16 +29,16 @@ In build 5 or later, open the AgentOnWeb macOS app and choose **Try Interactive 
 
 The Safari extension does not include or start DSH, and does not include a model-service subscription. DSH and Local terminal are separate installation paths.
 
-## Local terminal from source
+## Use Codex with Chrome
 
-The current checkout can start a real local shell and display it in the browser. Follow the [source installation guide](https://github.com/HeftyKoo/AgentOnWeb#start-with-your-local-terminal); use matching 0.2.0 terminal-host and extension builds. Before publication, use the source installation steps. macOS/Chrome has live terminal acceptance evidence; live Safari terminal acceptance is still pending.
+For Codex, use AgentOnWeb with macOS + Chrome. Install the store extension and run the [one-command installer](https://github.com/HeftyKoo/AgentOnWeb#use-codex) to configure your terminal and notifications.
 
 Run `aow service open` to manage terminal browser approvals. DSH authorization remains in DSH Settings → AgentOnWeb. Closing a terminal view does not stop its shell; stopping the terminal service does.
 
 ## Setup
 
 1. Install DeepSeek Harness using its [official instructions](https://www.npmjs.com/package/@deepseek-ai/dsh). Configure your provider credentials in DSH.
-2. After the 0.2.0 npm release, add the AgentOnWeb plugin to DSH's Web profile (before publication, use `pnpm install:dsh-surface` from the source checkout):
+2. Add the AgentOnWeb plugin to DSH's Web profile:
 
    ```sh
    dsh plugin --profile web add @agentonweb/dsh-surface@0.2.0

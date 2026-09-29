@@ -39,6 +39,8 @@ The DSH plugin is imported outside the workspace. The terminal archive is instal
 - Deploy `docs/store-site/` to the existing `gh-pages` publication workflow/process, then check the rendered support/privacy URLs. Committing these files alone does not update that site.
 - Check each store's processed version and final review/publication state independently. Update availability wording only after confirmation.
 
+The root READMEs are user-facing: keep release readiness, platform acceptance evidence and source-build instructions in this guide or `docs/development.md`. The public quick start must use the store extension and shell installer.
+
 ## Latest DSH compatibility
 
 The `dsh-latest` CI job installs `@deepseek-ai/dsh@latest`, builds the actual plugin archive, checks its HTTP bridge and native settings page, and runs the stale-cookie iframe/API/WebSocket regression in Chromium. Both `verify` and `dsh-latest` must pass before merging or tagging. See the [0.2.0 verification record](verification/release-0.2.0.md) for local reproduction commands.
@@ -55,7 +57,7 @@ npm install -g @agentonweb/terminal-host@0.2.0
 aow setup
 ```
 
-The release installer at `https://github.com/HeftyKoo/AgentOnWeb/releases/download/terminal-v0.2.0/install.sh` pins the package to 0.2.0 and explicitly calls setup. This URL is a publication target, not proof that the asset exists. Download and inspect it before running it; do not advertise it until the release and clean-install test succeed.
+The release installer at `https://github.com/HeftyKoo/AgentOnWeb/releases/download/terminal-v0.2.0/install.sh` pins the package to 0.2.0 and explicitly calls setup. The user-facing command downloads `https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh`. Both that script and its pinned npm package must be live before announcing the installation flow. The installer uses the user-owned `~/.local` npm prefix and adds its bin directory to the login-shell profile. The versioned release URL is a publication target, not proof that the asset exists. Download and inspect it before running it; do not advertise it until the release and clean-install test succeed.
 
 ## Local installation and upgrades
 
