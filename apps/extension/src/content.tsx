@@ -1,3 +1,4 @@
+import { OptionTapTracker, isSurfaceShortcut } from "@agentonweb/connector-contract";
 import { createDock } from "./dock.js";
 import { browser } from "./browser-api.js";
 import { DEFAULT_SURFACE_OPACITY, DoubleTapLatch } from "./interaction.js";
@@ -22,17 +23,24 @@ if (!document.getElementById(HOST_ID)) {
   const shell = document.createElement("section");
   shell.className = "surface-shell";
   shell.setAttribute("aria-label", "AgentOnWeb native coding workspace");
-  const frame = document.createElement("iframe");
+  let frame = document.createElement("iframe");
+  const frames = new Map<string, HTMLIFrameElement>();
+  const unread = new Set<string>();
+  const readyFrames = new WeakSet<HTMLIFrameElement>();
   frame.hidden = true;
   frame.className = "runtime-frame";
   frame.title = "Native coding workspace";
   frame.allow = "clipboard-read; clipboard-write";
   const setup = createSetup();
-  const dock = createDock();
+  const dock = createDock({ runtimeShortcutEnabled: () =>
+    visible && !host.hidden && !!state.surface && state.mode !== "watch" && !sitePassActive,
+  });
   const passLabel = document.createElement("div");
   passLabel.className = "site-pass-label";
   passLabel.textContent = "WEBSITE  ⌥⌥";
-  shell.append(frame, setup.element, dock.element, passLabel);
+  // Keep the placeholder detached: mounting about:blank inherits the site's
+  // CSP and can duplicate its parser warnings before a workspace is opened.
+  shell.append(setup.element, dock.element, passLabel);
   root.append(shell);
   shadow.append(style, root);
   document.documentElement.append(host);
@@ -44,6 +52,7 @@ if (!document.getElementById(HOST_ID)) {
   };
   let surfaceOrigin: string | undefined;
   let frameNonce: string | undefined;
+  let pendingTerminal: { runtimeId: string; terminalId: string; requestId: string } | undefined;
   let sitePassActive = false;
   // Restore the shared dismissal preference on first state delivery. Later
   // broadcasts never reopen a page; the dock remains its explicit entry point.
@@ -62,7 +71,24 @@ if (!document.getElementById(HOST_ID)) {
   };
   setup.onApproval = () => send({ source: "agentonweb-content", type: "runtime.approval" });
   setup.onClose = () => setVisible(false);
+  dock.onDiscover = () => send({ source: "agentonweb-content", type: "runtime.connect" });
+  dock.onRuntime = (runtimeId) => {
+    optionTap.reset();
+    setVisible(true);
+    send({ source: "agentonweb-content", type: "runtime.activate", runtimeId });
+  };
+  dock.onSession = (session) => {
+    pendingTerminal = { runtimeId: session.runtimeId, terminalId: session.terminalId, requestId: crypto.randomUUID() };
+    setSitePass(false);
+    setVisible(true);
+    if (state.mode === "watch") send({ source: "agentonweb-content", type: "mode.set", mode: "chill" });
+    send({ source: "agentonweb-content", type: "runtime.activate", runtimeId: session.runtimeId });
+    dock.setExpanded(false);
+    postPresentation();
+  };
+  dock.onAttentionRead = attentionId => send({ source: "agentonweb-content", type: "agent.attention.read", attentionId });
   dock.onMode = (mode) => {
+    optionTap.reset();
     setSitePass(false);
     optionLatch.reset();
     setVisible(true);
@@ -79,7 +105,7 @@ if (!document.getElementById(HOST_ID)) {
   };
 
   const postToSurface = (message: Record<string, unknown>) => {
-    if (!frame.contentWindow || !frameNonce || !surfaceOrigin) return;
+    if (!readyFrames.has(frame) || !frame.contentWindow || !frameNonce || !surfaceOrigin) return;
     frame.contentWindow.postMessage({
       source: "agentonweb-extension",
       nonce: frameNonce,
@@ -93,11 +119,15 @@ if (!document.getElementById(HOST_ID)) {
   const postPresentation = () => {
     postMode();
     postOpacity(state.opacity);
+    if (pendingTerminal && pendingTerminal.runtimeId === state.surface?.runtimeId)
+      postToSurface({ type: "terminal.activate", terminalId: pendingTerminal.terminalId, requestId: pendingTerminal.requestId });
   };
-  frame.addEventListener("load", postPresentation);
-
   const render = (next: SurfaceViewState) => {
     state = next;
+    for (const [id, saved] of frames) {
+      saved.hidden = true;
+      if (state.surfaces && !state.surfaces.some(item => item.runtimeId === id)) { saved.remove(); frames.delete(id); }
+    }
     host.dataset.mode = state.mode;
     root.dataset.mode = state.mode;
     host.style.setProperty("--agentonweb-surface-opacity", String(state.opacity));
@@ -105,20 +135,22 @@ if (!document.getElementById(HOST_ID)) {
       setSitePass(false);
       optionLatch.reset();
     }
-    dock.render(state);
+    if (visible && state.mode !== "watch" && state.surface) unread.delete(state.surface.runtimeId);
+    dock.render({ ...state, runtimes: (state.runtimes ?? []).map(item => ({ ...item, newOutput: unread.has(item.id) })) });
     setup.render(state, visible);
     root.dataset.active = String(visible);
     root.dataset.hasSurface = String(Boolean(state.surface));
-    // Keep the native authorization tab usable before pairing; never overlay
-    // its approval UI or recursively embed a runtime into itself.
-    if ([state.nativeUrl, state.approvalUrl, state.surface?.url].some((url) => url && location.origin === new URL(url).origin)) {
+    // Discovery identifies other runtimes' management pages before pairing.
+    // Never cover them with the selected runtime or recursively embed a runtime.
+    if (state.nativeOrigins?.includes(location.origin)
+      || [state.nativeUrl, state.approvalUrl, state.surface?.url, ...(state.surfaces ?? []).map(item => item.url)].some((url) => url && location.origin === new URL(url).origin)) {
       host.hidden = true;
       return;
     }
     host.hidden = false;
     if (!state.surface) {
       frame.hidden = true;
-      frame.removeAttribute("src");
+
       surfaceOrigin = undefined;
       frameNonce = undefined;
       return;
@@ -129,6 +161,14 @@ if (!document.getElementById(HOST_ID)) {
       frame.hidden = true;
       return;
     }
+    const existingFrame = frames.get(state.surface.runtimeId);
+    if (existingFrame) frame = existingFrame;
+    else {
+      if (frames.size > 0 || frame.src) frame = document.createElement("iframe");
+      frame.className = "runtime-frame";
+      frame.allow = "clipboard-read; clipboard-write";
+      frames.set(state.surface.runtimeId, frame);
+    }
     const nextNonce = state.surface.frameName.replace(/^agentonweb:/u, "");
     const runtime = browser.runtime as typeof browser.runtime & { getURL(path: string): string };
     const nextSource = new URL(runtime.getURL("/native-surface.html"));
@@ -138,15 +178,18 @@ if (!document.getElementById(HOST_ID)) {
     frameNonce = nextNonce;
     frame.title = state.surface.displayName;
     if (sourceChanged) {
+      readyFrames.delete(frame);
       frame.name = state.surface.frameName;
       frame.src = nextSource.href;
     }
+    // Set the authorized URL before mounting, and never reinsert a retained
+    // iframe: reinsertion destroys its browsing context in some browsers.
+    if (!frame.isConnected) shell.prepend(frame);
     // Explicitly hide the frame in Watch. Safari can keep painting descendants
     // of a cross-process extension frame when only CSS visibility is hidden.
     frame.hidden = state.mode === "watch";
-    // Before the navigation loads, contentWindow still has the website's
-    // origin. Posting the localhost presentation target at that moment makes
-    // the browser record a misleading origin-mismatch extension error.
+    // A load event can describe about:blank or a blocked error document.
+    // Only the wrapper's origin/source/nonce-checked handshake proves readiness.
     if (!sourceChanged) postPresentation();
   };
 
@@ -221,16 +264,62 @@ if (!document.getElementById(HOST_ID)) {
   };
 
   window.addEventListener("message", (event) => {
+    const message = event.data as { source?: unknown; type?: unknown; nonce?: unknown; action?: unknown; requestId?: unknown } | null;
+    if (!message || message.source !== "agentonweb-surface") return;
+    if (message.type === "surface.output" || message.type === "surface.wrapper-ready" || message.type === "surface.wrapper-retry") {
+      const entry = [...frames].find(([, saved]) => saved.contentWindow === event.source);
+      if (!entry || !entry[1].src) return;
+      const expected = new URL(entry[1].src);
+      if (event.origin !== `${expected.protocol}//${expected.host}` || message.nonce !== entry[1].name.replace(/^agentonweb:/u, "")) return;
+      if (message.type === "surface.wrapper-retry") {
+        const previousState = state;
+        const previousSource = entry[1].src;
+        // A restarted worker issues a new tab-bound nonce. Only the trusted
+        // top-level content script can request and install that fresh state.
+        void browser.runtime.sendMessage({ source: "agentonweb-content", type: "state.get" } satisfies ContentRequest)
+          .then((response: { ok?: boolean; result?: SurfaceViewState } | undefined) => {
+            if (!response?.ok || !response.result || state !== previousState || frames.get(entry[0]) !== entry[1]) return;
+            render(response.result);
+            if (entry[1].isConnected && entry[1].src === previousSource) {
+              readyFrames.delete(entry[1]);
+              entry[1].src = previousSource;
+            }
+          }).catch(() => {});
+        return;
+      }
+      if (message.type === "surface.wrapper-ready") {
+        readyFrames.add(entry[1]);
+        if (entry[1] === frame) postPresentation();
+        return;
+      }
+      if (!visible || state.mode === "watch" || state.surface?.runtimeId !== entry[0]) {
+        unread.add(entry[0]);
+        dock.render({ ...state, runtimes: (state.runtimes ?? []).map(item => ({ ...item, newOutput: unread.has(item.id) })) });
+      }
+      return;
+    }
     if (!frame.contentWindow || event.source !== frame.contentWindow || event.origin !== surfaceOrigin) return;
-    const message = event.data as { source?: unknown; type?: unknown; nonce?: unknown } | null;
-    if (!message || message.source !== "agentonweb-surface" || message.type !== "site-pass.option-tap") return;
     if (message.nonce !== frameNonce) return;
+    if (message.type === "terminal.activated" && pendingTerminal?.requestId === message.requestId) {
+      pendingTerminal = undefined;
+      return;
+    }
+    if (message.type === "surface.pointerdown") { dock.setExpanded(false); return; }
+    if (message.type === "surface.shortcut") {
+      if (isSurfaceShortcut(message.action) && message.action === "runtime.toggle" &&
+        visible && !host.hidden && !!state.surface && state.mode !== "watch" && !sitePassActive) dock.shortcut(message.action);
+      return;
+    }
+    if (message.type !== "site-pass.option-tap") return;
     if (state.runtime?.capabilities.optionTap !== false) handleOptionTap();
   });
 
-  window.addEventListener("keydown", (event) => {
-    if (event.key === "Alt" && !event.repeat) handleOptionTap();
+  const optionTap = new OptionTapTracker();
+  window.addEventListener("keydown", event => optionTap.keydown(event), true);
+  window.addEventListener("keyup", event => {
+    if (optionTap.keyup(event)) handleOptionTap();
   }, true);
+  window.addEventListener("blur", () => optionTap.reset());
 
   browser.runtime.sendMessage({ source: "agentonweb-content", type: "state.get" } satisfies ContentRequest)
     .then((response: { ok?: boolean; result?: SurfaceViewState } | undefined) => {
@@ -259,7 +348,7 @@ function createSetup(): {
   header.className = "surface-setup-header";
   const title = document.createElement("strong");
   title.id = "agentonweb-setup-title";
-  title.textContent = "AgentOnWeb · DSH On Web";
+  title.textContent = "AgentOnWeb · Local workspaces";
   const close = document.createElement("button");
   close.type = "button";
   close.className = "surface-setup-close";
@@ -267,7 +356,7 @@ function createSetup(): {
   close.setAttribute("aria-label", "Close AgentOnWeb");
   header.append(title, close);
   const copy = document.createElement("p");
-  copy.textContent = "Bring DeepSeek Harness onto this page. Start dsh web with the AgentOnWeb plugin, then approve this browser in the native workspace.";
+  copy.textContent = "Choose Local terminal to use your shell, or connect DSH. First-time setup: install the local service with aow service install, then approve this browser in its setup page.";
   const form = document.createElement("form");
   const runtimes = document.createElement("select");
   runtimes.setAttribute("aria-label", "Coding runtime");

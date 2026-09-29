@@ -9,6 +9,7 @@ import {
   type RuntimeCommand,
   type RuntimeCommandResult,
   type ServerAvailable,
+  type AgentSession,
 } from "@agentonweb/connector-contract";
 
 export { isLocalSurfaceUrl, isNativeSurface, isRuntimeDescriptor } from "@agentonweb/connector-contract";
@@ -55,6 +56,7 @@ async function isListening(endpoint: string): Promise<boolean> {
 }
 
 export interface ConnectorCallbacks {
+  sessions?(sessions: readonly AgentSession[]): void;
   pending(url: string): void;
   ready(credential?: string): void;
   closed(): void;
@@ -73,11 +75,13 @@ export class ConnectorClient {
     this.#socket = socket;
     let authorizationShown = false;
     socket.onopen = () => socket.send(encodeFrame({ kind: "hello", protocolVersion: PROTOCOL_VERSION,
+      ...(this.callbacks.sessions ? { agentSessions: true } : {}),
       ...(credential ? { credential } : { intent: "pair" }) }));
     socket.onmessage = ({ data }) => {
       if (this.#socket !== socket) return;
       try {
         const frame = parseServerFrame(JSON.parse(String(data)));
+        if (frame.kind === "agent.sessions") { this.callbacks.sessions?.(frame.sessions); return; }
         if (frame.kind === "pending") {
           if (!authorizationShown) { authorizationShown = true; this.callbacks.pending(frame.approvalUrl); }
         } else if (frame.kind === "hello") {
