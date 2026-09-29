@@ -4,14 +4,11 @@ The page launcher shows Codex sessions across local terminals. Running sessions 
 
 ## Enable Codex events
 
-Build/install the updated terminal host and extension together. For a source checkout:
+The [one-command installer](one-command-setup.md) sets up Codex events automatically. To repair them, run:
 
 ```sh
-pnpm --filter @agentonweb/terminal-host build
-node packages/terminal-host/lib/cli.js codex-hooks install
+aow codex-hooks install
 ```
-
-With the packaged CLI, run `aow codex-hooks install`.
 
 The installer backs up and updates `hooks.json` and `config.toml` in `CODEX_HOME` (default `~/.codex`). Existing hook groups and unrelated TOML formatting/comments remain intact. If a `notify` command already exists, the new completion reporter forwards every original payload to it using its original argument array, without a shell. Running the installer again updates the integration without nesting forwarders. Re-run it if the installed Node or CLI path changes.
 

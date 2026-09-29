@@ -227,6 +227,11 @@ it("keeps shell sessions alive across viewers and isolates setup authorization f
     host: "127.0.0.1",
     port: Number(new URL(origin).port),
   });
+  // Linux can reset a partially read request when closeAllConnections runs.
+  // Observe that expected shutdown result without hiding other socket errors.
+  const shutdownErrors: NodeJS.ErrnoException[] = [];
+  unfinished.on("error", (error) => shutdownErrors.push(error));
+  const connectionClosed = new Promise<void>((resolve) => unfinished.once("close", resolve));
   await once(unfinished, "connect");
   unfinished.write(`GET / HTTP/1.1\r\nHost: ${new URL(origin).host}\r\n`);
   const stopped = once(host, "exit");
@@ -234,6 +239,10 @@ it("keeps shell sessions alive across viewers and isolates setup authorization f
   try {
     await expect.poll(() => host!.exitCode, { timeout: 2000 }).toBe(0);
     await stopped;
+    await connectionClosed;
+    expect(shutdownErrors.map((error) => error.code)).toEqual(
+      shutdownErrors.length ? ["ECONNRESET"] : [],
+    );
     for (const file of ["endpoint.json", "host.pid", "host.pid.guard"]) {
       await expect(stat(join(directory, ".agentonweb", "terminal", file))).rejects.toMatchObject({ code: "ENOENT" });
     }
