@@ -31,7 +31,7 @@ The Safari extension does not include or start DSH, and does not include a model
 
 ## Use Codex with Chrome
 
-For Codex, use AgentOnWeb with macOS + Chrome. Install the store extension and run the [one-command installer](https://github.com/HeftyKoo/AgentOnWeb#get-started) to configure your terminal and notifications.
+For Codex, use AgentOnWeb with macOS + Chrome. Install the store extension and run the [one-command installer](https://github.com/HeftyKoo/AgentOnWeb#use-codex) to configure your terminal and notifications.
 
 Run `aow service open` to manage terminal browser approvals. DSH authorization remains in DSH Settings → AgentOnWeb. Closing a terminal view does not stop its shell; stopping the terminal service does.
 
