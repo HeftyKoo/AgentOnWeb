@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 — release candidate
+## 0.2.0 — 2026-09-29
 
 - Run real local login shells in the browser, with up to eight terminal tabs, directory-based names, shared renaming, clipboard integration and reconnectable views. Connected views share input; only the focused view changes terminal dimensions.
 - Keep Local terminal and DSH connected independently, switch runtimes without stopping work, and open exact terminal tabs from the page launcher.
@@ -14,4 +14,4 @@
 
 Use the 0.2.0 terminal host and extension together. Package installation does not replace a running host: finish terminal work, stop it with `aow service uninstall`, then run `aow setup` to start the updated code. Restart DSH separately after updating its plugin. Live terminal acceptance covers macOS/Chrome; automatic setup only supports that combination. Other platforms and live Firefox/Safari terminal use require further acceptance testing.
 
-This entry describes the candidate source. npm publication, installer availability and each browser store's approval are separate release gates; see the [release guide](docs/releasing.md).
+Browser-store updates become available after each store approves them. See the [GitHub releases](https://github.com/HeftyKoo/AgentOnWeb/releases) for downloadable packages and the [release guide](docs/releasing.md) for publication details.
