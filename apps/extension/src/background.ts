@@ -42,7 +42,7 @@ const leases = new PartitionLeaseManager({
     await browser.storage.local.set({ [COOKIE_SCOPES_STORAGE_KEY]: scopes });
   },
 });
-const sessionLeases = targetBrowser === "safari"
+const sessionLeases = targetBrowser !== "firefox"
   ? new HeaderLeaseManager({
       async getSessionRules() { return browser.declarativeNetRequest.getSessionRules(); },
       updateSessionRules(update) {
@@ -60,6 +60,7 @@ const coordinator = new ConnectionCoordinator({
       surfaces = new Map([...coordinator.snapshots].flatMap(([id, item]) => item.surface ? [[id, item.surface] as const] : []));
       for (const [id, old] of previous) if (surfaces.get(id) !== old) {
         void sessionLeases.revoke(id);
+        if (targetBrowser === "chrome") void leases.revoke(id);
         if (targetBrowser === "safari") void safariCookies.revoke(id);
       }
       applyConnectionView(snapshot.view);
@@ -70,6 +71,8 @@ const coordinator = new ConnectionCoordinator({
     openApproval,
     async revokeDelegation(runtimeId) {
       await sessionLeases.revoke(runtimeId);
+      // Chrome owns both the HTTP header lease and partitioned cookie lease.
+      if (targetBrowser === "chrome") await leases.revoke(runtimeId);
       if (targetBrowser === "safari") await safariCookies.revoke(runtimeId);
     },
   },
@@ -148,7 +151,7 @@ toolbarAction.onClicked.addListener((tab) => {
 browser.tabs.onRemoved.addListener((id) => {
   for (const key of frameNames.keys()) if (key.startsWith(`${id}:`)) frameNames.delete(key);
   tabRuntimes.delete(id);
-  if (targetBrowser === "safari") (sessionLeases as HeaderLeaseManager).removeTab(id);
+  if (targetBrowser !== "firefox") (sessionLeases as HeaderLeaseManager).removeTab(id);
 });
 // Hidden tabs catch up once selected; each window's visible tab gets live updates.
 browser.tabs.onActivated.addListener(() => { void initialized.then(enqueueBroadcast); });
@@ -163,7 +166,7 @@ async function initialize(): Promise<void> {
   if (typeof browser.storage.local.setAccessLevel === "function") {
     await browser.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
   }
-  if (targetBrowser === "safari") await (sessionLeases as HeaderLeaseManager).resetAfterRestart();
+  if (targetBrowser !== "firefox") await (sessionLeases as HeaderLeaseManager).resetAfterRestart();
   const stored = await browser.storage.local.get([STATE_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, COOKIE_SCOPES_STORAGE_KEY, SAFARI_COOKIE_SCOPES]);
   leases.restore(stored[COOKIE_SCOPES_STORAGE_KEY]);
   if (targetBrowser === "safari") safariCookies.restore(stored[SAFARI_COOKIE_SCOPES]);
@@ -364,6 +367,7 @@ async function viewForTab(
   for (const item of surfaces.values()) {
     const current = () => surfaces.get(item.runtimeId) === item;
     if (targetBrowser === "safari" && !await safariCookies.ensure(item, current)) continue;
+    if (targetBrowser === "chrome" && !await leases.ensure(tab.id, tab.url, item, current)) continue;
     if (!await sessionLeases.ensure(tab.id, tab.url, item, current) || !current()) continue;
     const key = `${tab.id}:${item.runtimeId}`;
     let frameName = frameNames.get(key);

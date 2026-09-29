@@ -1,17 +1,17 @@
 # One-command setup (macOS + Chrome)
 
-The extension and npm package must be released together. The Local terminal package and hosted installer have **not been published yet**. Existing store builds do not contain the new native bridge. These instructions describe the new release, not the old DSH-only store version.
+The extension and npm package must be released together. These instructions target **0.2.0**. Verify npm and store publication before using the release commands; during preparation, install the locally packed archive and matching source-built extension. Older store builds do not contain the native bridge.
 
 ## User flow
 
 1. Install the updated AgentOnWeb Chrome extension and Node.js 22.19+; install/login to Codex separately if using Codex.
-2. Run the published installer once. `scripts/install.sh` installs the package globally, then explicitly calls `aow setup`. Host and hooks configuration are automatic. Chrome checks every 30 seconds initially; failed native setup checks back off to at most 5 minutes. Manual pairing remains available immediately. No discovery picker or Allow connection page is required for a new installation.
+2. After publication, run the versioned release installer once. `scripts/install.sh` installs the package globally, then explicitly calls `aow setup`. Host and hooks configuration are automatic. Chrome checks every 30 seconds initially; failed native setup checks back off to at most 5 minutes. Manual pairing remains available immediately. No discovery picker or Allow connection page is required for a new installation.
 3. In Codex, open `/hooks`, review the AgentOnWeb hooks, and trust them once. Launch a new Codex session inside an AgentOnWeb terminal.
 
 The release installer URL must be deployed before advertising a `curl ... | sh` command. Until publication, developers can install a locally packed archive and run `aow setup`.
 
 ```sh
-npm install -g @agentonweb/terminal-host
+npm install -g @agentonweb/terminal-host@0.2.0
 # Only needed when npm blocks lifecycle scripts, or to repair setup:
 aow setup
 ```
@@ -20,7 +20,7 @@ Global npm installation invokes setup when lifecycle scripts are allowed. Newer 
 
 On non-macOS platforms or under root, postinstall warns and skips automatic setup without failing installation for that reason. Native dependencies still need to install successfully. Use `aow terminal` for a foreground host on other platforms; Windows/Linux still require acceptance testing. On macOS, run `aow setup` as your own user, without sudo. Explicit `aow setup` still rejects unsupported platforms and root.
 
-**Setup changes your Mac:** it adds AgentOnWeb hooks and notify forwarding to `~/.codex/hooks.json` and `config.toml` (or `CODEX_HOME`), registers the Chrome native messaging host, and installs/starts a per-user service that runs at login. Changed Codex files are backed up. To install the package without configuring these integrations, use `AOW_SKIP_SETUP=1 npm install -g @agentonweb/terminal-host`, then run `aow setup` when ready. If the notify configuration cannot be safely parsed, setup warns and leaves that file untouched while still installing hooks; completion notifications remain unavailable until repaired.
+**Setup changes your Mac:** it adds AgentOnWeb hooks and notify forwarding to `~/.codex/hooks.json` and `config.toml` (or `CODEX_HOME`), registers the Chrome native messaging host, and installs/starts a per-user service that runs at login. Changed Codex files are backed up. To install the package without configuring these integrations, use `AOW_SKIP_SETUP=1 npm install -g @agentonweb/terminal-host@0.2.0`, then run `aow setup` when ready. If the notify configuration cannot be safely parsed, setup warns and leaves that file untouched while still installing hooks; completion notifications remain unavailable until repaired.
 
 Setup checks the live service before reporting it ready. It reports Codex hook trust as a remaining user action, not as completed. It never selects a model, logs into Codex, changes its tool approval policy, writes hook-trust records, or enables the hook-trust bypass flag. Hook definitions that change may need a new review in Codex.
 

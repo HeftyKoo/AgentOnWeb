@@ -1,6 +1,6 @@
 {
   "name": "@agentonweb/terminal-host",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "license": "MIT",
   "description": "Your local interactive shell in AgentOnWeb",
@@ -34,5 +34,18 @@
     "@agentonweb/terminal-surface": "workspace:*",
     "@types/ws": "^8.18.1",
     "smol-toml": "1.8.0"
-  }
+  },
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HeftyKoo/AgentOnWeb.git",
+    "directory": "packages/terminal-host"
+  },
+  "bugs": {
+    "url": "https://github.com/HeftyKoo/AgentOnWeb/issues"
+  },
+  "homepage": "https://github.com/HeftyKoo/AgentOnWeb#readme"
 }

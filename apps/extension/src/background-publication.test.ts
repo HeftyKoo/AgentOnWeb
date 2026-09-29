@@ -26,6 +26,7 @@ it("publishes to selected pages in every window, catches up on tab/window switch
   ]);
   vi.stubGlobal("chrome", {
     runtime: { id: "test", onMessage: event },
+    declarativeNetRequest: { getSessionRules: async () => [], updateSessionRules: async () => {} },
     storage: { local: { get: async () => ({}), set } },
     tabs: { query, sendMessage, onRemoved: event, onActivated: { addListener: (fn: () => void) => activated.push(fn) } },
     windows: { WINDOW_ID_NONE: -1, onFocusChanged: { addListener: (fn: (id: number) => void) => focused.push(fn) } },

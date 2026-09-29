@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { HeaderLeaseManager } from "./header-leases.js";
+import { HeaderLeaseManager, type SessionRuleUpdater } from "./header-leases.js";
 
 const surface = {
   runtimeId: "native-test",
@@ -9,14 +9,19 @@ const surface = {
 };
 
 function setup() {
-  const updateSessionRules = vi.fn(async () => {});
+  const updateSessionRules = vi.fn<SessionRuleUpdater["updateSessionRules"]>(async () => {});
   return {
-    leases: new HeaderLeaseManager({ updateSessionRules }),
+    leases: new HeaderLeaseManager({ updateSessionRules, getSessionRules: async () => [{ id: 42 }, { id: 1_000_007 }] }),
     updateSessionRules,
   };
 }
 
-describe("Safari declarative header leases", () => {
+describe("declarative header leases", () => {
+  it("clears owned session rules surviving a background restart before restoring authorization", async () => {
+    const { leases, updateSessionRules } = setup();
+    await leases.resetAfterRestart();
+    expect(updateSessionRules).toHaveBeenCalledWith({ removeRuleIds: [1_000_007] });
+  });
   it("creates a delegated session rule scoped to the matching local surface and tab", async () => {
     const { leases, updateSessionRules } = setup();
     expect(await leases.ensure(7, "https://example.org/page", surface, () => true)).toBe(true);
@@ -37,7 +42,7 @@ describe("Safari declarative header leases", () => {
             ],
           },
           condition: {
-            regexFilter: "^http://localhost:3080/",
+            regexFilter: "^(http|ws)://localhost:3080/",
             isUrlFilterCaseSensitive: true,
             resourceTypes: [
               "sub_frame",
@@ -57,6 +62,17 @@ describe("Safari declarative header leases", () => {
       ],
     });
     expect(JSON.stringify(updateSessionRules.mock.calls)).toContain("private");
+    const pattern = new RegExp(updateSessionRules.mock.calls[0]![0].addRules![0]!.condition.regexFilter);
+    for (const url of ["http://localhost:3080/", "http://localhost:3080/api", "ws://localhost:3080/api/remote.mux"]) expect(pattern.test(url)).toBe(true);
+    for (const url of ["http://localhost:3081/", "http://localhost:30800/", "http://localhost:3080.evil.test/", "http://127.0.0.1:3080/"]) expect(pattern.test(url)).toBe(false);
+  });
+
+  it("keeps rule ids valid and distinct for large Chrome tab ids", async () => {
+    const { leases, updateSessionRules } = setup();
+    for (const tabId of [2_147_483_646, 2_147_483_647]) {
+      expect(await leases.ensure(tabId, "https://example.org/", surface, () => true)).toBe(true);
+    }
+    expect(updateSessionRules.mock.calls.map(([update]) => update.addRules![0]!.id)).toEqual([1_000_001, 1_000_002]);
   });
 
   it("preserves native management cookies without installing a header replacement", async () => {

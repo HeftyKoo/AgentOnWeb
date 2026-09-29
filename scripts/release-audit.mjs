@@ -42,6 +42,20 @@ const contract = await readJson(resolve(root, "release-contract.json"));
 const extensionPackage = await readJson(resolve(root, "apps/extension/package.json"));
 const pluginPackage = await readJson(resolve(root, "packages/dsh-surface-plugin/package.json"));
 const terminalPackage = await readJson(resolve(root, "packages/terminal-host/package.json"));
+const safariProject = await readFile(resolve(root, "apps/safari/AgentOnWeb/AgentOnWeb.xcodeproj/project.pbxproj"), "utf8");
+const safariVersions = [...safariProject.matchAll(/MARKETING_VERSION = ([^;]+);/g)].map(match => match[1]);
+const safariBuilds = [...safariProject.matchAll(/CURRENT_PROJECT_VERSION = ([^;]+);/g)].map(match => match[1]);
+if (safariVersions.length !== 4 || safariVersions.some(version => version !== contract.extensionVersion)
+  || safariBuilds.length !== 4 || new Set(safariBuilds).size !== 1 || !/^[1-9][0-9]*$/.test(safariBuilds[0])) {
+  throw new Error("Safari target versions/build numbers must agree with the extension release.");
+}
+const installer = await readFile(resolve(root, "scripts/install.sh"), "utf8");
+if (!installer.includes(`'@agentonweb/terminal-host@${contract.terminalHostVersion}'`)) {
+  throw new Error("The release installer must pin the terminal host version from the contract.");
+}
+if (terminalPackage.private !== false || terminalPackage.publishConfig?.access !== "public") {
+  throw new Error("The terminal host must be configured as a public npm package.");
+}
 const protocol = await import(pathToFileURL(resolve(root, "packages/connector-contract/dist/index.js")));
 
 if (extensionPackage.version !== contract.extensionVersion) {
@@ -64,6 +78,7 @@ if (protocol.PROTOCOL_VERSION !== contract.connectorProtocol) throw new Error("C
 
 await rm(releaseDirectory, { recursive: true, force: true });
 await mkdir(releaseDirectory, { recursive: true });
+await writeFile(resolve(releaseDirectory, "install.sh"), installer, { mode: 0o755 });
 await execute("pnpm", ["--filter", "@agentonweb/dsh-surface", "pack", "--pack-destination", releaseDirectory], { cwd: root });
 await execute("pnpm", ["--filter", terminalPackage.name, "pack", "--pack-destination", releaseDirectory], { cwd: root });
 await execute("node", [resolve(root, "scripts/package-extension.mjs")], { cwd: root });
@@ -140,7 +155,7 @@ try {
 }
 
 const hashes = [];
-for (const artifact of [pluginArchive, extensionArchive, terminalArchive]) {
+for (const artifact of [pluginArchive, extensionArchive, terminalArchive, resolve(releaseDirectory, "install.sh")]) {
   const digest = createHash("sha256").update(await readFile(artifact)).digest("hex");
   hashes.push(`${digest}  ${basename(artifact)}`);
 }

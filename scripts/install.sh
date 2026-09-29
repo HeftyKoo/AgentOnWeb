@@ -15,5 +15,5 @@ if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
 fi
 node -e 'const [a,b]=process.versions.node.split(".").map(Number);if(a<22||(a===22&&b<19)){console.error("Node.js 22.19+ is required.");process.exit(1)}'
 # Setup is explicit here even when npm lifecycle scripts are disabled.
-AOW_SKIP_SETUP=1 npm install --global --foreground-scripts '@agentonweb/terminal-host'
+AOW_SKIP_SETUP=1 npm install --global --foreground-scripts '@agentonweb/terminal-host@0.2.0'
 "$(npm prefix --global)/bin/aow" setup
