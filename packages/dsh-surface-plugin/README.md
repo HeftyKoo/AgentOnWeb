@@ -6,15 +6,13 @@
 
 Use Node.js **22.19+**. Install the latest DSH. This release was verified against **0.1.7-rc.2**, the npm latest version on September 29, 2026; it is independent of AgentOnWeb's version. Future DSH releases require the same compatibility checks.
 
-After the 0.2.0 npm release:
-
 ```sh
 npm install -g @deepseek-ai/dsh@latest
 dsh plugin --profile web add @agentonweb/dsh-surface@0.2.0
 dsh web
 ```
 
-Before publication, run `pnpm install:dsh-surface` from the AgentOnWeb checkout to build and install this plugin into DSH's Web profile. Restart `dsh web` after installing or upgrading the plugin, and keep it running. Configure model-provider credentials in DSH; the extension does not need an API key.
+Restart `dsh web` after installing or upgrading the plugin, and keep it running. Configure model-provider credentials in DSH; the extension does not need an API key.
 
 Install the matching AgentOnWeb extension. On a normal HTTP(S) website, expand its dock, use **+** to discover workspaces, select **DeepSeek Harness**, and approve **Allow connection** in the DSH page. Safari may also request local workspace and session-storage access. Revoke access in **DSH Settings → AgentOnWeb → Revoke connection**.
 

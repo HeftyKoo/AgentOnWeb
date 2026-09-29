@@ -38,7 +38,7 @@ If no runtime is found, check that `dsh web` is running and restart it after ins
 
 ## Local terminal (0.2.0)
 
-Version 0.2.0 provides a real local shell. Use matching extension and terminal-host versions. During release preparation, install from source; npm and store availability are confirmed separately. Follow the [local terminal guide](https://github.com/HeftyKoo/AgentOnWeb/blob/main/packages/terminal-host/README.md). Live acceptance currently covers macOS/Chrome; other platforms and live Firefox/Safari still need terminal acceptance testing.
+Use Codex on your websites with macOS + Chrome. Install the Chrome store extension and follow the [one-command setup guide](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md). The installer configures the terminal service, Chrome connection and Codex notifications.
 
 If Local terminal is missing, check `aow service status` or keep `aow terminal` running. Use `aow service open` to reopen private pairing/connection management. Type `cd` and your CLI commands inside the browser shell. All connected views can type into the same shell; focus its view to control terminal dimensions. If the shell exited, use **+** to create another one. Refreshing a view preserves a running shell; a host or computer restart ends live shell processes.
 
@@ -46,4 +46,4 @@ Reinstalling a running service does not load new host code immediately. Finish y
 
 ## Setup, notifications and removal
 
-On macOS + Chrome, `aow setup` configures the service, native pairing and Codex hooks. Unpacked extensions need `aow setup --extension-id YOUR_UNPACKED_CHROME_EXTENSION_ID`. Review/trust hooks in Codex and launch a new Codex session in a new host terminal for session notifications. If an older host is running, finish terminal work, run `aow service uninstall`, then `aow setup`. Before removing the npm package run `aow uninstall`. See [setup, upgrade and uninstall](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md).
+On macOS + Chrome, `aow setup` configures the service, native pairing and Codex hooks. Review/trust hooks in Codex and launch a new Codex session in a new host terminal for session notifications. If an older host is running, finish terminal work, run `aow service uninstall`, then `aow setup`. Before removing the npm package run `aow uninstall`. See [setup, upgrade and uninstall](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md).
