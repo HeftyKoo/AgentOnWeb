@@ -27,7 +27,7 @@ jobs:
   dsh-latest:
     runs-on: ubuntu-latest
     env:
-      DSH_TEST_PREFIX: ${{ runner.temp }}/agentonweb-dsh-latest
+      DSH_TEST_PREFIX: /tmp/agentonweb-dsh-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
