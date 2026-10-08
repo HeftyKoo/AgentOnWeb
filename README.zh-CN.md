@@ -52,6 +52,8 @@ curl -fsSL https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/in
 
 安装器会配置本机终端、登录自动启动、Chrome 连接和 Codex 通知，并保留你已有的 Codex 设置。
 
+安装命令兼容 zsh、bash 和 fish，会为新开的 zsh/bash 窗口及检测到的 fish 配置 `aow` 路径。已经打开的终端窗口请按安装结束时的提示加载路径，或直接运行 `"$HOME/.local/bin/aow" service open`。
+
 ### 2. 在网页上使用 Codex
 
 打开任意网站，点击 AgentOnWeb，在它的终端中进入项目目录并启动 Codex：

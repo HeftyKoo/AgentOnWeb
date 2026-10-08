@@ -52,6 +52,8 @@ curl -fsSL https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/in
 
 The installer sets up the local terminal, automatic startup, Chrome connection and Codex notifications. Existing Codex settings are preserved.
 
+The install command works from zsh, bash and fish. New zsh/bash windows and detected fish installations get `aow` on their PATH. For an already-open window, follow the installer's final instructions or run `"$HOME/.local/bin/aow" service open` directly.
+
 ### 2. Start Codex on any website
 
 Open a website and click AgentOnWeb. In its terminal, enter your project directory and start Codex:
