@@ -1,6 +1,6 @@
 {
   "name": "@agentonweb/terminal-host",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "license": "MIT",
   "description": "Your local interactive shell in AgentOnWeb",

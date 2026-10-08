@@ -1,5 +1,9 @@
 # Release AgentOnWeb
 
+## Terminal host 0.2.1 patch
+
+This patch fixes immediate command discovery after shell installation and makes `aow service` default to opening the connection page. Publish `terminal-v0.2.1` from the reviewed main commit after both CI jobs pass. The extension and DSH plugin remain at 0.2.0; the connector protocol remains 1.
+
 ## 0.2.0 scope
 
 This release introduces Local terminal, shared terminal views, directory-based tab names and renaming, independent Terminal/DSH connections, Codex session activity and page notifications, and macOS + Chrome setup. It also includes the main branch's DSH stale-cookie authentication fix. See [CHANGELOG](../CHANGELOG.md).
@@ -10,7 +14,7 @@ The extension, DSH plugin and terminal host all start this release at **0.2.0**.
 | --- | --- | --- |
 | Chrome extension ZIP | `extensionVersion` | `ext-v0.2.0`, then explicit store submission |
 | DSH plugin TGZ | `pluginVersion` | `dsh-v0.2.0`, npm + GitHub release |
-| Terminal host TGZ + installer | `terminalHostVersion` | `terminal-v0.2.0`, npm + GitHub release |
+| Terminal host TGZ + installer | `terminalHostVersion` | `terminal-v0.2.1`, npm + GitHub release |
 
 A merged branch or GitHub release does not mean a browser store has approved the update. Live terminal acceptance currently covers macOS/Chrome. Firefox/Safari builds and Linux CI do not establish live terminal support on those platforms. Automatic setup targets macOS + Chrome only.
 
@@ -33,7 +37,7 @@ The DSH plugin is imported outside the workspace. The terminal archive is instal
 - Integrate the latest default branch (`main` in this repository), resolve conflicts, and pass the complete audit on the final commit. Do not omit the DSH cookie fix while merging the multi-runtime code.
 - Review both READMEs, package guides, setup/upgrade/uninstall instructions, public support/privacy copy and changelog against the shipped behavior.
 - On macOS + Chrome, verify a clean installation, native/manual pairing, shell input, multiple views, Terminal/DSH switching, refresh/reconnect, revocation, upgrade and uninstall. Review/trust Codex hooks in Codex and verify real completion/approval notifications. Do not replace these with simulated preview events.
-- Confirm the npm publishing credential (`NPM_TOKEN`) has access to both public packages, and check that 0.2.0 is unused before creating immutable release tags. Never log the token.
+- Confirm the npm publishing credential (`NPM_TOKEN`) has access to the selected public package, and check that its version is unused before creating immutable release tags. Never log the token.
 - Publish from the reviewed commit on `main`: DSH and terminal npm releases first, then the extension release and store submissions. Each tag workflow reruns the full audit and checks its version before publishing.
 - Verify npm versions and GitHub checksums/downloads. Smoke-test the published installer and matching extension on a clean user environment before advertising them.
 - Deploy `docs/store-site/` to the existing `gh-pages` publication workflow/process, then check the rendered support/privacy URLs. Committing these files alone does not update that site.
@@ -52,19 +56,19 @@ The `dsh-latest` CI job installs `@deepseek-ai/dsh@latest`, builds the actual pl
 After the relevant release is public, users can run:
 
 ```sh
-npm install -g @agentonweb/terminal-host@0.2.0
+npm install -g @agentonweb/terminal-host@0.2.1
 # Repair setup or run it explicitly when lifecycle scripts were blocked:
 aow setup
 ```
 
-The release installer at `https://github.com/HeftyKoo/AgentOnWeb/releases/download/terminal-v0.2.0/install.sh` pins the package to 0.2.0 and explicitly calls setup. The user-facing command downloads `https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh`. Both that script and its pinned npm package must be live before announcing the installation flow. The installer uses the user-owned `~/.local` npm prefix and adds its bin directory to the login-shell profile. The versioned release URL is a publication target, not proof that the asset exists. Download and inspect it before running it; do not advertise it until the release and clean-install test succeed.
+The release installer at `https://github.com/HeftyKoo/AgentOnWeb/releases/download/terminal-v0.2.1/install.sh` pins the package to 0.2.1 and explicitly calls setup. The user-facing command downloads `https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh`. Both that script and its pinned npm package must be live before announcing the installation flow. The installer uses the user-owned `~/.local` npm prefix, configures zsh/bash/fish startup paths, and links `aow` beside Node when that directory is writable and already on PATH. Existing AgentOnWeb npm links are updated; unrelated commands are preserved. The versioned release URL is a publication target, not proof that the asset exists. Download and inspect it before running it; do not advertise it until the release and clean-install test succeed.
 
 ## Local installation and upgrades
 
 Before publishing, use the audited archive with the source-built extension:
 
 ```sh
-AOW_SKIP_SETUP=1 npm install -g ./release/agentonweb-terminal-host-0.2.0.tgz
+AOW_SKIP_SETUP=1 npm install -g ./release/agentonweb-terminal-host-0.2.1.tgz
 aow setup --extension-id YOUR_UNPACKED_CHROME_EXTENSION_ID
 ```
 

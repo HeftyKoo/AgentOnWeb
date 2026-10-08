@@ -55,12 +55,17 @@ if (inputArgs[0] === "codex-hooks" && inputArgs[1] === "uninstall") {
   process.exit(0);
 }
 if (inputArgs[0] === "service") {
-  await serviceCommand(inputArgs.slice(1));
+  try {
+    await serviceCommand(inputArgs.slice(1));
+  } catch (error) {
+    console.error(`aow: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
   process.exit(0);
 }
 if (inputArgs.length === 1 && inputArgs[0] === "--help") {
   console.log(
-    "Usage: aow setup | aow uninstall | aow terminal | aow codex-hooks install|uninstall | aow service install | aow service open | aow service status | aow service uninstall",
+    "Usage: aow setup | aow uninstall | aow terminal | aow codex-hooks install|uninstall | aow service [open|install|status|uninstall] (default: open)",
   );
   process.exit(0);
 }
