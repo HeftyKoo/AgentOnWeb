@@ -16,11 +16,13 @@ The installer configures your terminal service, automatic startup, Chrome connec
 
 The command works from zsh, bash and fish. The installer configures both login and interactive zsh/bash windows, including editor terminals, and uses fish's own PATH syntax when fish is installed or selected as your login shell. It respects exported `ZDOTDIR` and `XDG_CONFIG_HOME` settings and preserves the Bash login profile you already use.
 
+For an already-open terminal, the installer also creates a link to the installed `aow` beside Node when that directory is writable and already on PATH, as in typical nvm/Homebrew installations. This makes `aow` available immediately without `source`. Existing npm links from older AgentOnWeb packages are updated; unrelated commands are preserved.
+
 ## The workspace has not appeared
 
 On a first installation, Chrome connects automatically. Wait briefly and refresh your website. If Chrome previously tried to connect before setup, its next check can take up to five minutes.
 
-If you previously revoked access or cleared browser data, open AgentOnWeb, choose Local terminal and connect again. Run `aow service open` to open the private approval page. Additional Chrome profiles also use this manual connection flow.
+If you previously revoked access or cleared browser data, open AgentOnWeb, choose Local terminal and connect again. Run `aow service` (or `aow service open`) to open the private approval page. Additional Chrome profiles also use this manual connection flow. `aow service --help` lists the service actions.
 
 Check the service with:
 
@@ -28,10 +30,10 @@ Check the service with:
 aow service status
 ```
 
-To repair configuration, run `aow setup`. The installer runs in a child process, so it cannot update the PATH of an already-open terminal. If that window reports `command not found: aow`, open a new window or use the installed command directly:
+To repair configuration, run `aow setup`. If Node's command directory is protected or contains an unrelated `aow`, the installer cannot add its convenience link. Use the installed command directly in that window:
 
 ```sh
-"$HOME/.local/bin/aow" service open
+"$HOME/.local/bin/aow" service
 ```
 
 To enable `aow` in the same zsh/bash window, run `export PATH="$HOME/.local/bin:$PATH"`. In fish, run `fish_add_path --path --move "$HOME/.local/bin"`. If setup fails after package installation, the command's PATH configuration is retained and the installer prints `"$HOME/.local/bin/aow" setup` to retry directly. If the direct command also reports that the file does not exist, installation did not create the expected CLI; check the installer's error output before retrying.

@@ -18,6 +18,17 @@ afterEach(async () => {
   directory = "";
   host = undefined;
 });
+it('prints service help and usage errors without a Node stack trace', () => {
+  const entry = resolve('packages/terminal-host/lib/cli.js');
+  const help = spawnSync(process.execPath, [entry, 'service', '--help'], { encoding: 'utf8' });
+  expect(help.status).toBe(0);
+  expect(help.stdout).toContain('default: open');
+  expect(help.stderr).toBe('');
+  const invalid = spawnSync(process.execPath, [entry, 'service', 'open', '--no-open'], { encoding: 'utf8' });
+  expect(invalid.status).toBe(1);
+  expect(invalid.stdout).toBe('');
+  expect(invalid.stderr).toMatch(/^aow: Usage: aow service [^\n]+\n$/);
+});
 it("keeps shell sessions alive across viewers and isolates setup authorization from delegated terminals", async () => {
   directory = await mkdtemp(join(tmpdir(), "aow-shell-test-"));
   host = spawn(process.execPath, [resolve("packages/terminal-host/lib/cli.js"), "terminal"], {
