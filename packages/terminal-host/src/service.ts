@@ -20,8 +20,17 @@ export function launchAgent(node: string, entry: string, home: string, path: str
     '<key>StandardErrorPath</key>' + string(join(home, '.agentonweb/terminal/service.log')) + '</dict></plist>\n';
 }
 export async function serviceCommand(args: string[]): Promise<void> {
+  const usage = 'Usage: aow service [open | install [--no-open] | status | uninstall] (default: open)';
+  if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
+    console.log(usage);
+    return;
+  }
+  const action = args[0] ?? 'open';
+  if (!['install', 'open', 'status', 'uninstall'].includes(action) ||
+      (args.length > 1 && !(action === 'install' && args.length === 2 && args[1] === '--no-open'))) {
+    throw new Error(usage);
+  }
   if (process.platform !== 'darwin') throw new Error('Automatic service installation currently supports macOS. Run aow terminal on this platform.');
-  const action = args[0];
   const domain = 'gui/' + process.getuid!();
   if (action === 'install') {
     await mkdir(serviceDirectory, { recursive: true, mode: 0o700 });
@@ -43,7 +52,7 @@ export async function serviceCommand(args: string[]): Promise<void> {
     try { execFileSync('/bin/launchctl', ['bootout', domain + '/' + label], { stdio: 'pipe' }); } catch {}
     await unlink(plist).catch(error => { if (error.code !== 'ENOENT') throw error; });
     console.log('Automatic startup removed. Service terminals stopped; saved CLI history is unchanged.');
-  } else throw new Error('Usage: aow service install [--no-open] | open | status | uninstall');
+  }
 }
 async function openService() {
   for (let attempt = 0; attempt < 50; attempt++) {
@@ -55,5 +64,5 @@ async function openService() {
       execFileSync('/usr/bin/open', [url.href]); return;
     } catch { await new Promise(resolve => setTimeout(resolve, 100)); }
   }
-  throw new Error('Service did not become ready. Check ~/.agentonweb/terminal/service.log.');
+  throw new Error('Service did not become ready. Run aow setup to install or repair it, then check ~/.agentonweb/terminal/service.log.');
 }

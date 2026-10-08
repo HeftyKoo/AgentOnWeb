@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile, readFile, rm, access } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, access, symlink, readlink, rename, chmod } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -39,7 +39,7 @@ it('supports curl-to-bash input, paths with spaces and repeat setup without dupl
     expect(await readFile(log, 'utf8')).toBe('install\nsetup\n');
     const command = await readFile(args, 'utf8');
     expect(command).toContain(`--prefix ${root}/.local`);
-    expect(command).toContain('@agentonweb/terminal-host@0.2.0');
+    expect(command).toContain('@agentonweb/terminal-host@0.2.1');
     const profile = join(root, '.zprofile');
     const first = await readFile(profile, 'utf8');
     expect(first).toContain('export EDITOR=vim\n');
@@ -57,9 +57,34 @@ it.each([
 ].filter(([, executable]) => existsSync(executable)))('makes aow available in a new %s shell', async (_name, executable, options) => {
   await fixture(async ({ install, shell, log }) => {
     expect(install().status).toBe(0);
-    const result = shell(executable, options);
+    const result = shell(executable, options, { PATH: '/usr/bin:/bin' });
     expect(result.stderr).not.toContain('command not found');
     expect(result.status).toBe(0);
+    expect(await readFile(log, 'utf8')).toBe('install\nsetup\nservice\n');
+  });
+});
+
+it.each([
+  ['zsh', '/bin/zsh', ['-f', '-c']],
+  ['bash', '/bin/bash', ['--noprofile', '--norc', '-c']],
+  ...(fish ? [['fish', fish, ['--no-config', '-c']]] : []),
+].filter(([, executable]) => existsSync(executable)))('runs aow in the same %s shell immediately after installation without sourcing a profile', async (_name, executable, options) => {
+  await fixture(async ({ shell, log, root }) => {
+    const result = shell(executable, options, { AOW_TEST_INSTALLER: resolve('scripts/install.sh') }, 'cat "$AOW_TEST_INSTALLER" | /bin/bash && aow service open');
+    expect(result.status, result.stderr).toBe(0);
+    expect(await readFile(log, 'utf8')).toBe('install\nsetup\nservice\n');
+    expect(await readlink(join(root, 'bin/aow'))).toBe(join(root, '.local/bin/aow'));
+  });
+});
+
+it('replaces an older AgentOnWeb npm link on the current PATH', async () => {
+  await fixture(async ({ root, install, shell, log }) => {
+    const legacy = join(root, 'lib/node_modules/@agentonweb/codex-surface/lib');
+    await mkdir(legacy, { recursive: true });
+    await writeFile(join(legacy, 'cli.js'), '#!/bin/sh\nexit 42\n', { mode: 0o700 });
+    await symlink('../lib/node_modules/@agentonweb/codex-surface/lib/cli.js', join(root, 'bin/aow'));
+    expect(install().status).toBe(0);
+    expect(shell('/bin/bash', ['--noprofile', '--norc', '-c']).status).toBe(0);
     expect(await readFile(log, 'utf8')).toBe('install\nsetup\nservice\n');
   });
 });
@@ -86,14 +111,13 @@ it.each([false, true])('configures fish with a custom config directory: %s', asy
     await writeFile(profile, 'set -gx AOW_EXISTING_SETTING preserved\n');
     const result = install(overrides);
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('fish: fish_add_path --path --move "$HOME/.local/bin"');
     const first = await readFile(profile, 'utf8');
     expect(first).toContain('set -gx AOW_EXISTING_SETTING preserved\n');
     expect(install(overrides).status).toBe(0);
     expect(await readFile(profile, 'utf8')).toBe(first);
     if (fish) {
       for (const options of [['-ic'], ['-lic']]) {
-        const opened = shell(fish, options, overrides, 'test "$AOW_EXISTING_SETTING" = preserved && aow service open');
+        const opened = shell(fish, options, { ...overrides, PATH: '/usr/bin:/bin' }, 'test "$AOW_EXISTING_SETTING" = preserved && aow service open');
         expect(opened.status).toBe(0);
       }
     }
@@ -130,17 +154,43 @@ it.each(['.bash_login', '.profile'])('preserves bash login initialization throug
   });
 });
 
-it('prints a command that works in the existing terminal without loading a profile', async () => {
+it('preserves an unrelated command and prints the full path fallback for the existing terminal', async () => {
   await fixture(async ({ root, install, shell }) => {
+    const existing = '#!/bin/sh\nexit 42\n';
+    await writeFile(join(root, 'bin/aow'), existing, { mode: 0o700 });
     const result = install();
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('"$HOME/.local/bin/aow" service open');
+    expect(result.stdout).toContain('"$HOME/.local/bin/aow" service');
     expect(result.stdout).toContain('export PATH="$HOME/.local/bin:$PATH"');
-    // The curl-to-bash child cannot change the parent shell's PATH.
-    expect(shell('/bin/bash', ['--noprofile', '--norc', '-c']).status).toBe(127);
+    expect(await readFile(join(root, 'bin/aow'), 'utf8')).toBe(existing);
+    expect(shell('/bin/bash', ['--noprofile', '--norc', '-c']).status).toBe(42);
     const direct = spawnSync(join(root, '.local/bin/aow'), ['service', 'open'], { input: '', encoding: 'utf8',
       env: { ...process.env, HOME: root, TEST_LOG: join(root, 'calls') } });
     expect(direct.status).toBe(0);
+  });
+});
+
+it.each([false, true])('leaves the npm entry intact when Node is already in ~/.local/bin (symlink directory: %s)', async (alias) => {
+  await fixture(async ({ root, install, shell }) => {
+    await rename(join(root, 'bin/node'), join(root, '.local/bin/node'));
+    if (alias) await symlink('.local/bin', join(root, 'node-bin'));
+    const overrides = { PATH: `${root}/${alias ? 'node-bin' : '.local/bin'}:${root}/bin:/usr/bin:/bin` };
+    const result = install(overrides);
+    expect(result.status).toBe(0);
+    expect(shell('/bin/bash', ['--noprofile', '--norc', '-c'], overrides).status).toBe(0);
+    await expect(readlink(join(root, '.local/bin/aow'))).rejects.toThrow();
+  });
+});
+
+it.skipIf(process.getuid?.() === 0)('uses the full path fallback when the Node directory is read-only', async () => {
+  await fixture(async ({ root, install }) => {
+    await chmod(join(root, 'bin'), 0o500);
+    try {
+      const result = install();
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('"$HOME/.local/bin/aow" service');
+      await expect(access(join(root, 'bin/aow'))).rejects.toThrow();
+    } finally { await chmod(join(root, 'bin'), 0o700); }
   });
 });
 

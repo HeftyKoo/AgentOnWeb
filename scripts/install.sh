@@ -19,9 +19,40 @@ install_agentonweb() {
 
   # A user-owned prefix avoids sudo and leaves npm's global configuration alone.
   aow_prefix="$HOME/.local"
+  aow_original_path="$PATH"
+  aow_node_bin="$(dirname "$(command -v node)")"
   export PATH="$aow_prefix/bin:$PATH"
   echo 'Installing AgentOnWeb terminal…'
-  AOW_SKIP_SETUP=1 npm install --global --prefix "$aow_prefix" --foreground-scripts --no-audit --no-fund '@agentonweb/terminal-host@0.2.0' </dev/null
+  AOW_SKIP_SETUP=1 npm install --global --prefix "$aow_prefix" --foreground-scripts --no-audit --no-fund '@agentonweb/terminal-host@0.2.1' </dev/null
+
+  # A child process cannot export PATH to its parent. Put a convenience link next
+  # to Node when that directory is already on PATH and writable (e.g. nvm/Homebrew).
+  # Never replace another program, and never link ~/.local/bin/aow to itself.
+  aow_link_candidate="$aow_node_bin/aow"
+  aow_can_link=false
+  case "$aow_node_bin" in
+    /*)
+      case ":$aow_original_path:" in
+        *":$aow_node_bin:"*)
+          if [ ! "$aow_node_bin" -ef "$aow_prefix/bin" ] && [ -w "$aow_node_bin" ]; then
+            if [ ! -e "$aow_link_candidate" ] && [ ! -L "$aow_link_candidate" ]; then
+              aow_can_link=true
+            elif [ -L "$aow_link_candidate" ]; then
+              case "$(readlink "$aow_link_candidate")" in
+                "$aow_prefix/bin/aow"|*/lib/node_modules/@agentonweb/terminal-host/lib/cli.js|*/lib/node_modules/@agentonweb/codex-surface/lib/cli.js) aow_can_link=true ;;
+              esac
+            fi
+          fi
+          ;;
+      esac
+      ;;
+  esac
+  if [ "$aow_can_link" = true ]; then
+    if ! ln -sfn "$aow_prefix/bin/aow" "$aow_link_candidate"; then
+      aow_can_link=false
+      echo 'Could not add aow beside Node; use the full command path below.' >&2
+    fi
+  fi
 
   # Make the management command available in both login and interactive shells.
   # Terminal apps may select a shell different from the user's login SHELL.
@@ -62,12 +93,18 @@ install_agentonweb() {
   fi
   echo 'Ready. Open a website in Chrome, click AgentOnWeb, and run codex.'
   echo 'New zsh/bash terminal windows can run aow directly.'
-  echo 'To open the connection page from this already-open terminal, run:'
-  echo '  "$HOME/.local/bin/aow" service open'
-  echo 'To also enable the short command in this terminal:'
-  echo '  zsh/bash: export PATH="$HOME/.local/bin:$PATH"'
-  if [ "$aow_has_fish" = true ]; then
-    echo '  fish: fish_add_path --path --move "$HOME/.local/bin"'
+  aow_current_command="$(PATH="$aow_original_path" command -v aow || true)"
+  if [ "$aow_current_command" = "$aow_prefix/bin/aow" ] || { [ "$aow_can_link" = true ] && [ "$aow_current_command" = "$aow_link_candidate" ]; }; then
+    echo 'This terminal can also run aow now, without sourcing a profile:'
+    echo '  aow service'
+  else
+    echo 'To open the connection page from this already-open terminal, run:'
+    echo '  "$HOME/.local/bin/aow" service'
+    echo 'To also enable the short command in this terminal:'
+    echo '  zsh/bash: export PATH="$HOME/.local/bin:$PATH"'
+    if [ "$aow_has_fish" = true ]; then
+      echo '  fish: fish_add_path --path --move "$HOME/.local/bin"'
+    fi
   fi
 }
 
