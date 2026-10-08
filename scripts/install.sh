@@ -23,7 +23,7 @@ install_agentonweb() {
   aow_node_bin="$(dirname "$(command -v node)")"
   export PATH="$aow_prefix/bin:$PATH"
   echo 'Installing AgentOnWeb terminal…'
-  AOW_SKIP_SETUP=1 npm install --global --prefix "$aow_prefix" --foreground-scripts --no-audit --no-fund '@agentonweb/terminal-host@0.2.1' </dev/null
+  AOW_SKIP_SETUP=1 npm install --global --prefix "$aow_prefix" --foreground-scripts --prefer-online --no-audit --no-fund '@agentonweb/terminal-host@0.2.1' </dev/null
 
   # A child process cannot export PATH to its parent. Put a convenience link next
   # to Node when that directory is already on PATH and writable (e.g. nvm/Homebrew).
