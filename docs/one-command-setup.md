@@ -14,6 +14,8 @@ Use **macOS + Chrome**, with Node.js 22.19+ and Codex installed and signed in.
 
 The installer configures your terminal service, automatic startup, Chrome connection and Codex notifications. It installs the terminal package under `~/.local`, adds its command directory to your shell profile, and preserves existing Codex settings with backups. Run it as your own user, without sudo.
 
+The command works from zsh, bash and fish. The installer configures both login and interactive zsh/bash windows, including editor terminals, and uses fish's own PATH syntax when fish is installed or selected as your login shell. It respects exported `ZDOTDIR` and `XDG_CONFIG_HOME` settings and preserves the Bash login profile you already use.
+
 ## The workspace has not appeared
 
 On a first installation, Chrome connects automatically. Wait briefly and refresh your website. If Chrome previously tried to connect before setup, its next check can take up to five minutes.
@@ -26,7 +28,13 @@ Check the service with:
 aow service status
 ```
 
-To repair configuration, run `aow setup`. If your current Terminal window cannot find `aow`, open a new window or use `~/.local/bin/aow`.
+To repair configuration, run `aow setup`. The installer runs in a child process, so it cannot update the PATH of an already-open terminal. If that window reports `command not found: aow`, open a new window or use the installed command directly:
+
+```sh
+"$HOME/.local/bin/aow" service open
+```
+
+To enable `aow` in the same zsh/bash window, run `export PATH="$HOME/.local/bin:$PATH"`. In fish, run `fish_add_path --path --move "$HOME/.local/bin"`. If setup fails after package installation, the command's PATH configuration is retained and the installer prints `"$HOME/.local/bin/aow" setup` to retry directly. If the direct command also reports that the file does not exist, installation did not create the expected CLI; check the installer's error output before retrying.
 
 ## Codex notifications are missing
 
