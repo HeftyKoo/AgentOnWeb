@@ -8,6 +8,7 @@ import { SafariCookieLeaseManager } from "./safari-cookie-leases.js";
 import { COOKIE_SCOPES_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, isContentRequest, type ContentRequest, type StateUpdate, type SurfaceCommand, type SurfaceViewState } from "./shared.js";
 import { nativeSetup, probeNativeSetup } from "./native-setup.js";
 import { topLevelSite } from "./surface-cookie.js";
+import { commandMode } from "./mode-shortcuts.js";
 
 let state: SurfaceViewState = { mode: "chill", opacity: DEFAULT_SURFACE_OPACITY, connection: "disconnected" };
 let surface: NativeSurface | undefined;
@@ -16,6 +17,7 @@ let broadcastQueued = false;
 let savedPreferences: string | undefined;
 const frameNames = new Map<string, string>();
 const tabRuntimes = new Map<number, string>();
+const modeShortcuts = new Map<number, Map<AgentOnWebMode, { source: "page" | "command"; time: number }>>();
 let surfaces = new Map<string, NativeSurface>();
 const safariSetupVisits = new Map<string, { returnTabId: number; visitTabId: number }>();
 const targetBrowser = import.meta.env.BROWSER ?? "chrome";
@@ -116,7 +118,9 @@ browser.runtime.onMessage.addListener((message: unknown, sender, respond) => {
     await initialized;
     return handleRequest(message, sender.tab);
   }).then(
-    (result) => respond({ ok: true, result }),
+    async (result) => respond({ ok: true, result,
+      ...(message.type === "state.get" ? { modeShortcuts: await readModeShortcuts() } : {}),
+    }),
     (error: unknown) => {
       const text = error instanceof Error ? error.message : String(error);
       patch({ error: text });
@@ -127,10 +131,9 @@ browser.runtime.onMessage.addListener((message: unknown, sender, respond) => {
 });
 browser.commands.onCommand.addListener((command, tab) => {
   initialized.then(async () => {
-    const mode = command === "mode-chill" ? "chill" : command === "mode-focus" ? "focus" : command === "mode-watch" ? "watch" : undefined;
+    const mode = commandMode(command);
     if (!mode) return;
-    setMode(mode);
-    await presentInTab(tab, "surface.show");
+    await applyModeShortcut(mode, tab, "command");
   });
 });
 const toolbarAction = browser.action ?? browser.browserAction;
@@ -149,6 +152,7 @@ toolbarAction.onClicked.addListener((tab) => {
   }).catch((error: unknown) => patch({ error: error instanceof Error ? error.message : String(error) }));
 });
 browser.tabs.onRemoved.addListener((id) => {
+  modeShortcuts.delete(id);
   for (const key of frameNames.keys()) if (key.startsWith(`${id}:`)) frameNames.delete(key);
   tabRuntimes.delete(id);
   if (targetBrowser !== "firefox") (sessionLeases as HeaderLeaseManager).removeTab(id);
@@ -199,11 +203,15 @@ async function handleRequest(request: ContentRequest, tab?: Browser.tabs.Tab): P
       await publication;
       return { ok: true };
     case "state.get": return viewForTab(tab);
+    case "mode.shortcuts.get": return readModeShortcuts();
     case "visibility.set":
       patch({ dismissed: !request.visible });
       await publication;
       return { ok: true };
     case "mode.set": setMode(request.mode); return viewForTab(tab);
+    case "mode.shortcut":
+      await applyModeShortcut(request.mode, tab, "page");
+      return { ok: true };
     case "opacity.set": patch({ opacity: normalizeSurfaceOpacity(request.opacity) }); return viewForTab(tab);
     case "runtime.activate":
     case "runtime.connect":
@@ -268,6 +276,26 @@ async function openApproval(url: string): Promise<void> {
 
 function setMode(mode: AgentOnWebMode): void {
   patch({ mode });
+}
+
+async function readModeShortcuts() {
+  try { return await browser.commands.getAll(); }
+  catch { return []; }
+}
+
+async function applyModeShortcut(mode: AgentOnWebMode, tab: Browser.tabs.Tab | undefined, source: "page" | "command"): Promise<void> {
+  const target = tab ?? (await browser.tabs.query({ active: true, lastFocusedWindow: true }))[0];
+  if (target?.id === undefined || !target.url || !topLevelSite(target.url)) return;
+  const recent = modeShortcuts.get(target.id) ?? new Map();
+  const previous = recent.get(mode);
+  const time = performance.now();
+  // A single physical key may arrive through both APIs, in either order.
+  // Preserve distinct mode choices, other tabs, and repeated same-path presses.
+  if (previous && previous.source !== source && time - previous.time < 250) return;
+  recent.set(mode, { source, time });
+  modeShortcuts.set(target.id, recent);
+  setMode(mode);
+  await presentInTab(target, "surface.show");
 }
 
 async function presentInTab(tab: Browser.tabs.Tab | undefined, type: SurfaceCommand["type"]): Promise<boolean> {
