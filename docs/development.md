@@ -18,6 +18,8 @@ After `pnpm install`, build and load the extension for your browser:
 
 Chrome uses **Developer mode → Load unpacked** in `chrome://extensions`; select the output folder. Firefox uses **Load Temporary Add-on** in `about:debugging#/runtime/this-firefox`; select the output's `manifest.json`. Safari uses **Add Temporary Extension** with developer features enabled. See the [Safari build guide](../apps/safari/README.md) for its containing app.
 
+Arc can deliver Control+1/2/3 to a webpage without dispatching the extension's mode commands. The content script falls back to the default mode keys on non-editable HTTP(S) pages, including when the workspace is dismissed. It reads current command bindings at page load and when the page regains focus; clearing or remapping a mode command disables its default page fallback. Both keyboard paths pass through the background, which coalesces the same mode from opposite paths in the same tab within 250 ms. No Global shortcut scope is required for this fallback. Browser-owned shortcuts that never reach the page, website editors, and native workspace iframes still rely on browser commands. Reload the extension and the test webpage when checking a new build.
+
 For terminal development, build `pnpm --filter @agentonweb/terminal-host build`, then run `node packages/terminal-host/lib/cli.js terminal`. Only one terminal host can own your user state directory at a time; a running installed service already owns it. See the local terminal guide before stopping or upgrading a service with live shells.
 
 For DSH plugin development, `pnpm install:dsh-surface` builds and installs the checkout into DSH's Web profile; then restart `dsh web`.
