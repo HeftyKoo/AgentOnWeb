@@ -1,4 +1,5 @@
-import { OptionTapTracker, isSurfaceShortcut } from "@agentonweb/connector-contract";
+import { OptionTapTracker, isMacPlatform, isSurfaceShortcut } from "@agentonweb/connector-contract";
+import { hasDefaultModeShortcut, type ModeShortcutBinding } from "./mode-shortcuts.js";
 import { createDock } from "./dock.js";
 import { browser } from "./browser-api.js";
 import { DEFAULT_SURFACE_OPACITY, DoubleTapLatch } from "./interaction.js";
@@ -32,8 +33,12 @@ if (!document.getElementById(HOST_ID)) {
   frame.title = "Native coding workspace";
   frame.allow = "clipboard-read; clipboard-write";
   const setup = createSetup();
-  const dock = createDock({ runtimeShortcutEnabled: () =>
-    visible && !host.hidden && !!state.surface && state.mode !== "watch" && !sitePassActive,
+  let modeShortcuts: readonly ModeShortcutBinding[] = [];
+  let modeShortcutsRevision = 0;
+  const dock = createDock({
+    localModeShortcuts: mode => hasDefaultModeShortcut(modeShortcuts, mode, isMacPlatform()),
+    runtimeShortcutEnabled: () =>
+      visible && !host.hidden && !!state.surface && state.mode !== "watch" && !sitePassActive,
   });
   const passLabel = document.createElement("div");
   passLabel.className = "site-pass-label";
@@ -94,6 +99,9 @@ if (!document.getElementById(HOST_ID)) {
     setVisible(true);
     send({ source: "agentonweb-content", type: "mode.set", mode });
   };
+  // The background owns both keyboard paths, including deduplication and the
+  // explicit reveal of this tab. Mode buttons keep their existing direct path.
+  dock.onModeShortcut = mode => send({ source: "agentonweb-content", type: "mode.shortcut", mode });
   dock.onOpacity = (opacity) => {
     host.style.setProperty("--agentonweb-surface-opacity", String(opacity));
     postOpacity(opacity);
@@ -320,9 +328,21 @@ if (!document.getElementById(HOST_ID)) {
     if (optionTap.keyup(event)) handleOptionTap();
   }, true);
   window.addEventListener("blur", () => optionTap.reset());
+  // Returning from extension shortcut settings refreshes remaps and removals.
+  window.addEventListener("focus", () => {
+    const revision = ++modeShortcutsRevision;
+    modeShortcuts = [];
+    browser.runtime.sendMessage({ source: "agentonweb-content", type: "mode.shortcuts.get" } satisfies ContentRequest)
+      .then((response: { ok?: boolean; result?: ModeShortcutBinding[] } | undefined) => {
+        if (revision !== modeShortcutsRevision) return;
+        modeShortcuts = response?.ok && Array.isArray(response.result) ? response.result : [];
+      }).catch(() => { if (revision === modeShortcutsRevision) modeShortcuts = []; });
+  });
 
   browser.runtime.sendMessage({ source: "agentonweb-content", type: "state.get" } satisfies ContentRequest)
-    .then((response: { ok?: boolean; result?: SurfaceViewState } | undefined) => {
+    .then((response: { ok?: boolean; result?: SurfaceViewState; modeShortcuts?: ModeShortcutBinding[] } | undefined) => {
+      if (modeShortcutsRevision === 0)
+        modeShortcuts = response?.ok && Array.isArray(response.modeShortcuts) ? response.modeShortcuts : [];
       // A slow initial snapshot must not overwrite a newer explicit open/update.
       if (response?.result && !receivedUpdate) {
         visible = response.result.dismissed !== true;

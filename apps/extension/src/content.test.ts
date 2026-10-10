@@ -3,6 +3,7 @@ import { build } from "esbuild";
 import { JSDOM } from "jsdom";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ContentRequest, StateUpdate, SurfaceCommand, SurfaceViewState } from "./shared.js";
+import type { ModeShortcutBinding } from "./mode-shortcuts.js";
 
 let source: string;
 const pages: JSDOM[] = [];
@@ -42,14 +43,19 @@ afterEach(() => {
 async function page(
   initial = idle,
   url = "https://example.org/",
-  initialReply?: Promise<{ ok: boolean; result: SurfaceViewState }>,
+  initialReply?: Promise<{ ok: boolean; result: SurfaceViewState; modeShortcuts?: ModeShortcutBinding[] }>,
   onRequest?: (request: ContentRequest) => void,
+  options: { platform?: string; modeShortcuts?: ModeShortcutBinding[] } = {},
 ) {
   // No external resources are loaded. Only our bundled content script executes.
   const dom = new JSDOM('<button id="website-control">Website control</button>', { url, runScripts: "outside-only" });
   pages.push(dom);
   const { window } = dom;
   const { document } = window;
+  Object.defineProperty(window.navigator, "platform", { value: options.platform ?? "Win32" });
+  const modeShortcuts = options.modeShortcuts ?? ["chill", "focus", "watch"].map((mode, index) => ({
+    name: `mode-${mode}`, shortcut: `${options.platform === "MacIntel" ? "Ctrl" : "Alt"}+${index + 1}`,
+  }));
   const createdFrames: HTMLIFrameElement[] = [];
   const createElement = document.createElement.bind(document);
   vi.spyOn(document, "createElement").mockImplementation(((name: string, options?: ElementCreationOptions) => {
@@ -68,7 +74,8 @@ async function page(
   let receive!: (message: StateUpdate | SurfaceCommand) => void;
   const sendMessage = vi.fn(async (request: ContentRequest) => {
     onRequest?.(request);
-    return initialReply ?? { ok: true, result: initial };
+    if (request.type === "mode.shortcuts.get") return { ok: true, result: modeShortcuts };
+    return initialReply ?? { ok: true, result: initial, modeShortcuts };
   });
   Object.assign(window, {
     chrome: {
@@ -485,7 +492,22 @@ describe("page-local AgentOnWeb visibility", () => {
     expect(dock.dataset.expanded).toBe("false");
   });
 
-  it("leaves mode keys and inactive or editable website shortcuts alone", async () => {
+  it("switches modes from macOS page keys when browser commands are not dispatched", async () => {
+    const p = await page({ ...connected, dismissed: true }, undefined, undefined, undefined, { platform: "MacIntel" });
+    p.sendMessage.mockClear();
+    for (const [code, mode] of [["Digit1", "chill"], ["Digit2", "focus"], ["Digit3", "watch"]] as const) {
+      const event = new p.window.KeyboardEvent("keydown", { code, ctrlKey: true, bubbles: true, cancelable: true });
+      p.websiteControl.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(p.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "mode.shortcut", mode }));
+    }
+    expect(p.sendMessage.mock.calls.filter(([request]) => request.type === "mode.shortcut")).toHaveLength(3);
+    p.emit("surface.show", { ...connected, mode: "watch" });
+    expect(p.host.dataset.mode).toBe("watch");
+    expect(p.shadow.querySelector<HTMLElement>(".agentonweb-root")!.dataset.active).toBe("true");
+  });
+
+  it("leaves editable website shortcuts and inactive runtime shortcuts alone", async () => {
     const state = { ...connected, runtimeId: "terminal", runtimes: [
       { id: "terminal", displayName: "Terminal" }, { id: "deepseek-harness", displayName: "DSH" },
     ] };
@@ -496,10 +518,9 @@ describe("page-local AgentOnWeb visibility", () => {
       return event;
     };
     p.sendMessage.mockClear();
-    for (const code of ["Digit1", "Digit2", "Digit3"]) expect(key(code).defaultPrevented).toBe(false);
-    expect(p.sendMessage).not.toHaveBeenCalled();
     const input = p.window.document.createElement("textarea");
     p.window.document.body.append(input);
+    for (const code of ["Digit1", "Digit2", "Digit3"]) expect(key(code, input).defaultPrevented).toBe(false);
     expect(key("Backquote", input).defaultPrevented).toBe(false);
     p.emit("state.update", { ...state, mode: "watch" });
     expect(key("Backquote").defaultPrevented).toBe(false);
@@ -514,15 +535,68 @@ describe("page-local AgentOnWeb visibility", () => {
     expect(p.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "runtime.activate", runtimeId: "deepseek-harness" }));
   });
 
-  it("does not install a mode-key fallback when the workspace is dismissed or unconnected", async () => {
+  it("can reopen a dismissed, unconnected workspace with a mode key while runtime switching stays inactive", async () => {
     const p = await page({ ...idle, dismissed: true });
     p.sendMessage.mockClear();
-    for (const code of ["Digit1", "Digit2", "Digit3", "Backquote"]) {
+    for (const code of ["Digit1", "Digit2", "Digit3"]) {
       const event = new p.window.KeyboardEvent("keydown", { code, altKey: true, bubbles: true, cancelable: true });
       p.websiteControl.dispatchEvent(event);
-      expect(event.defaultPrevented).toBe(false);
+      expect(event.defaultPrevented).toBe(true);
     }
+    expect(p.sendMessage.mock.calls.filter(([request]) => request.type === "mode.shortcut")).toHaveLength(3);
+    p.sendMessage.mockClear();
+    const event = new p.window.KeyboardEvent("keydown", { code: "Backquote", altKey: true, bubbles: true, cancelable: true });
+    p.websiteControl.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
     expect(p.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("honors remapped/cleared mode bindings and refreshes them after shortcut settings", async () => {
+    const bindings = [
+      { name: "mode-chill", shortcut: "" },
+      { name: "mode-focus", shortcut: "Ctrl+Shift+2" },
+      { name: "mode-watch", shortcut: "Ctrl+3" },
+    ];
+    const p = await page(connected, undefined, undefined, undefined, { platform: "MacIntel", modeShortcuts: bindings });
+    const press = (code: string, fields: KeyboardEventInit = {}) => {
+      const event = new p.window.KeyboardEvent("keydown", { code, ctrlKey: true, bubbles: true, cancelable: true, ...fields });
+      p.websiteControl.dispatchEvent(event);
+      return event;
+    };
+    p.sendMessage.mockClear();
+    expect(press("Digit1").defaultPrevented).toBe(false);
+    expect(press("Digit2").defaultPrevented).toBe(false);
+    expect(press("Digit3", { shiftKey: true }).defaultPrevented).toBe(false);
+    expect(press("Digit3", { isComposing: true }).defaultPrevented).toBe(false);
+    expect(p.sendMessage).not.toHaveBeenCalled();
+    expect(press("Digit3", { repeat: true }).defaultPrevented).toBe(true);
+    expect(p.sendMessage).not.toHaveBeenCalled();
+    expect(press("Digit3").defaultPrevented).toBe(true);
+    expect(p.sendMessage).toHaveBeenCalledExactlyOnceWith({ source: "agentonweb-content", type: "mode.shortcut", mode: "watch" });
+    p.sendMessage.mockClear();
+    bindings[2]!.shortcut = "";
+    p.window.dispatchEvent(new p.window.Event("focus"));
+    await Promise.resolve();
+    p.sendMessage.mockClear();
+    expect(press("Digit3").defaultPrevented).toBe(false);
+    expect(p.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("does not overwrite a refreshed shortcut binding with a delayed initial snapshot", async () => {
+    let reply!: (value: { ok: boolean; result: SurfaceViewState; modeShortcuts: ModeShortcutBinding[] }) => void;
+    const initialReply = new Promise<{ ok: boolean; result: SurfaceViewState; modeShortcuts: ModeShortcutBinding[] }>(resolve => { reply = resolve; });
+    const p = await page(connected, undefined, initialReply);
+    p.emit("state.update", connected);
+    p.window.dispatchEvent(new p.window.Event("focus"));
+    await Promise.resolve();
+    reply({ ok: true, result: connected, modeShortcuts: [] });
+    await Promise.resolve();
+    await Promise.resolve();
+    p.sendMessage.mockClear();
+    const event = new p.window.KeyboardEvent("keydown", { code: "Digit2", altKey: true, bubbles: true, cancelable: true });
+    p.websiteControl.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(p.sendMessage).toHaveBeenCalledExactlyOnceWith({ source: "agentonweb-content", type: "mode.shortcut", mode: "focus" });
   });
 
   it("collapses runtime choices and keeps the current trigger stable across updates", async () => {
