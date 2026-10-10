@@ -1,5 +1,12 @@
 # Changelog
 
+## Extension 0.2.1 — 2026-10-10
+
+- Restore default mode shortcuts on ordinary webpages in Arc when browser extension commands are not dispatched. Respect cleared and remapped bindings, and leave editable webpage controls to the browser and website.
+- Coalesce page and browser-command events for the same tab and mode so one physical shortcut does not switch modes twice.
+- Browser-owned shortcuts and native workspace iframes still depend on browser commands. Arc Control+2 may switch Spaces; Chrome mode shortcuts work in both webpages and terminal iframes.
+- This patch updates the browser extension only. Local terminal and DSH packages retain their independent versions; no service reinstall is required.
+
 ## Terminal host 0.2.1 — 2026-10-08
 
 - Make `aow service` open the private connection page by default, add service help, and report usage/setup errors without a Node stack trace.

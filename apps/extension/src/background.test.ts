@@ -31,7 +31,11 @@ function createChrome() {
   return {
     runtime: { id: "extension-test", onMessage: event() },
     permissions: { request: vi.fn(async () => true), contains: vi.fn(async () => true) },
-    commands: { onCommand: event() }, action: { onClicked: event() },
+    commands: { onCommand: event(), getAll: vi.fn(async () => [
+      { name: "mode-chill", shortcut: "Ctrl+1" },
+      { name: "mode-focus", shortcut: "Ctrl+2" },
+      { name: "mode-watch", shortcut: "Ctrl+3" },
+    ]) }, action: { onClicked: event() },
     alarms: { create: vi.fn(async () => {}), onAlarm: event() },
     tabs: { query: vi.fn(async () => [tab]), sendMessage: vi.fn(async (_id: number, _message: StateUpdate | SurfaceCommand) => {}), onRemoved: event(), onActivated: event(),
       update: vi.fn(async () => {}), create: vi.fn(async () => {}) },
@@ -129,6 +133,74 @@ describe("cross-browser native connection lifecycle", () => {
     expect(commands[0]![0]).toBe(otherTab.id);
     expect((await message("state.get")).result.mode).toBe("watch");
     expect(transport.connect).not.toHaveBeenCalled();
+  });
+
+  it("returns current mode bindings on initial state and explicit refresh without persisting them", async () => {
+    await boot();
+    expect((await message("state.get")).modeShortcuts).toEqual(await chromeMock.commands.getAll());
+    chromeMock.commands.getAll.mockResolvedValue([{ name: "mode-focus", shortcut: "" }]);
+    expect((await message("mode.shortcuts.get")).result).toEqual([{ name: "mode-focus", shortcut: "" }]);
+    expect(JSON.stringify(data[STATE_STORAGE_KEY])).not.toContain("shortcut");
+  });
+
+  it.each(["page", "command"])("deduplicates page and command mode shortcuts when %s arrives first", async (first) => {
+    await boot();
+    chromeMock.tabs.sendMessage.mockClear();
+    const onCommand = chromeMock.commands.onCommand.addListener.mock.calls[0]![0];
+    const shows = () => chromeMock.tabs.sendMessage.mock.calls.filter(([, message]) => message.type === "surface.show");
+    const pageKey = () => message("mode.shortcut", undefined, { mode: "focus" });
+    if (first === "page") await pageKey();
+    else {
+      onCommand("mode-focus", tab);
+      await vi.waitFor(() => expect(shows()).toHaveLength(1));
+    }
+    if (first === "page") onCommand("mode-focus", tab);
+    else await pageKey();
+    // Drain command callbacks and state publication before counting both paths.
+    await message("state.get");
+    expect(shows()).toHaveLength(1);
+    expect(shows()[0]![0]).toBe(tab.id);
+    expect((await message("state.get")).result.mode).toBe("focus");
+  });
+
+  it("keeps different tabs, different modes and later shortcut presses independent", async () => {
+    await boot();
+    let time = 1_000;
+    vi.spyOn(performance, "now").mockImplementation(() => time);
+    chromeMock.tabs.sendMessage.mockClear();
+    const onCommand = chromeMock.commands.onCommand.addListener.mock.calls[0]![0];
+    const shows = () => chromeMock.tabs.sendMessage.mock.calls.filter(([, message]) => message.type === "surface.show");
+    await message("mode.shortcut", undefined, { mode: "focus" });
+    onCommand("mode-focus", { ...tab, id: 2 });
+    await vi.waitFor(() => expect(shows()).toHaveLength(2));
+    onCommand("mode-watch", tab);
+    await vi.waitFor(() => expect(shows()).toHaveLength(3));
+    await message("mode.shortcut", undefined, { mode: "watch" });
+    expect(shows()).toHaveLength(3);
+    time += 251;
+    await message("mode.shortcut", undefined, { mode: "watch" });
+    expect(shows()).toHaveLength(4);
+    // Mode buttons must work even within the keyboard deduplication interval.
+    await message("mode.set", undefined, { mode: "chill" });
+    expect((await message("state.get")).result.mode).toBe("chill");
+    vi.restoreAllMocks();
+  });
+
+  it("uses the active tab when a browser command omits its tab argument", async () => {
+    await boot();
+    chromeMock.tabs.sendMessage.mockClear();
+    chromeMock.commands.onCommand.addListener.mock.calls[0]![0]("mode-focus");
+    await vi.waitFor(() => expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(tab.id, expect.objectContaining({ type: "surface.show" })));
+    await message("mode.shortcut", undefined, { mode: "focus" });
+    expect(chromeMock.tabs.sendMessage.mock.calls.filter(([, message]) => message.type === "surface.show")).toHaveLength(1);
+  });
+
+  it("does not let a delayed duplicate of an earlier key reverse a newer mode", async () => {
+    await boot();
+    await message("mode.shortcut", undefined, { mode: "focus" });
+    await message("mode.shortcut", undefined, { mode: "watch" });
+    chromeMock.commands.onCommand.addListener.mock.calls[0]![0]("mode-focus", tab);
+    expect((await message("state.get")).result.mode).toBe("watch");
   });
 
   it("ignores toolbar actions on restricted browser pages", async () => {

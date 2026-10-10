@@ -25,6 +25,7 @@ export interface SurfaceDock {
   onDiscover: () => void;
   onRuntime: (runtimeId: string) => void;
   onMode: (mode: AgentOnWebMode) => void;
+  onModeShortcut: (mode: AgentOnWebMode) => void;
   onOpacityPreview: (opacity: number) => void;
   onOpacity: (opacity: number) => void;
   shortcut: (action: SurfaceShortcut) => void;
@@ -34,7 +35,7 @@ export interface SurfaceDock {
 }
 
 export function createDock(options: {
-  localModeShortcuts?: boolean;
+  localModeShortcuts?: boolean | ((mode: AgentOnWebMode) => boolean);
   runtimeShortcutEnabled?: () => boolean;
 } = {}): SurfaceDock {
   const mac = isMacPlatform();
@@ -154,6 +155,7 @@ export function createDock(options: {
   const api: SurfaceDock = {
     element,
     onSession: () => {}, onAttentionRead: () => {}, onDiscover: () => {}, onRuntime: () => {}, onMode: () => {}, onOpacityPreview: () => {}, onOpacity: () => {},
+    onModeShortcut: mode => api.onMode(mode),
     shortcut(action) {
       if (action !== "runtime.toggle") { api.onMode(action); return; }
       const nextId = nextRuntimeId(runtimeIds.map(id => ({ id })), currentRuntimeId);
@@ -207,9 +209,10 @@ export function createDock(options: {
     if (!element.isConnected || (root instanceof ShadowRoot && (root.host as HTMLElement).hidden)) return;
     const action = surfaceShortcut(event);
     if (action === undefined || event.defaultPrevented) return;
-    // Production mode keys belong exclusively to browser.commands, including
-    // user remaps. Only the standalone preview/demo need a local fallback.
-    if (action !== "runtime.toggle" && !options.localModeShortcuts) return;
+    // Fall back only while the corresponding default command is still bound.
+    // Remapped and cleared commands remain owned by browser.commands.
+    if (action !== "runtime.toggle" && !(typeof options.localModeShortcuts === "function"
+      ? options.localModeShortcuts(action) : options.localModeShortcuts)) return;
     if (action === "runtime.toggle" && !expanded && !options.runtimeShortcutEnabled?.()) return;
     // Keep website editors' own shortcuts intact. Native workspace iframes
     // forward the one explicitly reserved runtime switch separately.
@@ -217,7 +220,10 @@ export function createDock(options: {
       (target.matches("input, textarea, select, [role=textbox]") || target.isContentEditable))) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (!event.repeat) api.shortcut(action);
+    if (!event.repeat) {
+      if (action === "runtime.toggle") api.shortcut(action);
+      else api.onModeShortcut(action);
+    }
   }, true);
   api.setExpanded(false);
   return api;
