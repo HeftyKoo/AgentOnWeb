@@ -19,6 +19,8 @@ codex
 
 For notifications, review and trust **AgentOnWeb session status** in Codex `/hooks`, then start a new Codex session. Your existing Codex settings are preserved.
 
+The installer configures zsh, bash and detected fish installations. It also links `aow` into Node's command directory when that directory is already on PATH and writable, so the current terminal can use it without sourcing a profile. If another program owns that command or the directory is protected, use `"$HOME/.local/bin/aow" service` directly.
+
 ## Terminal controls
 
 - **+** opens another independent local shell (up to eight). The selector switches between shells without stopping their processes.
@@ -36,7 +38,9 @@ Closing the overlay or a browser tab does not stop the shell. Logging out, reboo
 ## Service management
 
 ```sh
-aow service open       # Reopen the private browser setup/connection-management page
+aow service            # Reopen the private browser setup/connection-management page
+aow service open       # Explicit form of the same command
+aow service --help
 aow service status
 aow service uninstall  # Stop the service and remove automatic startup
 ```

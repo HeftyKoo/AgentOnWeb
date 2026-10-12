@@ -18,6 +18,10 @@ jobs:
           node-version: 22.19.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install shells for installer tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends zsh fish
       - run: pnpm release:audit
       - uses: actions/upload-artifact@v4
         with:
