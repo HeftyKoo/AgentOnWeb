@@ -124,6 +124,26 @@ async function page(
 }
 
 describe("page-local AgentOnWeb visibility", () => {
+  it("keeps the active iframe visible and focused across status and presentation updates", async () => {
+    const p = await page(connected);
+    p.frame.focus();
+    const context = p.frame.contentWindow;
+    // JSDOM does not blur hidden iframes. Catch the transient hidden=true that
+    // clears the native terminal textarea's focus in a real browser.
+    const hidden = vi.spyOn(p.frame, "hidden", "set");
+    for (const state of [connected, { ...connected, agentSessions: [] },
+      { ...connected, opacity: 0.7 }, { ...connected, mode: "focus" as const }]) {
+      p.emit("state.update", state);
+      expect(hidden).not.toHaveBeenCalledWith(true);
+      expect(p.shadow.activeElement).toBe(p.frame);
+      expect(p.frame.contentWindow).toBe(context);
+    }
+    p.emit("surface.show", { ...connected, mode: "focus" });
+    expect(hidden).not.toHaveBeenCalledWith(true);
+    p.emit("state.update", { ...connected, mode: "watch" });
+    expect(p.frame.hidden).toBe(true);
+  });
+
   it("refreshes a wrapper's lost authorization after worker restart and rejects forged retry messages", async () => {
     const ui = await page(connected);
     const recovered = { ...connected, surface: { ...connected.surface!, frameName: 'agentonweb:fresh-nonce' } };
