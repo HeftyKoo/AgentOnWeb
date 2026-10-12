@@ -21,6 +21,8 @@ const built = await buildExtension({ browser: "safari" });
 const resources = resolve(root, "apps/safari/AgentOnWeb/AgentOnWeb Extension/Resources");
 await rm(resources, { recursive: true, force: true });
 await cp(built, resources, { recursive: true });
+// Xcode references this resource folder even when WXT inlines every asset.
+await mkdir(resolve(resources, "assets"), { recursive: true });
 const manifest = JSON.parse(await readFile(resolve(resources, "manifest.json"), "utf8"));
 if (manifest.version !== contract.extensionVersion || manifest.manifest_version !== 2) {
   throw new Error("Unexpected Safari manifest version.");
