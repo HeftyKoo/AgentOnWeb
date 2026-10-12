@@ -133,7 +133,9 @@ if (!document.getElementById(HOST_ID)) {
   const render = (next: SurfaceViewState) => {
     state = next;
     for (const [id, saved] of frames) {
-      saved.hidden = true;
+      // Hiding a focused iframe clears its native input focus, even if it is
+      // shown again in the same render. Only hide inactive workspaces.
+      saved.hidden = !visible || state.mode === "watch" || id !== state.surface?.runtimeId;
       if (state.surfaces && !state.surfaces.some(item => item.runtimeId === id)) { saved.remove(); frames.delete(id); }
     }
     host.dataset.mode = state.mode;

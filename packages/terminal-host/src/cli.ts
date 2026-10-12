@@ -15,8 +15,10 @@ import { serviceCommand, serviceDirectory } from "./service.js";
 import { setup, uninstall } from "./setup.js";
 import { runNativeHost, nativeOrigins } from "./native-bridge.js";
 import { AgentSessions } from "./agent-sessions.js";
-import { installCodexHooks, uninstallCodexHooks, reportCodexEvent, reportCodexInput } from "./codex-hooks.js";
+import { installCodexHooks, uninstallCodexHooks, reportCodexInput } from "./codex-hooks.js";
 import { completionEvent, forwardNotification } from "./codex-notify.js";
+import { installClaudeHooks, uninstallClaudeHooks } from "./claude-hooks.js";
+import { reportAgentEvent } from "./agent-events.js";
 import type { NativeSurface } from "@agentonweb/connector-contract";
 
 const inputArgs = process.argv.slice(2);
@@ -42,7 +44,17 @@ if (inputArgs[0] === "agent-notify") {
   process.exit(0);
 }
 if (inputArgs[0] === "agent-event") {
-  await reportCodexEvent().catch(() => {});
+  if (inputArgs.length === 1 || inputArgs.length === 2 && inputArgs[1] === "claude-code")
+    await reportAgentEvent(inputArgs[1] === "claude-code" ? "claude-code" : "codex").catch(() => {});
+  process.exit(0);
+}
+if (inputArgs[0] === "claude-hooks" && inputArgs[1] === "install" && inputArgs.length === 2) {
+  console.log(`Installed observational hooks: ${await installClaudeHooks()}\nReview AgentOnWeb session status in Claude Code /hooks, then start a new Claude Code session inside an AgentOnWeb terminal.`);
+  process.exit(0);
+}
+if (inputArgs[0] === "claude-hooks" && inputArgs[1] === "uninstall" && inputArgs.length === 2) {
+  await uninstallClaudeHooks();
+  console.log("AgentOnWeb Claude Code hooks removed; other settings preserved.");
   process.exit(0);
 }
 if (inputArgs[0] === "codex-hooks" && inputArgs[1] === "install") {
@@ -65,7 +77,7 @@ if (inputArgs[0] === "service") {
 }
 if (inputArgs.length === 1 && inputArgs[0] === "--help") {
   console.log(
-    "Usage: aow setup | aow uninstall | aow terminal | aow codex-hooks install|uninstall | aow service [open|install|status|uninstall] (default: open)",
+    "Usage: aow setup | aow uninstall | aow terminal | aow codex-hooks install|uninstall | aow claude-hooks install|uninstall | aow service [open|install|status|uninstall] (default: open)",
   );
   process.exit(0);
 }

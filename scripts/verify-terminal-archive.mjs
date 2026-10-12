@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn, execFile } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -19,10 +19,11 @@ export async function verifyTerminalArchive(archive, root) {
     const listing = (await execute('tar', ['-tf', archive])).stdout.trim().split('\n').sort();
     assert.deepEqual(listing, [
       'package/LICENSE', 'package/README.md', 'package/package.json', 'package/postinstall.mjs', 'package/fix-pty-permissions.mjs',
-      'package/lib/cli.js', 'package/lib/public/index.html', 'package/lib/public/main.js', 'package/lib/public/main.css',
+      'package/lib/cli.js', 'package/lib/agent-hook.js', 'package/lib/public/index.html', 'package/lib/public/main.js', 'package/lib/public/main.css',
     ].sort(), 'Unexpected terminal archive contents');
     await execute('npm', ['install', '--prefix', directory, '--omit=dev', '--no-package-lock', '--no-audit', '--no-fund', archive], { timeout: 120000, maxBuffer: 4 * 1024 * 1024 });
     const installed = resolve(directory, 'node_modules/@agentonweb/terminal-host');
+    const bin = resolve(directory, 'node_modules/.bin/aow');
     assert.equal(await readFile(resolve(installed, 'README.md'), 'utf8'), await readFile(resolve(root, 'packages/terminal-host/README.md'), 'utf8'));
     const entry = resolve(installed, 'lib/cli.js');
     assert.match((await execute(process.execPath, [entry, '--help'], { cwd: directory })).stdout, /aow terminal/);
@@ -34,6 +35,24 @@ export async function verifyTerminalArchive(archive, root) {
     });
     const home = resolve(directory, 'home');
     await mkdir(home);
+    const claudeDirectory = resolve(home, '.claude');
+    await mkdir(claudeDirectory);
+    const settingsPath = resolve(claudeDirectory, 'settings.json');
+    const settings = { model: 'user-model', permissions: { ask: ['Bash'] }, hooks: { Stop: [{ hooks: [{ type: 'command', command: 'user-stop-hook' }] }] } };
+    await writeFile(settingsPath, JSON.stringify(settings));
+    const hookEnv = { ...process.env, CLAUDE_CONFIG_DIR: claudeDirectory };
+    await execute(process.execPath, [bin, 'claude-hooks', 'install'], { cwd: directory, env: hookEnv });
+    const configured = await readFile(settingsPath, 'utf8');
+    const hook = JSON.parse(configured).hooks.Stop.at(-1).hooks[0];
+    assert.equal(hook.command, process.execPath);
+    assert.deepEqual(hook.args, [await realpath(resolve(installed, 'lib/agent-hook.js')), 'claude-code'], 'Installed hooks must target the shipped lightweight reporter without a shell');
+    await execute(hook.command, hook.args, {
+      cwd: directory, env: { ...hookEnv, AOW_AGENT_ENDPOINT: '', AOW_AGENT_TOKEN: '' }, timeout: 5000,
+    });
+    await execute(process.execPath, [bin, 'claude-hooks', 'install'], { cwd: directory, env: hookEnv });
+    assert.equal(await readFile(settingsPath, 'utf8'), configured);
+    await execute(process.execPath, [bin, 'claude-hooks', 'uninstall'], { cwd: directory, env: hookEnv });
+    assert.deepEqual(JSON.parse(await readFile(settingsPath, 'utf8')), settings);
     // The smoke test does not change service state or user startup files.
     host = spawn(process.execPath, [entry, 'terminal'], {
       cwd: directory, env: { ...process.env, HOME: home, SHELL: '/bin/sh', ENV: undefined, BASH_ENV: undefined, ZDOTDIR: undefined }, stdio: ['ignore', 'pipe', 'pipe'],
@@ -84,7 +103,7 @@ export async function verifyTerminalArchive(archive, root) {
       }
     });
     await waitFor(() => { if (socketError) throw socketError; return text.includes('AOW_PACKED_SHELL_OK'); });
-    console.log('Packed terminal host passed: isolated production install, browser assets and real shell input/output.');
+    console.log('Packed terminal host passed: isolated production install, Claude hook install/uninstall, lightweight reporter, browser assets and real shell input/output.');
   } finally {
     socket?.terminate();
     if (host && host.exitCode === null && host.signalCode === null) {
