@@ -26,9 +26,15 @@ export async function verifyTerminalArchive(archive, root) {
     assert.equal(await readFile(resolve(installed, 'README.md'), 'utf8'), await readFile(resolve(root, 'packages/terminal-host/README.md'), 'utf8'));
     const entry = resolve(installed, 'lib/cli.js');
     assert.match((await execute(process.execPath, [entry, '--help'], { cwd: directory })).stdout, /aow terminal/);
+    assert.match((await execute(process.execPath, [entry, 'service', '--help'], { cwd: directory })).stdout, /default: open/);
+    await assert.rejects(execute(process.execPath, [entry, 'service', 'unknown'], { cwd: directory }), error => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /^aow: Usage: aow service [^\n]+\n$/);
+      return true;
+    });
     const home = resolve(directory, 'home');
     await mkdir(home);
-    // No service commands or user startup files are used by this smoke test.
+    // The smoke test does not change service state or user startup files.
     host = spawn(process.execPath, [entry, 'terminal'], {
       cwd: directory, env: { ...process.env, HOME: home, SHELL: '/bin/sh', ENV: undefined, BASH_ENV: undefined, ZDOTDIR: undefined }, stdio: ['ignore', 'pipe', 'pipe'],
     });

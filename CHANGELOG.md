@@ -7,6 +7,13 @@
 - Browser-owned shortcuts and native workspace iframes still depend on browser commands. Arc Control+2 may switch Spaces; Chrome mode shortcuts work in both webpages and terminal iframes.
 - This patch updates the browser extension only. Local terminal and DSH packages retain their independent versions; no service reinstall is required.
 
+## Terminal host 0.2.1 — 2026-10-08
+
+- Make `aow service` open the private connection page by default, add service help, and report usage/setup errors without a Node stack trace.
+- Make `aow` available in the current terminal without sourcing a profile when Node's command directory is writable and on PATH. Update older AgentOnWeb npm links while preserving unrelated commands, and keep zsh/bash/fish startup configuration for future terminals.
+- Pin the public installer to terminal-host 0.2.1. The extension and DSH plugin remain at 0.2.0 with connector protocol 1.
+- Refresh npm metadata during installation so a cached older version index cannot hide the newly published package.
+
 ## 0.2.0 — 2026-09-29
 
 - Run real local login shells in the browser, with up to eight terminal tabs, directory-based names, shared renaming, clipboard integration and reconnectable views. Connected views share input; only the focused view changes terminal dimensions.
