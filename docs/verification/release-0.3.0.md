@@ -20,6 +20,9 @@ package versions are 0.3.0; connector protocol remains 1. Safari uses build 8.
 - The extension content suite includes focus-preservation regression coverage.
   It detects transient iframe hiding; JSDOM does not reproduce native browser
   focus loss itself.
+- Safari preparation and the signed 0.3.0/build 8 Xcode archive passed. Preparation
+  now creates the resource folder Xcode requires even when WXT inlines all assets.
+  Export, upload, App Store processing and review remain separate checks.
 
 The extension release workflow additionally packages Firefox and the exact
 tracked source with `AMO-BUILD.md`, publishing checksums for all browser assets.
