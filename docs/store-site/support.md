@@ -46,4 +46,4 @@ Reinstalling a running service does not load new host code immediately. Finish y
 
 ## Setup, notifications and removal
 
-On macOS + Chrome, `aow setup` configures the service, native pairing and Codex/Claude Code hooks. Review/trust hooks in Codex and launch a new Codex session in a new host terminal for session notifications. If an older host is running, finish terminal work, run `aow service uninstall`, then `aow setup`. Before removing the npm package run `aow uninstall`. See [setup, upgrade and uninstall](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md).
+On macOS + Chrome, `aow setup` configures the service, native pairing and Codex/Claude Code hooks. Review AgentOnWeb hooks in your CLI's `/hooks`, then launch a new Codex or Claude Code session in a new host terminal for session notifications. If an older host is running, finish terminal work, run `aow service uninstall`, then `aow setup`. Before removing the npm package run `aow uninstall`. See [setup, upgrade and uninstall](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md).

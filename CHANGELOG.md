@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0 — 2026-10-12
+
+- Add Claude Code session status, approval and completion notifications through official observational hooks, alongside existing Codex support. `aow setup` installs both integrations; `aow claude-hooks install|uninstall` manages Claude hooks independently while preserving other settings.
+- Track resumed Claude turns correctly and resolve the lightweight hook reporter from the installed package, including npm bin symlinks.
+- Keep the active terminal iframe visible during status and presentation updates so typing retains focus.
+- Apply Chill opacity to ANSI terminal cell backgrounds while keeping text readable and Focus mode opaque.
+- Align the extension, terminal host, DSH package and version-pinned installer at 0.3.0. Connector protocol remains 1. Safari uses version 0.3.0, build 8.
+
+### Upgrade
+
+Update the browser extension and rerun the installer. Finish active terminal work before `aow service uninstall`, then run `aow setup` to start the updated host. Review AgentOnWeb hooks in your CLI's `/hooks` and start a new Codex or Claude Code session. Browser updates become available after each store approves them.
+
 ## Extension 0.2.1 — 2026-10-10
 
 - Restore default mode shortcuts on ordinary webpages in Arc when browser extension commands are not dispatched. Respect cleared and remapped bindings, and leave editable webpage controls to the browser and website.

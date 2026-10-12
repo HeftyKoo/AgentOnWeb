@@ -7,7 +7,7 @@ on:
         description: Existing release tag to publish or retry
         required: true
         type: choice
-        options: [dsh-v0.2.0, terminal-v0.2.0, terminal-v0.2.1, ext-v0.2.0]
+        options: [dsh-v0.3.0, terminal-v0.3.0, ext-v0.3.0, dsh-v0.2.0, terminal-v0.2.0, terminal-v0.2.1, ext-v0.2.0, ext-v0.2.1]
   push:
     tags: ["ext-v*", "dsh-v*", "terminal-v*"]
 
@@ -61,8 +61,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          grep "agentonweb-extension-" release/SHA256SUMS > release/extension-SHA256SUMS
-          gh release create "$RELEASE_TAG" release/agentonweb-extension-*.zip release/extension-SHA256SUMS --verify-tag --notes-file CHANGELOG.md
+          node scripts/package-browser-assets.mjs
+          gh release create "$RELEASE_TAG" release/agentonweb-extension-*.zip release/browser-SHA256SUMS --verify-tag --notes-file CHANGELOG.md
       - name: Create DSH plugin GitHub release
         if: startsWith(env.RELEASE_TAG, 'dsh-v')
         env:

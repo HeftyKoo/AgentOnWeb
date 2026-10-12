@@ -85,7 +85,7 @@ npm install -g @deepseek-ai/dsh@latest
 在 DSH 中配置服务商凭据（例如 `DEEPSEEK_API_KEY`），然后安装 AgentOnWeb 集成并启动工作区：
 
 ```sh
-dsh plugin --profile web add @agentonweb/dsh-surface@0.2.0
+dsh plugin --profile web add @agentonweb/dsh-surface@0.3.0
 dsh web
 ```
 
