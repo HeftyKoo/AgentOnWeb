@@ -3,6 +3,7 @@ import { access, chmod, readFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { installCodexHooks, uninstallCodexHooks } from './codex-hooks.js';
+import { installClaudeHooks, uninstallClaudeHooks } from './claude-hooks.js';
 import { installNativeBridge, uninstallNativeBridge, extensionOrigin, STORE_EXTENSION_ID } from './native-bridge.js';
 import { serviceCommand, serviceDirectory } from './service.js';
 import { cleanup } from './cleanup.js';
@@ -27,6 +28,8 @@ export async function setup(args: string[]) {
   await chmod(join(dirname(require.resolve('node-pty/package.json')), 'prebuilds', `darwin-${process.arch}`, 'spawn-helper'), 0o755);
   await installCodexHooks();
   console.log('Codex hooks installed; existing settings preserved. Any skipped notify configuration is reported above.');
+  await installClaudeHooks();
+  console.log('Claude Code hooks installed; existing settings preserved. Review them in /hooks and start a new Claude Code session.');
   await installNativeBridge(entry, ids);
   await serviceCommand(['install', '--no-open']);
   let ready = false;
@@ -55,6 +58,7 @@ export async function uninstall(): Promise<void> {
   // Clean integrations before npm removes the CLI used by their commands.
   await cleanup([
     () => uninstallCodexHooks(),
+    () => uninstallClaudeHooks(),
     () => uninstallNativeBridge(),
     async () => { if (process.platform === 'darwin') await serviceCommand(['uninstall']); },
   ], 'AgentOnWeb uninstall is incomplete. All integrations were attempted; fix the reported errors and rerun aow uninstall before removing the npm package.');

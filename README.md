@@ -6,7 +6,7 @@
 
 AgentOnWeb brings your coding workspace onto the page you already have open. Watch a video, browse documentation, or keep a website in view while working with your agent—then switch back to the page without leaving your conversation.
 
-**Use Codex right on the page.** Open your project in the built-in terminal, follow running sessions, and get notified when a task finishes or needs approval. Click a session to return to its terminal. AgentOnWeb also supports the complete **DeepSeek Harness (DSH)** workspace, including conversations, tools, approvals, models and plugins.
+**Use Codex or Claude Code right on the page.** Open your project in the built-in terminal, follow running sessions, and get notified when a task finishes or needs approval. Click a session to return to its terminal. AgentOnWeb also supports the complete **DeepSeek Harness (DSH)** workspace, including conversations, tools, approvals, models and plugins.
 
 | Mode | What it does |
 | --- | --- |
@@ -38,9 +38,9 @@ A 100-second walkthrough of DSH setup, Chrome Web Store installation, Connect au
 | Firefox | [Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/agentonweb/) |
 | Safari | Coming soon — Mac App Store link will be added after approval. |
 
-## Use Codex
+## Use Codex and Claude Code
 
-For **macOS + Chrome**. Have [Node.js 22.19+](https://nodejs.org/en/download) and Codex installed and signed in.
+For **macOS + Chrome**. Have [Node.js 22.19+](https://nodejs.org/en/download) and your preferred CLI (Codex or Claude Code) installed and signed in.
 
 ### 1. Set up your terminal
 
@@ -50,11 +50,11 @@ Run this once in your Mac's Terminal:
 curl -fsSL https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh | bash
 ```
 
-The installer sets up the local terminal, automatic startup, Chrome connection and Codex notifications. Existing Codex settings are preserved.
+The installer sets up the local terminal, automatic startup, Chrome connection and Codex/Claude Code notifications. Existing CLI settings are preserved.
 
 The install command works from zsh, bash and fish. When Node's command directory is writable and already on PATH, the installer adds an `aow` entry there, so the same terminal can run `aow service` immediately without sourcing a profile. New zsh/bash windows and detected fish installations also get `aow` on their PATH. If that directory is protected or has an unrelated `aow` command, use `"$HOME/.local/bin/aow" service` directly.
 
-### 2. Start Codex on any website
+### 2. Start your CLI on any website
 
 Open a website and click AgentOnWeb. In its terminal, enter your project directory and start Codex:
 
@@ -64,6 +64,8 @@ codex
 ```
 
 For session notifications, open `/hooks` in Codex, review and trust **AgentOnWeb session status**, then start a new Codex session. You only need to do this once for the installed hooks.
+
+For Claude Code, run `claude` in the same terminal. Setup installs observational hooks in `CLAUDE_CONFIG_DIR/settings.json` (default `~/.claude/settings.json`). Review **AgentOnWeb session status** in Claude Code `/hooks`, then start a new session. To repair or remove only this integration, use `aow claude-hooks install` or `aow claude-hooks uninstall`. Models, permissions, other hooks and history are preserved.
 
 Use **+** in the terminal tab bar to open another project, click a tab to switch, double-click its name to rename it, or click **×** to close it. Hiding the workspace or refreshing the page keeps your sessions running.
 
@@ -103,7 +105,7 @@ Once approved, the browser reconnects automatically while DSH is running. You ca
 
 ## Everyday controls
 
-Use the dock to switch between your Codex terminal and DSH workspace. Both keep running while you work in the other.
+Use the dock to switch between your local terminal and DSH workspace. Both keep running while you work in the other.
 
 Use the lower-right dock to choose **Chill**, **Focus**, or **Watch**. Chill opens by default and includes an opacity slider. Close the panel or use the toolbar icon to hide it; the dock remains available to reopen it.
 

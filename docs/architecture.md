@@ -9,7 +9,7 @@ AgentOnWeb displays workspaces from local processes on ordinary websites. The ex
 | Local terminal | A local host and its PTY-backed shells | `apps/terminal-surface` using xterm | `aow terminal` or the macOS `aow service install` |
 | DSH | `dsh web` | DSH's native Web UI and surface plugin | `dsh web` with `@agentonweb/dsh-surface` installed |
 
-The local terminal launches a new interactive login shell in the user's home directory. Shell startup files may change that directory and environment. Users run their own commands, including `codex`, from the shell. No Codex installation is required for the host itself, and no model or CLI permissions are selected by AgentOnWeb.
+The local terminal launches a new interactive login shell in the user's home directory. Shell startup files may change that directory and environment. Users run their own commands, including `codex` and `claude`, from the shell. No Codex installation is required for the host itself, and no model or CLI permissions are selected by AgentOnWeb.
 
 ## Packages
 
@@ -47,4 +47,4 @@ The terminal host bundles internal workspace code and the terminal HTML/JS/CSS. 
 
 ## Setup and agent activity
 
-`aow setup` configures the macOS service, Chrome native messaging bridge and Codex event hooks. The bridge verifies the caller extension origin and grants automatic pairing once; revocation and later browser storage resets require manual approval. Codex lifecycle events enter through a per-terminal bearer token, then authenticated connector subscriptions update the page session list and notifications. Terminal commands and approval decisions remain in the native CLI. See [setup](one-command-setup.md) and [agent events](agent-notifications.md).
+`aow setup` configures the macOS service, Chrome native messaging bridge and Codex/Claude Code event hooks. The bridge verifies the caller extension origin and grants automatic pairing once; revocation and later browser storage resets require manual approval. CLI lifecycle events enter through a per-terminal bearer token, then authenticated connector subscriptions update the page session list and notifications. Terminal commands and approval decisions remain in the native CLI. See [setup](one-command-setup.md) and [agent events](agent-notifications.md).
