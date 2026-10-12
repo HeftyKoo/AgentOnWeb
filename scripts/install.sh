@@ -91,7 +91,7 @@ install_agentonweb() {
     echo '  "$HOME/.local/bin/aow" setup' >&2
     return 1
   fi
-  echo 'Ready. Open a website in Chrome, click AgentOnWeb, and run codex.'
+  echo 'Ready. Open a website in Chrome, click AgentOnWeb, and run codex or claude.'
   echo 'New zsh/bash terminal windows can run aow directly.'
   aow_current_command="$(PATH="$aow_original_path" command -v aow || true)"
   if [ "$aow_current_command" = "$aow_prefix/bin/aow" ] || { [ "$aow_can_link" = true ] && [ "$aow_current_command" = "$aow_link_candidate" ]; }; then

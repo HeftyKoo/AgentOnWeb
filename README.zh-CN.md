@@ -6,7 +6,7 @@
 
 AgentOnWeb 将你的编程工作区带到你当前打开的页面上。一边看视频、查阅文档，或保持某个网站在视野中，一边与你的助手协作——然后无需离开对话即可切回原页面。
 
-**直接在网页上使用 Codex。** 在内置终端中打开项目，查看正在运行的会话，在任务完成或需要审批时收到提醒。点击会话即可回到对应终端。AgentOnWeb 也支持完整的 **DeepSeek Harness (DSH)** 工作区，保留会话、工具、审批、模型及插件。
+**直接在网页上使用 Codex 或 Claude Code。** 在内置终端中打开项目，查看正在运行的会话，在任务完成或需要审批时收到提醒。点击会话即可回到对应终端。AgentOnWeb 也支持完整的 **DeepSeek Harness (DSH)** 工作区，保留会话、工具、审批、模型及插件。
 
 | 模式 | 功能 |
 | --- | --- |
@@ -37,9 +37,9 @@ AgentOnWeb 将你的编程工作区带到你当前打开的页面上。一边看
 | Chrome | [从 Chrome 应用商店安装](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe) |
 | Firefox | [从 Firefox 附加组件安装](https://addons.mozilla.org/en-US/firefox/addon/agentonweb/) |
 
-## 使用 Codex
+## 使用 Codex 和 Claude Code
 
-适用于 **macOS + Chrome**。请先安装 [Node.js 22.19+](https://nodejs.org/en/download)，并安装、登录 Codex。
+适用于 **macOS + Chrome**。请先安装 [Node.js 22.19+](https://nodejs.org/en/download)，并安装、登录你要使用的 CLI（Codex 或 Claude Code）。
 
 ### 1. 一键配置终端
 
@@ -49,11 +49,11 @@ AgentOnWeb 将你的编程工作区带到你当前打开的页面上。一边看
 curl -fsSL https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh | bash
 ```
 
-安装器会配置本机终端、登录自动启动、Chrome 连接和 Codex 通知，并保留你已有的 Codex 设置。
+安装器会配置本机终端、登录自动启动、Chrome 连接和 Codex / Claude Code 通知，并保留已有的 CLI 设置。
 
 安装命令兼容 zsh、bash 和 fish。如果 Node 命令目录已在 PATH 中且可写，安装器会在其中创建 `aow` 入口，同一个终端安装后即可运行 `aow service`，无需 source。新开的 zsh/bash 窗口及检测到的 fish 也会配置 `aow` 路径。如果该目录受保护或已有其他程序的 `aow` 命令，可直接运行 `"$HOME/.local/bin/aow" service`。
 
-### 2. 在网页上使用 Codex
+### 2. 在网页上使用编程助手
 
 打开任意网站，点击 AgentOnWeb，在它的终端中进入项目目录并启动 Codex：
 
@@ -63,6 +63,8 @@ codex
 ```
 
 要接收会话通知，在 Codex 中打开 `/hooks`，审查并信任 **AgentOnWeb session status**，然后新建一个 Codex 会话。已安装的 hooks 只需信任一次。
+
+使用 Claude Code 时，在同一终端运行 `claude`。安装器会在 `CLAUDE_CONFIG_DIR/settings.json`（默认 `~/.claude/settings.json`）中添加观察性 hooks。在 Claude Code `/hooks` 中查看 **AgentOnWeb session status**，然后启动新会话。单独修复或移除该集成可运行 `aow claude-hooks install` 或 `aow claude-hooks uninstall`；模型、权限、其他 hooks 和历史记录都会保留。
 
 点击终端标签栏的 **+** 打开另一个项目，点击标签切换，双击名称重命名，点击 **×** 关闭。隐藏工作区或刷新网页不会中断正在运行的会话。
 
@@ -102,7 +104,7 @@ Safari 可能还会请求允许访问网站以及本地会话存储。按照浏�
 
 ## 日常操作
 
-通过 dock 在 Codex 终端与 DSH 工作区之间切换，两边的会话都会继续运行。
+通过 dock 在本地终端与 DSH 工作区之间切换，两边的会话都会继续运行。
 
 使用右下角的 dock 切换 **Chill**、**Focus** 或 **Watch**。默认打开 Chill 模式，并带有透明度滑块。关闭面板或使用工具栏图标可将其隐藏；dock 始终可用，便于重新打开。
 
