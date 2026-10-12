@@ -2,6 +2,7 @@ import { surfaceShortcut } from "@agentonweb/connector-contract";
 import { OptionTapTracker } from "@agentonweb/connector-contract";
 import { Terminal } from "@xterm/xterm";
 import { splitInput } from "./input.js";
+import { installCellBackgroundOpacity } from "./cell-backgrounds.js";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import "./style.css";
@@ -27,6 +28,7 @@ function showStatus(message: string) {
   notice.hidden = message === "Connected";
 }
 terminal.open(container);
+const setCellBackgroundOpacity = installCellBackgroundOpacity(terminal, container);
 const sessionPicker = document.querySelector<HTMLElement>("#sessions")!;
 const newButton = document.querySelector<HTMLButtonElement>("#new")!;
 type ConnectionState = "background" | "connecting" | "connected" | "disconnected" | "exited";
@@ -577,6 +579,7 @@ function presentation() {
         : "#15171cff",
     foreground: "#f1f3f5",
   };
+  setCellBackgroundOpacity(mode === "chill" ? opacity : 1);
 }
 window.addEventListener("message", (event) => {
   if (event.source !== parent || !/^(chrome-extension|moz-extension|safari-web-extension):\/\//u.test(event.origin))

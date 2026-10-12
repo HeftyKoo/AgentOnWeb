@@ -23,7 +23,7 @@ install_agentonweb() {
   aow_node_bin="$(dirname "$(command -v node)")"
   export PATH="$aow_prefix/bin:$PATH"
   echo 'Installing AgentOnWeb terminal…'
-  AOW_SKIP_SETUP=1 npm install --global --prefix "$aow_prefix" --foreground-scripts --prefer-online --no-audit --no-fund '@agentonweb/terminal-host@0.2.1' </dev/null
+  AOW_SKIP_SETUP=1 npm install --global --prefix "$aow_prefix" --foreground-scripts --prefer-online --no-audit --no-fund '@agentonweb/terminal-host@0.3.0' </dev/null
 
   # A child process cannot export PATH to its parent. Put a convenience link next
   # to Node when that directory is already on PATH and writable (e.g. nvm/Homebrew).
@@ -91,7 +91,7 @@ install_agentonweb() {
     echo '  "$HOME/.local/bin/aow" setup' >&2
     return 1
   fi
-  echo 'Ready. Open a website in Chrome, click AgentOnWeb, and run codex.'
+  echo 'Ready. Open a website in Chrome, click AgentOnWeb, and run codex or claude.'
   echo 'New zsh/bash terminal windows can run aow directly.'
   aow_current_command="$(PATH="$aow_original_path" command -v aow || true)"
   if [ "$aow_current_command" = "$aow_prefix/bin/aow" ] || { [ "$aow_can_link" = true ] && [ "$aow_current_command" = "$aow_link_candidate" ]; }; then

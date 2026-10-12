@@ -1,16 +1,16 @@
-# AgentOnWeb terminal for Codex
+# AgentOnWeb terminal for Codex and Claude Code
 
-Run Codex in your browser, keep several project terminals open, and return to the right session when a task finishes or needs approval.
+Run Codex or Claude Code in your browser, keep several project terminals open, and return to the right session when a task finishes or needs approval.
 
 ## Install on macOS
 
-Install [the Chrome extension](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe), Node.js 22.19+ and Codex, then run:
+Install [the Chrome extension](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe), Node.js 22.19+ and your preferred CLI (Codex or Claude Code), then run:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh | bash
 ```
 
-The installer configures the terminal service, Chrome connection and Codex notifications. Open a website, click AgentOnWeb and run:
+The installer configures the terminal service, Chrome connection and Codex/Claude Code notifications. Open a website, click AgentOnWeb and run:
 
 ```sh
 cd ~/your-project
@@ -20,6 +20,8 @@ codex
 For notifications, review and trust **AgentOnWeb session status** in Codex `/hooks`, then start a new Codex session. Your existing Codex settings are preserved.
 
 The installer configures zsh, bash and detected fish installations. It also links `aow` into Node's command directory when that directory is already on PATH and writable, so the current terminal can use it without sourcing a profile. If another program owns that command or the directory is protected, use `"$HOME/.local/bin/aow" service` directly.
+
+For Claude Code, run `claude` in the same terminal. Setup installs observational hooks in `CLAUDE_CONFIG_DIR/settings.json` (default `~/.claude/settings.json`). Review **AgentOnWeb session status** in Claude Code `/hooks`, then start a new session. To repair or remove only this integration, use `aow claude-hooks install` or `aow claude-hooks uninstall`. Models, permissions, other hooks and history are preserved.
 
 ## Terminal controls
 
@@ -62,4 +64,4 @@ npm uninstall --global --prefix "$HOME/.local" @agentonweb/terminal-host
 
 If you installed through npm directly, uninstall from your original npm prefix instead. User settings, CLI history and backups remain.
 
-[Setup and troubleshooting](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md) · [Codex notifications](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/agent-notifications.md) · [Source development](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/development.md)
+[Setup and troubleshooting](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md) · [Agent notifications](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/agent-notifications.md) · [Source development](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/development.md)

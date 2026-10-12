@@ -1,6 +1,6 @@
-# Set up AgentOnWeb for Codex
+# Set up AgentOnWeb for Codex and Claude Code
 
-Use **macOS + Chrome**, with Node.js 22.19+ and Codex installed and signed in.
+Use **macOS + Chrome**, with Node.js 22.19+ and Codex or Claude Code installed and signed in.
 
 1. Install [AgentOnWeb from the Chrome Web Store](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe).
 2. Run this command in your Mac's Terminal:
@@ -9,10 +9,10 @@ Use **macOS + Chrome**, with Node.js 22.19+ and Codex installed and signed in.
    curl -fsSL https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh | bash
    ```
 
-3. Open a website, click AgentOnWeb and run `codex` in its terminal.
+3. Open a website, click AgentOnWeb and run `codex` or `claude` in its terminal.
 4. For session notifications, open Codex `/hooks`, review and trust **AgentOnWeb session status**, then start a new Codex session.
 
-The installer configures your terminal service, automatic startup, Chrome connection and Codex notifications. It installs the terminal package under `~/.local`, adds its command directory to your shell profile, and preserves existing Codex settings with backups. Run it as your own user, without sudo.
+The installer configures your terminal service, automatic startup, Chrome connection and Codex/Claude Code notifications. It installs the terminal package under `~/.local`, adds its command directory to your shell profile, and preserves existing CLI settings with backups. Run it as your own user, without sudo.
 
 The command works from zsh, bash and fish. The installer configures both login and interactive zsh/bash windows, including editor terminals, and uses fish's own PATH syntax when fish is installed or selected as your login shell. It respects exported `ZDOTDIR` and `XDG_CONFIG_HOME` settings and preserves the Bash login profile you already use.
 
@@ -44,6 +44,10 @@ Review the hooks in Codex `/hooks`, then start a new Codex session inside AgentO
 
 Notifications link back to the relevant terminal. Approval decisions stay in Codex. See [notification details](agent-notifications.md).
 
+## Claude Code notifications are missing
+
+Run `aow claude-hooks install`, review **AgentOnWeb session status** in Claude Code `/hooks`, then start a new session inside AgentOnWeb. Use the same `CLAUDE_CONFIG_DIR` as your CLI. The installer backs up `settings.json` and preserves existing hooks, models, permissions and `disableAllHooks`; disabled or policy-restricted hooks remain disabled. Approval decisions stay in Claude Code.
+
 ## Update or repair
 
 Rerun the installation command to install the current AgentOnWeb terminal package and repair its configuration. Installation leaves active terminal sessions running. To load an updated service, finish your work, then run:
@@ -66,6 +70,6 @@ npm uninstall --global --prefix "$HOME/.local" @agentonweb/terminal-host
 
 This stops the terminal service, removes Chrome pairing registration and AgentOnWeb hooks, and restores your previous Codex notify command. User settings, history and backups remain. If you installed through npm directly instead of the shell installer, uninstall from the npm prefix you originally used.
 
-If cleanup reports an error, correct it and rerun `aow uninstall` before removing the package. To remove only notifications, use `aow codex-hooks uninstall`.
+If cleanup reports an error, correct it and rerun `aow uninstall` before removing the package. To remove only notifications, use `aow codex-hooks uninstall` or `aow claude-hooks uninstall`.
 
 [Back to AgentOnWeb](../README.md) · [Development setup](development.md)

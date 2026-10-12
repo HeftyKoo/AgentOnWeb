@@ -110,6 +110,8 @@ for (const sourceRoot of sourceRoots) {
 const contract = await readJson("release-contract.json");
 const expectedArtifacts = {
   extension: `agentonweb-extension-${contract.extensionVersion}.zip`,
+  firefoxExtension: `agentonweb-extension-firefox-${contract.extensionVersion}.zip`,
+  extensionSource: `agentonweb-extension-source-${contract.extensionVersion}.zip`,
   dshPlugin: `agentonweb-dsh-surface-${contract.pluginVersion}.tgz`,
   terminalHost: `agentonweb-terminal-host-${contract.terminalHostVersion}.tgz`,
 };

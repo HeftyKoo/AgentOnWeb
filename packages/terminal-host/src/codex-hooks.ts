@@ -82,23 +82,4 @@ async function removeHooks(directory: string): Promise<void> {
   }
 }
 
-/** Observational hook: no stdout, permission decision, or effect outside AOW terminals. */
-export async function reportCodexEvent(): Promise<void> {
-  if (!process.env.AOW_AGENT_ENDPOINT || !process.env.AOW_AGENT_TOKEN) return;
-  let body = "";
-  for await (const chunk of process.stdin) { body += chunk; if (body.length > 4_194_304) return; }
-  await reportCodexInput(JSON.parse(body));
-}
-export async function reportCodexInput(input: any): Promise<void> {
-  const endpoint = process.env.AOW_AGENT_ENDPOINT;
-  const token = process.env.AOW_AGENT_TOKEN;
-  if (!endpoint || !token) return;
-  const url = new URL(endpoint);
-  if (url.protocol !== "http:" || url.hostname !== "127.0.0.1" || url.pathname !== "/agent-event") return;
-  // Do not forward commands, tool output, or assistant responses to presentation.
-  const payload = { session_id: input.session_id, hook_event_name: input.hook_event_name, turn_id: input.turn_id,
-    agent_id: input.agent_id, source: input.source, cwd: input.cwd, prompt: typeof input.prompt === "string" ? input.prompt.slice(0, 160) : undefined,
-    tool_name: input.tool_name, tool_use_id: input.tool_use_id,
-    tool_input: { description: typeof input.tool_input?.description === "string" ? input.tool_input.description.slice(0, 500) : undefined } };
-  await fetch(url, { method: "POST", redirect: "error", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(1200) });
-}
+export { reportAgentEvent as reportCodexEvent, reportAgentInput as reportCodexInput } from "./agent-events.js";
