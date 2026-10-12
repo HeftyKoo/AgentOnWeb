@@ -21,6 +21,7 @@ vi.mock("@xterm/xterm", () => ({
     onBinary(callback: (data: string) => void) {
       terminalMock.binary = callback;
     }
+    onRender() {}
     write(_data: string, callback?: () => void) {
       if (callback) terminalMock.writes.push(callback);
     }
