@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, realpath, rm, stat, readFile, writeFile, readdir } from
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { once } from "node:events";
+import { request } from "node:http";
 import { afterEach, expect, it } from "vitest";
 import WebSocket from "ws";
 let host: ChildProcess | undefined;
@@ -17,6 +18,54 @@ afterEach(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
   directory = "";
   host = undefined;
+});
+it("preserves Unicode terminal names split across HTTP body chunks and publishes terminal registry changes", async () => {
+  directory = await mkdtemp(join(tmpdir(), "aow-unicode-test-"));
+  host = spawn(process.execPath, [resolve("packages/terminal-host/lib/cli.js"), "terminal"], {
+    env: { ...process.env, HOME: directory, SHELL: "/bin/sh", ENV: undefined, BASH_ENV: undefined, ZDOTDIR: undefined },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let output = "";
+  host.stdout!.on("data", chunk => { output += chunk; });
+  await expect.poll(() => output.includes("Open once:"), { timeout: 10000 }).toBe(true);
+  const launchUrl = /Open once: (http:\/\/[^\s]+)/u.exec(output)![1]!;
+  const origin = new URL(launchUrl).origin;
+  const launch = await fetch(launchUrl);
+  const cookie = launch.headers.getSetCookie().map(value => value.split(";")[0]!).join("; ");
+  await launch.text();
+  const headers = { Cookie: cookie, "X-AgentOnWeb-Terminal": "1" };
+  const list = await (await fetch(origin + "/api/terminals", { headers })).json() as { id: string }[];
+  const name = "中文工作区 👋";
+  const body = Buffer.from(JSON.stringify({ action: "rename", id: list[0]!.id, name }));
+  const split = body.indexOf(Buffer.from("中")) + 1;
+  const response = await new Promise<{ status: number | undefined; body: string }>((resolveResponse, reject) => {
+    const req = request({ hostname: "127.0.0.1", port: new URL(origin).port, path: "/api/terminals", method: "POST",
+      headers: { ...headers, Host: new URL(origin).host, Origin: origin, "Content-Type": "application/json", "Content-Length": body.length } }, res => {
+      res.setEncoding("utf8");
+      let data = "";
+      res.on("data", chunk => { data += chunk; });
+      res.on("end", () => resolveResponse({ status: res.statusCode, body: data }));
+    });
+    req.on("error", reject);
+    req.write(body.subarray(0, split));
+    setTimeout(() => req.end(body.subarray(split)), 30);
+  });
+  expect(response.status).toBe(200);
+  expect(JSON.parse(response.body)).toEqual([{ id: list[0]!.id, name }]);
+  const ticket = await (await fetch(origin + "/ticket?session=" + list[0]!.id, { headers })).json();
+  const viewer = new WebSocket(origin.replace("http:", "ws:") + "/terminal", ticket.token, { headers: { ...headers, Origin: origin } });
+  const snapshots: { id: string; name: string }[][] = [];
+  viewer.on("message", raw => {
+    const message = JSON.parse(String(raw));
+    if (message.type === "session-names") snapshots.push(message.sessions);
+  });
+  try {
+    await expect.poll(() => snapshots.length).toBe(1);
+    const created = await (await fetch(origin + "/api/terminals", { method: "POST", headers: { ...headers, Origin: origin }, body: JSON.stringify({ action: "new" }) })).json();
+    await expect.poll(() => snapshots.at(-1)?.map(item => item.id)).toEqual([list[0]!.id, created.id]);
+    await fetch(origin + "/api/terminals", { method: "POST", headers: { ...headers, Origin: origin }, body: JSON.stringify({ action: "close", id: created.id }) });
+    await expect.poll(() => snapshots.at(-1)?.map(item => item.id)).toEqual([list[0]!.id]);
+  } finally { viewer.close(); }
 });
 it('prints service help and usage errors without a Node stack trace', () => {
   const entry = resolve('packages/terminal-host/lib/cli.js');
@@ -493,8 +542,21 @@ it("installs packaged Codex hooks and notify without changing permissions, model
   expect(config).toContain('# Keep this comment\nmodel = "custom-model"\napproval_policy = "on-request"\n');
   expect(config).toContain("agent-notify");
   const hooks = JSON.parse(await readFile(join(directory, "hooks.json"), "utf8"));
+  const guard = 'data:text/javascript,' + encodeURIComponent(`
+    import { registerHooks } from 'node:module';
+    registerHooks({ resolve(specifier, context, next) {
+      if (['node-pty', '@xterm/headless', '@xterm/addon-serialize', 'ws'].includes(specifier))
+        throw new Error('An observational hook must not load terminal runtime dependencies');
+      return next(specifier, context);
+    } });
+  `);
+  const hook = spawnSync("/bin/sh", ["-c", hooks.hooks.PreToolUse.at(-1).hooks[0].command], {
+    env: { ...process.env, AOW_AGENT_ENDPOINT: "", AOW_AGENT_TOKEN: "", NODE_OPTIONS: `--import=${guard}` }, encoding: "utf8",
+  });
+  expect(hook.stderr).toBe("");
+  expect(hook.status).toBe(0);
   expect(hooks.hooks.Stop[0].hooks[0].command).toBe("my-stop-hook");
-  expect(hooks.hooks.PermissionRequest[0].hooks[0].command).toContain("agent-event");
+  expect(hooks.hooks.PermissionRequest[0].hooks[0].command).toContain("agent-hook.js");
   expect((await readdir(directory)).some(name => name.startsWith("config.toml.agentonweb-") && name.endsWith(".bak"))).toBe(true);
   expect(install().status).toBe(0);
   expect(await readFile(join(directory, "config.toml"), "utf8")).toBe(config);

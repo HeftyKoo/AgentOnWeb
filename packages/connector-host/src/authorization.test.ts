@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +9,27 @@ async function open() { const dir = await mkdtemp(join(tmpdir(), "agentonweb-aut
 afterEach(async () => { vi.useRealTimers(); await Promise.all(directories.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))); });
 
 describe("connector host authorization", () => {
+  it("keeps a failed revocation visible and retryable, then durably revokes it", async () => {
+    const authority = await open();
+    const pending = authority.request(origin);
+    await authority.decide(pending.request.id, true);
+    const grant = await pending.result;
+    const revoked = vi.fn();
+    authority.onRevoke(revoked);
+    const file = join(authority.directory, "connections.json");
+    const backup = file + ".backup";
+    await rename(file, backup);
+    await mkdir(file); // Deterministic storage failure, including when tests run as root.
+    await expect(authority.revoke(grant.id)).rejects.toThrow();
+    expect(authority.snapshot().grants.map(item => item.id)).toEqual([grant.id]);
+    expect(revoked).not.toHaveBeenCalled();
+    await rm(file, { recursive: true });
+    await rename(backup, file);
+    await authority.revoke(grant.id);
+    expect(revoked).toHaveBeenCalledExactlyOnceWith(grant.id);
+    expect(() => authority.authenticate(origin, grant.credential)).toThrow();
+    expect((await Authorization.open(authority.directory)).snapshot().grants).toEqual([]);
+  });
   it("issues no credential until approved; stores only a hash and binds the origin across restart", async () => {
     const authority = await open();
     const pending = authority.request(origin);

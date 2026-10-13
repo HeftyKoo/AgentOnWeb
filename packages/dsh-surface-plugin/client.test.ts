@@ -153,6 +153,19 @@ describe("DeepSeek Harness surface client", () => {
     harness.stop();
   });
 
+  it("preserves a user selection made while the native session list is refreshing", async () => {
+    const harness = await nativeViewHarness();
+    let release!: () => void;
+    harness.sessions.refresh.mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve; }));
+    harness.start();
+    await vi.waitFor(() => expect(harness.sessions.refresh).toHaveBeenCalledOnce());
+    harness.select("another-session");
+    release();
+    await vi.waitFor(() => expect(harness.bookmark()).toEqual({ sessionId: "another-session" }));
+    expect(harness.sessions.open).not.toHaveBeenCalled();
+    harness.stop();
+  });
+
   it("does not let a hidden website partition overwrite the shared native selection", async () => {
     const harness = await nativeViewHarness("hidden");
     harness.start();
@@ -165,6 +178,35 @@ describe("DeepSeek Harness surface client", () => {
 
     harness.show();
     await vi.waitFor(() => expect(harness.sessions.open).toHaveBeenCalledWith("saved-session"));
+    harness.stop();
+  });
+
+  it("stops queued and later bookmark writes when a previously active page becomes hidden", async () => {
+    const harness = await nativeViewHarness();
+    harness.start();
+    await vi.waitFor(() => expect(harness.sessions.open).toHaveBeenCalledWith("saved-session"));
+    harness.select("another-session");
+    harness.hide();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    harness.select("partition-session");
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(harness.bookmark()).toEqual({ sessionId: "saved-session" });
+    harness.show();
+    await vi.waitFor(() => expect(harness.sessions.open).toHaveBeenCalledTimes(2));
+    expect(harness.sessions.open).toHaveBeenLastCalledWith("saved-session");
+    harness.stop();
+  });
+
+  it("cancels a bookmark restoration when its page becomes hidden", async () => {
+    const harness = await nativeViewHarness();
+    let release!: (value: any) => void;
+    harness.fetch.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+    harness.start();
+    await vi.waitFor(() => expect(harness.fetch).toHaveBeenCalledOnce());
+    harness.hide();
+    release({ ok: true, json: async () => ({ selection: { sessionId: "saved-session" } }) });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(harness.sessions.open).not.toHaveBeenCalled();
     harness.stop();
   });
 });
@@ -203,6 +245,7 @@ async function nativeViewHarness(initialVisibility: DocumentVisibilityState = "v
     fetch, sessions, select, bookmark: () => bookmark,
     start: () => plugin?.apply({ sessions, theme: { overrideTokens: () => () => {} }, effect: (setup: () => () => void) => cleanups.push(setup()) }),
     show: () => { visibilityState = "visible"; documentListeners.get("visibilitychange")?.(); },
+    hide: () => { visibilityState = "hidden"; documentListeners.get("visibilitychange")?.(); },
     stop: () => cleanups.forEach((cleanup) => cleanup()),
   };
 }

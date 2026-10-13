@@ -162,8 +162,20 @@ browser.tabs.onActivated.addListener(() => { void initialized.then(enqueueBroadc
 browser.windows.onFocusChanged.addListener((id) => {
   if (id !== browser.windows.WINDOW_ID_NONE) void initialized.then(enqueueBroadcast);
 });
+browser.cookies.onChanged?.addListener(({ removed, cause, cookie }) => {
+  // Setting a replacement cookie produces an overwrite removal event too.
+  if (!removed || cause === "overwrite" || ![...surfaces.values()].some(item =>
+    item.cookie.name === cookie.name && new URL(item.url).hostname === cookie.domain.replace(/^\./u, ""))) return;
+  leases.invalidate();
+  safariCookies.invalidate();
+  void initialized.then(enqueueBroadcast);
+});
 browser.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "agentonweb-reconnect") initialized.then(async () => { await coordinator.reconnectIfNeeded(); await autoConnectTerminal(); });
+  if (alarm.name === "agentonweb-reconnect") initialized.then(async () => {
+    // Alarms also recover renewals whose timers were suspended by the browser.
+    void coordinator.refreshSurfacesIfNeeded().catch(() => {});
+    await coordinator.reconnectIfNeeded(); await autoConnectTerminal();
+  });
 });
 
 async function initialize(): Promise<void> {
@@ -376,6 +388,7 @@ async function viewForTab(
 ): Promise<SurfaceViewState> {
   if (tab?.id === undefined || !tab.url || !topLevelSite(tab.url)) return stateSnapshot;
   let selectedId = tabRuntimes.get(tab.id) ?? stateSnapshot.runtimeId;
+  if (selectedId) await coordinator.refreshSurfacesIfNeeded(selectedId);
   const connectionSnapshot = coordinator.snapshot;
   if (selectedId && !connectionSnapshot.view.runtimes?.some(runtime => runtime.id === selectedId)) {
     selectedId = [...coordinator.snapshots].find(([, item]) => item.surface && item.view.connection === "connected")?.[0];

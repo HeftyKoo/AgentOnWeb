@@ -3,7 +3,7 @@ import { readFile, writeFile, rename, unlink } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { Authorization, startConnector } from "@agentonweb/connector-host";
 import { TerminalSession } from "@agentonweb/terminal-core";
@@ -139,6 +139,18 @@ class RequestError extends Error {
     super(message);
   }
 }
+async function readBody(req: IncomingMessage, limit: number): Promise<string> {
+  const chunks: Buffer[] = [];
+  let bytes = 0;
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    bytes += buffer.length;
+    if (bytes > limit) throw new RequestError(413, "Request body is too large.");
+    chunks.push(buffer);
+  }
+  // Network chunks can end in the middle of a UTF-8 character.
+  return Buffer.concat(chunks).toString("utf8");
+}
 function newSession() {
   if (sessions.size >= 8) throw new RequestError(409, "Close an unused terminal before opening another (maximum 8).");
   const id = randomUUID();
@@ -157,6 +169,7 @@ function newSession() {
     }, 1000);
   });
   item.session.pty.onExit(() => { item.exited = true; clearTimeout(directoryTimer); output.dispose(); agentSessions.removeTerminal(id); });
+  broadcastSessionNames();
   return id;
 }
 const adminSecret = randomBytes(32).toString("base64url");
@@ -206,8 +219,7 @@ const server = createServer(async (req, res) => {
       if (nativePairBusy) { res.writeHead(409).end(); return; }
       nativePairBusy = true;
       try {
-        let body = "";
-        for await (const chunk of req) { body += chunk; if (body.length > 4096) { res.writeHead(413).end(); return; } }
+        const body = await readBody(req, 4096);
         const input = JSON.parse(body);
         if (!(await nativeOrigins(stateDirectory)).includes(input.origin)) { res.writeHead(403).end(); return; }
         const receiptPath = join(stateDirectory, "native-paired-" + new URL(input.origin).hostname);
@@ -235,8 +247,7 @@ const server = createServer(async (req, res) => {
       const token = (req.headers.authorization ?? "").replace(/^Bearer /u, "");
       const terminal = [...sessions].find(([, item]) => !item.exited && matchesSecret(token, item.token));
       if (!terminal) { res.writeHead(403).end(); return; }
-      let body = "";
-      for await (const chunk of req) { body += chunk; if (body.length > 65_536) { res.writeHead(413).end(); return; } }
+      const body = await readBody(req, 65_536);
       let input: unknown;
       try { input = JSON.parse(body); } catch { res.writeHead(400).end(); return; }
       res.writeHead(agentSessions.ingest(terminal[0], input) ? 204 : 400).end();
@@ -278,14 +289,7 @@ const server = createServer(async (req, res) => {
           res.writeHead(403).end();
           return;
         }
-        let body = "";
-        for await (const chunk of req) {
-          body += chunk;
-          if (body.length > 4096) {
-            res.writeHead(413).end();
-            return;
-          }
-        }
+        const body = await readBody(req, 4096);
         let action;
         try { action = JSON.parse(body); }
         catch { throw new RequestError(400, "Request body must be valid JSON."); }
@@ -319,6 +323,7 @@ const server = createServer(async (req, res) => {
           sessions.get(action.id)!.session.dispose();
           sessions.delete(action.id);
           agentSessions.removeTerminal(action.id);
+          broadcastSessionNames();
         } else {
           res.writeHead(400).end();
           return;

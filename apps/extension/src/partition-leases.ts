@@ -18,7 +18,7 @@ interface PartitionLeaseEffects {
 /** Owns delegated cookie installation, persistence, stale-write cleanup and revocation. */
 export class PartitionLeaseManager {
   readonly #effects: PartitionLeaseEffects;
-  readonly #installed = new Set<string>();
+  readonly #installed = new Map<string, { surface: NativeSurface; expires: number }>();
   readonly #scopes = new Map<string, PersistedCookieScope>();
   #operations: Promise<unknown> = Promise.resolve();
 
@@ -52,13 +52,14 @@ export class PartitionLeaseManager {
       const details = surfaceCookieDetails(surface, partition);
       if (!details) return false;
       const key = this.#key(details.name, details.partitionKey.topLevelSite);
-      if (!this.#installed.has(key)) {
+      const installed = this.#installed.get(key);
+      if (installed?.surface !== surface || installed.expires <= Date.now()) {
         if (!await this.#effects.set(details)) throw new Error("The browser refused the isolated native runtime session.");
         if (!isCurrent()) {
           await this.#effects.remove({ url: details.url, name: details.name, partitionKey: details.partitionKey });
           return false;
         }
-        this.#installed.add(key);
+        this.#installed.set(key, { surface, expires: details.expirationDate * 1000 });
         this.#scopes.set(key, { runtimeId: surface.runtimeId, url: details.url, name: details.name, partitionKey: details.partitionKey });
         await this.#effects.persist([...this.#scopes.values()]);
       }
