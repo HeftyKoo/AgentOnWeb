@@ -87,7 +87,7 @@ npm install -g @deepseek-ai/dsh@latest
 Configure your provider credentials in DSH, such as `DEEPSEEK_API_KEY`, then install the AgentOnWeb integration and start the workspace:
 
 ```sh
-dsh plugin --profile web add @agentonweb/dsh-surface@0.3.0
+dsh plugin --profile web add @agentonweb/dsh-surface@0.4.0
 dsh web
 ```
 

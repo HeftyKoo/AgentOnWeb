@@ -1,16 +1,16 @@
 # Release AgentOnWeb
 
-## 0.3.0 scope
+## 0.4.0 scope
 
-This release adds Claude Code session hooks alongside Codex, preserves terminal input focus during extension state updates, and applies Chill opacity to ANSI cell backgrounds. The installer configures both CLI integrations while preserving existing settings. See [CHANGELOG](../CHANGELOG.md).
+This release adds Pi session status alongside Codex and Claude Code, detects installed CLIs during setup and prompts for integrations, recovers disconnected runtime sessions, and preserves independent browser-tab state. Terminal mode shortcuts work from native terminal input: Focus moves input to the terminal, Chill preserves focus, and Watch restores website input. See [CHANGELOG](../CHANGELOG.md).
 
-The extension, DSH plugin and terminal host use **0.3.0**. Safari targets use marketing version **0.3.0**, build **8**. `release-contract.json` records the artifact versions and filenames. Connector protocol remains **1**, so existing 0.2.1 extensions can consume Claude session updates; the new extension is required for the input-focus fix. The DSH compatibility baseline remains **0.1.7-rc.2**; the `dsh-latest` CI job checks the currently published upstream version.
+The extension, DSH plugin and terminal host use **0.4.0**. Safari targets use marketing version **0.4.0**, build **9**. `release-contract.json` records the artifact versions and filenames. Connector protocol remains **1**, the matching extension and terminal host are both required for the terminal shortcut and focus changes. The DSH compatibility baseline remains **0.1.7-rc.2**; the `dsh-latest` CI job checks the currently published upstream version.
 
 | Artifact | Version field | Delivery |
 | --- | --- | --- |
-| Chrome/Firefox extension ZIPs and source | `extensionVersion` | `ext-v0.3.0`, then store submission |
-| DSH plugin TGZ | `pluginVersion` | `dsh-v0.3.0`, npm + GitHub release |
-| Terminal host TGZ + installer | `terminalHostVersion` | `terminal-v0.3.0`, npm + GitHub release |
+| Chrome/Firefox extension ZIPs and source | `extensionVersion` | `ext-v0.4.0`, then store submission |
+| DSH plugin TGZ | `pluginVersion` | `dsh-v0.4.0`, npm + GitHub release |
+| Terminal host TGZ + installer | `terminalHostVersion` | `terminal-v0.4.0`, npm + GitHub release |
 
 A merged branch or GitHub release does not mean a browser store has approved the update. Live terminal acceptance currently covers macOS/Chrome. Firefox/Safari builds and Linux CI do not establish live terminal support on those platforms. Automatic setup targets macOS + Chrome only.
 
@@ -52,19 +52,19 @@ The `dsh-latest` CI job installs `@deepseek-ai/dsh@latest`, builds the actual pl
 After the relevant release is public, users can run:
 
 ```sh
-npm install -g @agentonweb/terminal-host@0.3.0
+npm install -g @agentonweb/terminal-host@0.4.0
 # Repair setup or run it explicitly when lifecycle scripts were blocked:
 aow setup
 ```
 
-The release installer at `https://github.com/HeftyKoo/AgentOnWeb/releases/download/terminal-v0.3.0/install.sh` pins the package to 0.3.0 and explicitly calls setup. The user-facing command downloads `https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh`. Both that script and its pinned npm package must be live before announcing the installation flow. The installer uses the user-owned `~/.local` npm prefix, configures zsh/bash/fish startup paths, and links `aow` beside Node when that directory is writable and already on PATH. Existing AgentOnWeb npm links are updated; unrelated commands are preserved. The versioned release URL is a publication target, not proof that the asset exists. Download and inspect it before running it; do not advertise it until the release and clean-install test succeed.
+The release installer at `https://github.com/HeftyKoo/AgentOnWeb/releases/download/terminal-v0.4.0/install.sh` pins the package to 0.4.0 and explicitly calls setup. The user-facing command downloads `https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh`. Both that script and its pinned npm package must be live before announcing the installation flow. The installer uses the user-owned `~/.local` npm prefix, configures zsh/bash/fish startup paths, and links `aow` beside Node when that directory is writable and already on PATH. Existing AgentOnWeb npm links are updated; unrelated commands are preserved. The versioned release URL is a publication target, not proof that the asset exists. Download and inspect it before running it; do not advertise it until the release and clean-install test succeed.
 
 ## Local installation and upgrades
 
 Before publishing, use the audited archive with the source-built extension:
 
 ```sh
-AOW_SKIP_SETUP=1 npm install -g ./release/agentonweb-terminal-host-0.3.0.tgz
+AOW_SKIP_SETUP=1 npm install -g ./release/agentonweb-terminal-host-0.4.0.tgz
 aow setup --extension-id YOUR_UNPACKED_CHROME_EXTENSION_ID
 ```
 
