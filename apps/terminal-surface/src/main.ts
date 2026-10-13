@@ -541,6 +541,7 @@ async function showConnections() {
       pending: { id: string; origin: string }[];
       grants: { id: string; origin: string }[];
     } = await api("/api/connections");
+    await showUpdates();
     const signature = JSON.stringify(data);
     if (signature === connectionsSignature) return;
     connectionsSignature = signature;
@@ -578,6 +579,20 @@ async function showConnections() {
   } catch {
     /* Delegated terminal viewers have no admin access. */
   }
+}
+async function showUpdates() {
+  try {
+    const data = await api('/api/updates');
+    const panel = document.querySelector<HTMLElement>('#updates');
+    const message = document.querySelector<HTMLElement>('#update-status');
+    if (!panel || !message) return;
+    panel.hidden = false;
+    message.textContent = data.installedVersion !== data.runningVersion
+      ? `Installed ${data.installedVersion} · Running ${data.runningVersion}. Close terminals, then run aow service restart in a separate macOS Terminal.`
+      : data.enabled && data.updateAvailable
+        ? `AgentOnWeb ${data.latest} is available · Running ${data.runningVersion}. Close terminals, then run aow update in a separate macOS Terminal.`
+        : `AgentOnWeb ${data.runningVersion} · Automatic update checks ${data.enabled ? 'enabled' : 'disabled'}.${data.error ? ' Last check failed; try aow check-update later.' : ''}`;
+  } catch { /* Only the private management page has access to version status. */ }
 }
 if (parent === window) {
   void showConnections();

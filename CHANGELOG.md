@@ -1,5 +1,15 @@
 # Changelog
 
+## Terminal host 0.4.1 — 2026-10-13
+
+- Add terminal-host version reporting, daily asynchronous npm update checks with caching/backoff, persistent opt-out, and reminders in the private management page and service log.
+- Add `aow update` for explicit global npm upgrades in the original prefix, retaining CLI integrations and enrolled browser origins. Add `aow service restart` and running-version verification. Both protect live shells unless `--force` is explicit and pause new shells during maintenance.
+- Keep automatic checks separate from installation; version-pinned release installers and the extension/DSH update paths remain independent.
+
+### Upgrade
+
+For the first upgrade from 0.4.0 or earlier, finish terminal work, run `aow service uninstall`, and rerun the installer. This installs 0.4.1 and starts the update-capable host. Subsequent upgrades use `aow update` in a separate macOS Terminal after exiting or closing live shells. `aow service restart` reloads already-installed code; explicit `--force` ends live tasks. Chrome/Firefox/Safari extensions and the DSH plugin remain at 0.4.0 with connector protocol 1.
+
 ## 0.4.0 — 2026-10-13
 
 - Add Pi session status, approval and completion notifications alongside Codex and Claude Code.

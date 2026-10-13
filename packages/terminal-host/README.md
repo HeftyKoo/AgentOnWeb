@@ -48,10 +48,28 @@ aow service            # Reopen the private browser setup/connection-management 
 aow service open       # Explicit form of the same command
 aow service --help
 aow service status
+aow service restart    # Reload installed code after exiting or closing terminals
 aow service uninstall  # Stop the service and remove automatic startup
 ```
 
-Uninstalling stops its live terminals but does not delete saved CLI history. The service is installed only for your macOS user. It uses `~/Library/LaunchAgents/com.agentonweb.terminal.plist`; diagnostics are at `~/.agentonweb/terminal/service.log`. Keep the installed Node and package paths available; reinstall the service after moving/removing them. Re-running install while loaded updates the next-login configuration without interrupting live terminals. New host code takes effect after the host restarts. To update immediately, finish your shell work, run `aow service uninstall`, then `aow service install`; uninstall stops live processes. Browser grants and CLI history remain.
+Uninstalling stops its live terminals but does not delete saved CLI history. The service is installed only for your macOS user. It uses `~/Library/LaunchAgents/com.agentonweb.terminal.plist`; diagnostics are at `~/.agentonweb/terminal/service.log`. Keep the installed Node and package paths available; reinstall the service after moving/removing them. Re-running install while loaded updates the next-login configuration without interrupting live terminals. New host code takes effect after the host restarts. Run `aow service restart` in a separate macOS Terminal after exiting or closing every live shell. It refuses while any shell is alive, including an idle shell; `--force` explicitly ends their tasks. Restart waits for the old process to exit and verifies the new process's version. Browser grants and CLI history remain.
+
+## Version checks and upgrades
+
+```sh
+aow --version                    # Installed CLI version
+aow service status               # Installed CLI and running host versions
+aow check-update                 # Query the latest stable npm version now
+aow check-update --disable       # Persistently disable automatic checks
+aow check-update --enable        # Re-enable automatic checks
+aow update                       # Install a newer version and restart safely
+```
+
+The host checks npm asynchronously after startup, caches successful checks for 24 hours, and retries failed checks with increasing delays. Each request times out after three seconds. Automatic checks only query public package metadata; they never download/install packages or restart the service. They are disabled in CI and when `AOW_UPDATE_CHECK=0` is set in the host environment. Explicit `check-update` and `update` still query npm when automatic checks are disabled. The private management page and service log show available updates; the page also identifies a newer installed version waiting for restart.
+
+Run `aow update` from a separate macOS Terminal, outside AgentOnWeb. It supports global npm installations, retains the original installation prefix and Node executable, and installs the exact stable version it checked. Development checkouts, npx and other package-manager layouts must be updated through their original workflow. It never downgrades to an older `latest` or selects a prerelease. An incompatible Node requirement stops the update before installation. Active terminals block installation/restart unless you explicitly pass `--force`; new terminal creation is paused during maintenance. An npm failure does not restart the service. If installation succeeds but restart fails, inspect `service.log` and run `aow setup` to repair the service.
+
+Update skips automatic setup so it preserves chosen CLI integrations, enrolled unpacked extension IDs, pairing and shell profiles. The existing integrations keep referring to the same package paths. Without a running service, update installs the package and leaves service setup to you. Old hosts without the maintenance interface require finishing terminal work, stopping them manually and rerunning the installer once to acquire these commands. Versioned release installers remain pinned. Browser extensions and DSH plugins follow their own release/update paths.
 
 Only one host may use a state directory. A dead PID is recovered automatically, with lock updates serialized through `host.pid.guard`. If `host.pid` is invalid or an interrupted update leaves `host.pid.guard`, the startup error identifies the affected path. Confirm that no host is running or starting for that directory before removing the reported file or empty guard directory. Do not remove a live host's lock.
 
