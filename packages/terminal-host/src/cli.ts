@@ -88,6 +88,7 @@ if (inputArgs[0] === "service") {
 if (inputArgs.length === 1 && inputArgs[0] === "--help") {
   console.log(
     "Usage: aow setup | aow uninstall | aow terminal | aow codex-hooks install|uninstall | aow claude-hooks install|uninstall | aow pi-extension install|uninstall | aow service [open|install|status|uninstall] (default: open)",
+    "\nRun aow setup --help to select CLI integrations with --agents.",
   );
   process.exit(0);
 }

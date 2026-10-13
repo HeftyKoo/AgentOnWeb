@@ -38,7 +38,7 @@ If no runtime is found, check that `dsh web` is running and restart it after ins
 
 ## Local terminal (0.2.0)
 
-Use Codex or Claude Code on your websites with macOS + Chrome. Install the Chrome store extension and follow the [one-command setup guide](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md). The installer configures the terminal service, Chrome connection and Codex/Claude Code notifications.
+Use Codex or Claude Code on your websites with macOS + Chrome. Install the Chrome store extension and follow the [one-command setup guide](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md). The installer configures the terminal service and Chrome connection, detects installed CLIs on `PATH`, and asks which Codex/Claude Code/Pi notification integrations to install.
 
 If Local terminal is missing, check `aow service status` or keep `aow terminal` running. Use `aow service open` to reopen private pairing/connection management. Type `cd` and your CLI commands inside the browser shell. All connected views can type into the same shell; focus its view to control terminal dimensions. If the shell exited, use **+** to create another one. Refreshing a view preserves a running shell; a host or computer restart ends live shell processes.
 
@@ -46,4 +46,4 @@ Reinstalling a running service does not load new host code immediately. Finish y
 
 ## Setup, notifications and removal
 
-On macOS + Chrome, `aow setup` configures the service, native pairing and Codex/Claude Code hooks. Review AgentOnWeb hooks in your CLI's `/hooks`, then launch a new Codex or Claude Code session in a new host terminal for session notifications. If an older host is running, finish terminal work, run `aow service uninstall`, then `aow setup`. Before removing the npm package run `aow uninstall`. See [setup, upgrade and uninstall](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md).
+On macOS + Chrome, `aow setup` configures the service and native pairing, and shows a terminal menu for the Codex/Claude Code/Pi integrations detected on `PATH`. Select all, comma-separated numbers/names, or `0` to skip integrations. For unattended setup use `--agents codex,claude`, `--agents all` or `--agents none`; missing CLIs are always skipped. Review AgentOnWeb hooks in your CLI's `/hooks`, then launch a new Codex or Claude Code session in a new host terminal for session notifications. If an older host is running, finish terminal work, run `aow service uninstall`, then `aow setup`. Before removing the npm package run `aow uninstall`. See [setup, upgrade and uninstall](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md).
