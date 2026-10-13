@@ -1,10 +1,10 @@
-import { access, realpath } from 'node:fs/promises';
+import { access, realpath, stat } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { basename, delimiter, join, resolve } from 'node:path';
 
 export async function executablePath(command: string): Promise<string> {
   const candidates = command.includes('/') ? [resolve(command)] : (process.env.PATH ?? '').split(delimiter).map(p => join(p, command));
-  for (const path of candidates) { try { await access(path, constants.X_OK); return await realpath(path); } catch {} }
+  for (const path of candidates) { try { await access(path, constants.X_OK); if ((await stat(path)).isFile()) return await realpath(path); } catch {} }
   throw new Error(`Executable not found: ${command}`);
 }
 

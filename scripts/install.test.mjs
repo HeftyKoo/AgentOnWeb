@@ -18,17 +18,18 @@ async function fixture(run) {
     await fake('id', 'echo "${TEST_UID:-501}"\n');
     await fake('node', 'exit "${TEST_NODE_EXIT:-0}"\n');
     await fake('npm', 'test "$AOW_SKIP_SETUP" = 1 || exit 2; echo "$*" >> "$TEST_ARGS"; cat >/dev/null; echo install >> "$TEST_LOG"; exit "${TEST_INSTALL_EXIT:-0}"\n');
-    await writeFile(join(installedBin, 'aow'), '#!/bin/sh\ncat >/dev/null\necho "$1" >> "$TEST_LOG"\nexit "${TEST_SETUP_EXIT:-0}"\n', { mode: 0o700 });
+    await writeFile(join(installedBin, 'aow'), '#!/bin/sh\ncat >/dev/null\necho "$1" >> "$TEST_LOG"\nif [ "$1" = setup ]; then printf "%s\\n" "$@" > "$TEST_SETUP_ARGS"; fi\nexit "${TEST_SETUP_EXIT:-0}"\n', { mode: 0o700 });
     const log = join(root, 'calls');
     const args = join(root, 'args');
-    const env = { ...process.env, HOME: root, SHELL: '/bin/zsh', PATH: bin + ':/usr/bin:/bin', TEST_LOG: log, TEST_ARGS: args,
+    const setupArgs = join(root, 'setup-args');
+    const env = { ...process.env, HOME: root, SHELL: '/bin/zsh', PATH: bin + ':/usr/bin:/bin', TEST_LOG: log, TEST_ARGS: args, TEST_SETUP_ARGS: setupArgs,
       ZDOTDIR: undefined, XDG_CONFIG_HOME: undefined, BASH_ENV: undefined, ENV: undefined };
     const source = await readFile(resolve('scripts/install.sh'), 'utf8');
     const install = (overrides = {}, input = source) => spawnSync('/bin/bash', [], { input, encoding: 'utf8', env: { ...env, ...overrides } });
     const shell = (executable, options, overrides = {}, command = 'aow service open') => spawnSync(executable, [...options, command], {
       input: '', encoding: 'utf8', env: { ...env, ...overrides },
     });
-    await run({ root, log, args, install, source, shell });
+    await run({ root, log, args, setupArgs, install, source, shell });
   } finally { await rm(root, { recursive: true, force: true }); }
 }
 
@@ -46,6 +47,15 @@ it('supports curl-to-bash input, paths with spaces and repeat setup without dupl
     expect(first).toContain('export PATH="$HOME/.local/bin:$PATH"');
     expect(install().status).toBe(0);
     expect(await readFile(profile, 'utf8')).toBe(first);
+  });
+});
+
+it('forwards explicit CLI selection from curl-to-bash arguments without changing the interactive default', async () => {
+  await fixture(async ({ setupArgs, install, source }) => {
+    expect(install().status).toBe(0);
+    expect(await readFile(setupArgs, 'utf8')).toBe('setup\n');
+    expect(install({}, 'set -- --agents "codex,claude"\n' + source).status).toBe(0);
+    expect(await readFile(setupArgs, 'utf8')).toBe('setup\n--agents\ncodex,claude\n');
   });
 });
 

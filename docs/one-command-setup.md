@@ -12,11 +12,34 @@ Use **macOS + Chrome**, with Node.js 22.19+ and Codex, Claude Code or Pi 1.1+ in
 3. Open a website, click AgentOnWeb and run `codex`, `claude` or `pi` in its terminal.
 4. For session notifications, open Codex `/hooks`, review and trust **AgentOnWeb session status**, then start a new Codex session.
 
-The installer configures your terminal service, automatic startup, Chrome connection and Codex/Claude Code/Pi notifications. It installs the terminal package under `~/.local`, adds its command directory to your shell profile, and preserves existing CLI settings with backups. Run it as your own user, without sudo.
+The installer configures your terminal service, automatic startup and Chrome connection. It detects `codex`, `claude` and `pi` executables on your current `PATH`, then asks which detected CLIs should receive notification hooks or an extension. It installs the terminal package under `~/.local`, adds its command directory to your shell profile, and preserves existing CLI settings with backups. Run it as your own user, without sudo.
 
 The command works from zsh, bash and fish. The installer configures both login and interactive zsh/bash windows, including editor terminals, and uses fish's own PATH syntax when fish is installed or selected as your login shell. It respects exported `ZDOTDIR` and `XDG_CONFIG_HOME` settings and preserves the Bash login profile you already use.
 
 For an already-open terminal, the installer also creates a link to the installed `aow` beside Node when that directory is writable and already on PATH, as in typical nvm/Homebrew installations. This makes `aow` available immediately without `source`. Existing npm links from older AgentOnWeb packages are updated; unrelated commands are preserved.
+
+## Choose CLI integrations
+
+By default, both the installer and `aow setup` show a numbered terminal menu for the detected CLIs. Enter a number, several comma-separated numbers (for example `1,2`), or CLI names (for example `codex,claude`). Press Enter or type `all` to choose every detected CLI; enter `0` or `none` to configure only the terminal service. The installer reads the choice from your terminal even when run through `curl | bash`. Cancel with Control+C before integration/service configuration starts.
+
+To choose explicitly without an interactive menu:
+
+```sh
+aow setup --agents codex,claude  # Only these CLIs, if installed
+aow setup --agents all          # All detected CLIs
+aow setup --agents none         # Terminal service and Chrome connection only
+aow setup --help
+```
+
+Pass the same options through the installer:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh | bash -s -- --agents codex,pi
+```
+
+Missing CLIs are always skipped, including with `--agents all`. Saved CLI settings, shell aliases and a desktop app alone do not count as an executable CLI on `PATH`. Add an installed CLI to `PATH`, then rerun setup to include it. Skipping a CLI preserves any existing integration; use its separate uninstall command to remove it.
+
+Unattended setup requires an explicit `--agents` choice when CLIs are detected. A global npm installation without a controlling terminal leaves the package installed and skips automatic setup; run `aow setup` in a terminal or use `--agents` afterward.
 
 ## The workspace has not appeared
 

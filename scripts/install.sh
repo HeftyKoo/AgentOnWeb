@@ -86,12 +86,12 @@ install_agentonweb() {
     configure_aow_path "${XDG_CONFIG_HOME:-$HOME/.config}/fish/config.fish" 'fish_add_path --path --move "$HOME/.local/bin"'
   fi
   # Keep the installed management command available even if connection setup fails.
-  if ! "$aow_prefix/bin/aow" setup </dev/null; then
+  if ! "$aow_prefix/bin/aow" setup "$@" </dev/null; then
     echo 'AgentOnWeb is installed, but setup did not finish. Retry in this terminal:' >&2
     echo '  "$HOME/.local/bin/aow" setup' >&2
     return 1
   fi
-  echo 'Ready. Open a website in Chrome, click AgentOnWeb, and run codex or claude.'
+  echo 'Ready. Open a website in Chrome, click AgentOnWeb, and run codex, claude or pi.'
   echo 'New zsh/bash terminal windows can run aow directly.'
   aow_current_command="$(PATH="$aow_original_path" command -v aow || true)"
   if [ "$aow_current_command" = "$aow_prefix/bin/aow" ] || { [ "$aow_can_link" = true ] && [ "$aow_current_command" = "$aow_link_candidate" ]; }; then
