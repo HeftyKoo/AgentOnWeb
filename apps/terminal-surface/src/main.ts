@@ -592,6 +592,7 @@ document.addEventListener("visibilitychange", () => {
 });
 const nonce = new URLSearchParams(location.hash.slice(1)).get("agentonweb");
 let authorizedParent = parent === window;
+let modeShortcuts: readonly string[] = [];
 let mode = "focus",
   opacity = 0.82;
 function presentation() {
@@ -615,6 +616,9 @@ window.addEventListener("message", (event) => {
     authorizedParent = true;
     void connect();
   }
+  if (m.type === "mode.shortcuts" && authorizedParent && Array.isArray(m.modes)
+    && m.modes.length <= 3 && m.modes.every((value: unknown) => value === "chill" || value === "focus" || value === "watch")) modeShortcuts = m.modes;
+  if (m.type === "surface.focus" && authorizedParent && mode === "focus") terminal.focus();
   if (m.type === "terminal.activate" && authorizedParent && typeof m.terminalId === "string" && m.terminalId.length <= 100
     && typeof m.requestId === "string" && m.requestId.length <= 100 && m.requestId !== lastActivation && m.requestId !== requestedTerminal?.requestId) {
     requestedTerminal = { id: m.terminalId, requestId: m.requestId };
@@ -631,11 +635,15 @@ window.addEventListener("keydown", (event) => {
   optionTap.keydown(event);
   if (!nonce || parent === window || !authorizedParent) return;
   const action = surfaceShortcut(event);
-  if (action !== "runtime.toggle" || event.defaultPrevented) return;
+  if (!action || (action !== "runtime.toggle" && !modeShortcuts.includes(action)) || event.defaultPrevented) return;
   event.preventDefault();
   event.stopImmediatePropagation();
   if (!event.repeat) parent.postMessage({ source: "agentonweb-surface", type: "surface.shortcut", nonce, action }, "*");
 }, true);
+window.addEventListener("focus", () => {
+  if (nonce && parent !== window && authorizedParent)
+    parent.postMessage({ source: "agentonweb-surface", type: "surface.focused", nonce }, "*");
+});
 window.addEventListener("pointerdown", () => {
   if (nonce && parent !== window && authorizedParent) parent.postMessage({ source: "agentonweb-surface", type: "surface.pointerdown", nonce }, "*");
 }, true);

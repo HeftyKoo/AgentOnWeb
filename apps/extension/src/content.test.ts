@@ -258,7 +258,7 @@ describe("page-local AgentOnWeb visibility", () => {
     p.ready(p.frame, undefined, undefined, p.window);
     expect(postMessage).not.toHaveBeenCalled();
     p.ready();
-    expect(postMessage).toHaveBeenCalledTimes(2);
+    expect(postMessage).toHaveBeenCalledTimes(3);
   });
 
   it("does not trust an inherited about:blank load as extension readiness", async () => {
@@ -306,9 +306,10 @@ describe("page-local AgentOnWeb visibility", () => {
         type: "opacity.set",
         opacity: 0.8,
       },
+      { source: "agentonweb-extension", nonce: "test-nonce", type: "mode.shortcuts", modes: ["chill", "focus", "watch"] },
     ]);
     p.emit("state.update", { ...state, mode: "chill", opacity: 0.4 });
-    expect(postMessage).toHaveBeenLastCalledWith(
+    expect(postMessage).toHaveBeenCalledWith(
       {
         source: "agentonweb-extension",
         nonce: "test-nonce",
@@ -525,6 +526,101 @@ describe("page-local AgentOnWeb visibility", () => {
     p.emit("surface.show", { ...connected, mode: "watch" });
     expect(p.host.dataset.mode).toBe("watch");
     expect(p.shadow.querySelector<HTMLElement>(".agentonweb-root")!.dataset.active).toBe("true");
+  });
+
+  it("forwards authenticated terminal mode keys through the deduplicated shortcut path and refreshes its policy", async () => {
+    const bindings = [
+      { name: "mode-chill", shortcut: "Ctrl+1" },
+      { name: "mode-focus", shortcut: "Ctrl+Shift+2" },
+      { name: "mode-watch", shortcut: "Ctrl+3" },
+    ];
+    const p = await page(connected, undefined, undefined, undefined, { platform: "MacIntel", modeShortcuts: bindings });
+    const native = { postMessage: vi.fn() };
+    Object.defineProperty(p.frame, "contentWindow", { configurable: true, value: native });
+    p.ready();
+    expect(native.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "mode.shortcuts", modes: ["chill", "watch"] }), "chrome-extension://test-extension");
+    const key = (action: string, nonce = "test-nonce", origin = "chrome-extension://test-extension", sender: unknown = native) =>
+      p.window.dispatchEvent(new p.window.MessageEvent("message", { source: sender as Window, origin,
+        data: { source: "agentonweb-surface", type: "surface.shortcut", nonce, action } }));
+    p.sendMessage.mockClear();
+    key("watch", "wrong");
+    key("watch", undefined, "https://attacker.example");
+    key("watch", undefined, undefined, p.window);
+    key("focus");
+    expect(p.sendMessage).not.toHaveBeenCalled();
+    key("chill");
+    key("watch");
+    expect(p.sendMessage.mock.calls.map(([request]) => request)).toEqual([
+      { source: "agentonweb-content", type: "mode.shortcut", mode: "chill" },
+      { source: "agentonweb-content", type: "mode.shortcut", mode: "watch" },
+    ]);
+    let refresh!: (value: { ok: boolean; result: typeof bindings }) => void;
+    p.sendMessage.mockImplementationOnce(() => new Promise(resolve => { refresh = resolve; }));
+    bindings[2]!.shortcut = "";
+    p.window.dispatchEvent(new p.window.MessageEvent("message", { source: native as any, origin: "chrome-extension://test-extension",
+      data: { source: "agentonweb-surface", type: "surface.focused", nonce: "test-nonce" } }));
+    p.sendMessage.mockClear();
+    key("chill");
+    expect(p.sendMessage).toHaveBeenCalledWith({ source: "agentonweb-content", type: "mode.shortcut", mode: "chill" });
+    refresh({ ok: true, result: bindings });
+    await Promise.resolve();
+    expect(native.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: "mode.shortcuts", modes: ["chill"] }), "chrome-extension://test-extension");
+    p.sendMessage.mockClear();
+    key("watch");
+    expect(p.sendMessage).not.toHaveBeenCalled();
+    p.emit("state.update", { ...connected, mode: "watch" });
+    key("chill");
+    expect(p.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("focuses the terminal only for explicit Focus, preserves Chill focus, and restores the last website control in Watch", async () => {
+    const p = await page(connected);
+    const postMessage = vi.fn();
+    Object.defineProperty(p.frame, "contentWindow", { configurable: true, value: { postMessage } });
+    p.ready();
+    const field = p.window.document.createElement("input");
+    p.window.document.body.append(field);
+    field.focus();
+    p.emit("state.update", { ...connected, mode: "focus" });
+    expect(p.window.document.activeElement).toBe(field);
+    expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: "surface.focus" }), expect.anything());
+    p.emit("surface.show", { ...connected, mode: "focus" });
+    expect(p.shadow.activeElement).toBe(p.frame);
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "surface.focus" }), "chrome-extension://test-extension");
+    postMessage.mockClear();
+    p.emit("surface.show", connected);
+    expect(p.shadow.activeElement).toBe(p.frame);
+    p.emit("state.update", connected);
+    expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: "surface.focus" }), expect.anything());
+    p.emit("state.update", { ...connected, mode: "watch" });
+    p.emit("surface.show", { ...connected, mode: "watch" });
+    expect(p.window.document.activeElement).toBe(field);
+    // Chromium may focus the intermediate extension frame asynchronously when
+    // it finishes hiding the native out-of-process child.
+    p.frame.focus();
+    p.window.dispatchEvent(new p.window.MessageEvent("message", { source: p.frame.contentWindow,
+      origin: "chrome-extension://test-extension",
+      data: { source: "agentonweb-surface", type: "surface.focused", nonce: "test-nonce" } }));
+    expect(p.window.document.activeElement).toBe(field);
+    p.emit("surface.show", connected);
+    expect(p.window.document.activeElement).toBe(field);
+    p.emit("surface.show", { ...connected, mode: "focus" });
+    expect(p.shadow.activeElement).toBe(p.frame);
+    field.remove();
+    p.emit("surface.show", { ...connected, mode: "watch" });
+    expect(p.window.document.activeElement).toBe(p.window.document.body);
+  });
+
+  it("delivers a Focus request after wrapper readiness without replaying it on later state updates", async () => {
+    const p = await page(connected);
+    const postMessage = vi.fn();
+    Object.defineProperty(p.frame, "contentWindow", { configurable: true, value: { postMessage } });
+    p.emit("surface.show", { ...connected, mode: "focus" });
+    expect(postMessage).not.toHaveBeenCalled();
+    p.ready();
+    expect(postMessage.mock.calls.filter(([message]) => message.type === "surface.focus")).toHaveLength(1);
+    p.emit("state.update", { ...connected, mode: "focus" });
+    expect(postMessage.mock.calls.filter(([message]) => message.type === "surface.focus")).toHaveLength(1);
   });
 
   it("leaves editable website shortcuts and inactive runtime shortcuts alone", async () => {
