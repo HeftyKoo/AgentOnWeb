@@ -40,7 +40,7 @@ it('supports curl-to-bash input, paths with spaces and repeat setup without dupl
     expect(await readFile(log, 'utf8')).toBe('install\nsetup\n');
     const command = await readFile(args, 'utf8');
     expect(command).toContain(`--prefix ${root}/.local`);
-    expect(command).toContain('@agentonweb/terminal-host@0.3.0');
+    expect(command).toContain('@agentonweb/terminal-host@0.4.0');
     const profile = join(root, '.zprofile');
     const first = await readFile(profile, 'utf8');
     expect(first).toContain('export EDITOR=vim\n');

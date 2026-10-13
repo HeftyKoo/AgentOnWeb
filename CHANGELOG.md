@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0 — 2026-10-13
+
+- Add Pi session status, approval and completion notifications alongside Codex and Claude Code.
+- Detect installed CLIs during `aow setup` and prompt for the integrations to enable while preserving existing settings.
+- Recover disconnected runtime sessions and preserve independent visibility and presentation across browser tabs.
+- Forward enabled default mode shortcuts from terminal input without sending their key bytes to the shell; respect cleared and remapped browser bindings.
+- Focus native terminal input on explicit Focus actions, preserve input focus in Chill, and restore the most recently focused website control in Watch. Preserve terminal focus during background updates and rapid keyboard mode changes.
+- Align extension, terminal host, DSH package and installer at 0.4.0. Connector protocol remains 1. Safari uses version 0.4.0, build 9.
+
+### Upgrade
+
+Update the browser extension and terminal host together. Finish active terminal work, run `aow service uninstall`, then rerun the installer or `aow setup` to start the updated host. Restart DSH after updating its plugin. Browser updates become available after each store approves them.
+
 ## 0.3.0 — 2026-10-12
 
 - Add Claude Code session status, approval and completion notifications through official observational hooks, alongside existing Codex support. `aow setup` installs both integrations; `aow claude-hooks install|uninstall` manages Claude hooks independently while preserving other settings.
