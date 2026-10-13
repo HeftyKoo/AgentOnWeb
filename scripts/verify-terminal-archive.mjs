@@ -19,7 +19,7 @@ export async function verifyTerminalArchive(archive, root) {
     const listing = (await execute('tar', ['-tf', archive])).stdout.trim().split('\n').sort();
     assert.deepEqual(listing, [
       'package/LICENSE', 'package/README.md', 'package/package.json', 'package/postinstall.mjs', 'package/fix-pty-permissions.mjs',
-      'package/lib/cli.js', 'package/lib/agent-hook.js', 'package/lib/public/index.html', 'package/lib/public/main.js', 'package/lib/public/main.css',
+      'package/lib/cli.js', 'package/lib/agent-hook.js', 'package/lib/pi-extension.js', 'package/lib/public/index.html', 'package/lib/public/main.js', 'package/lib/public/main.css',
     ].sort(), 'Unexpected terminal archive contents');
     await execute('npm', ['install', '--prefix', directory, '--omit=dev', '--no-package-lock', '--no-audit', '--no-fund', archive], { timeout: 120000, maxBuffer: 4 * 1024 * 1024 });
     const installed = resolve(directory, 'node_modules/@agentonweb/terminal-host');
@@ -53,6 +53,18 @@ export async function verifyTerminalArchive(archive, root) {
     assert.equal(await readFile(settingsPath, 'utf8'), configured);
     await execute(process.execPath, [bin, 'claude-hooks', 'uninstall'], { cwd: directory, env: hookEnv });
     assert.deepEqual(JSON.parse(await readFile(settingsPath, 'utf8')), settings);
+    const piDirectory = resolve(home, '.pi/agent');
+    const piEnv = { ...process.env, PI_CODING_AGENT_DIR: piDirectory };
+    await execute(process.execPath, [bin, 'pi-extension', 'install'], { cwd: directory, env: piEnv });
+    const piPath = resolve(piDirectory, 'extensions/agentonweb.ts');
+    const piSource = await readFile(piPath, 'utf8');
+    assert.ok(piSource.includes(JSON.stringify(await realpath(resolve(installed, 'lib/pi-extension.js')))));
+    const extension = (await import(resolve(installed, 'lib/pi-extension.js'))).default;
+    assert.equal(typeof extension, 'function');
+    await execute(process.execPath, [bin, 'pi-extension', 'install'], { cwd: directory, env: piEnv });
+    assert.equal(await readFile(piPath, 'utf8'), piSource);
+    await execute(process.execPath, [bin, 'pi-extension', 'uninstall'], { cwd: directory, env: piEnv });
+    await assert.rejects(readFile(piPath), { code: 'ENOENT' });
     // The smoke test does not change service state or user startup files.
     host = spawn(process.execPath, [entry, 'terminal'], {
       cwd: directory, env: { ...process.env, HOME: home, SHELL: '/bin/sh', ENV: undefined, BASH_ENV: undefined, ZDOTDIR: undefined }, stdio: ['ignore', 'pipe', 'pipe'],
@@ -103,7 +115,7 @@ export async function verifyTerminalArchive(archive, root) {
       }
     });
     await waitFor(() => { if (socketError) throw socketError; return text.includes('AOW_PACKED_SHELL_OK'); });
-    console.log('Packed terminal host passed: isolated production install, Claude hook install/uninstall, lightweight reporter, browser assets and real shell input/output.');
+    console.log('Packed terminal host passed: isolated production install, Claude/Pi integration install/uninstall, lightweight reporters, browser assets and real shell input/output.');
   } finally {
     socket?.terminate();
     if (host && host.exitCode === null && host.signalCode === null) {
