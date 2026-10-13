@@ -4,9 +4,9 @@ title: Privacy Policy
 ---
 # AgentOnWeb Privacy Policy
 
-Effective date: September 29, 2026
+Effective date: October 13, 2026
 
-AgentOnWeb is an open-source browser extension for Chrome, Firefox, and Safari that displays local workspaces over the website you are using. Version 0.2.0 supports DeepSeek Harness and a separate local terminal host. This policy covers the browser extensions, the Safari macOS containing app, the DSH integration and the local terminal host.
+AgentOnWeb is an open-source browser extension for Chrome, Firefox, and Safari that displays local workspaces over the website you are using. The 0.4.0 extension supports DeepSeek Harness and a separate local terminal host for Codex, Claude Code and Pi. Terminal host 0.4.1 adds version checks and explicit upgrade/restart commands. This policy covers the browser extensions, the Safari macOS containing app, the DSH integration and the local terminal host.
 
 ## Data handled on your computer
 
@@ -23,6 +23,8 @@ When enabled, the Codex and Claude Code integrations report session IDs, termina
 The shell installer installs the terminal package under `~/.local` and adds its command directory to your shell profile. `aow setup` detects `codex`, `claude` and `pi` executables on `PATH` and asks which integrations to install (or accepts an explicit `--agents` selection). It installs a login service and a Chrome native messaging registration. For detected and selected CLIs, it backs up/updates Codex hooks and notify configuration in `CODEX_HOME` (normally `~/.codex`) and Claude Code hooks in `CLAUDE_CONFIG_DIR/settings.json` (normally `~/.claude/settings.json`), or installs a Pi extension under `PI_CODING_AGENT_DIR` (normally `~/.pi/agent/extensions/agentonweb.ts`). Missing or unselected CLI integrations are left untouched. An existing notify command remains responsible for its own data processing. Native pairing uses local secrets and a saved receipt to avoid automatically reauthorizing revoked access. Files under `~/.agentonweb/terminal/` include native launcher/configuration and pairing receipts. Setup does not select a model, sign in to a CLI, change approval policy or trust hooks for you.
 
 ## Collection and sharing
+
+The update-capable local terminal host automatically queries public npm metadata for `@agentonweb/terminal-host`, at most once every 24 hours after successful checks. Failed checks use increasing retry delays. npm's infrastructure receives normal request/network information, such as your IP address; the query contains no terminal text, prompts, browsing data, directories, connection credentials or user identifier. Results and the on/off preference are stored locally in `~/.agentonweb/terminal/update-cache.json` and `updates.json`. Checks do not install packages or restart processes. Disable them with `aow check-update --disable`, or `AOW_UPDATE_CHECK=0` in the host environment; CI skips automatic checks. Explicit `aow check-update` and `aow update` still contact npm. An explicit update uses npm to install the checked package and its dependencies under the original global prefix. Live shells block upgrade/restart unless you explicitly use `--force` to end their tasks.
 
 AgentOnWeb does not operate an analytics service, advertising service, or developer-hosted data backend. The extension and containing app do not send your browsing history, website contents, prompts, or connection credentials to the AgentOnWeb developer. AgentOnWeb does not sell personal information or track users across apps and websites for advertising.
 

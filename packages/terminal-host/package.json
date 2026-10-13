@@ -1,6 +1,6 @@
 {
   "name": "@agentonweb/terminal-host",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "license": "MIT",
   "description": "Your local interactive shell in AgentOnWeb",
@@ -25,6 +25,7 @@
     "@xterm/addon-serialize": "^0.13.0",
     "@xterm/headless": "^5.5.0",
     "node-pty": "^1.1.0",
+    "semver": "^7.8.5",
     "ws": "^8.18.3"
   },
   "devDependencies": {
@@ -32,6 +33,7 @@
     "@agentonweb/connector-host": "workspace:*",
     "@agentonweb/terminal-core": "workspace:*",
     "@agentonweb/terminal-surface": "workspace:*",
+    "@types/semver": "^7.8.0",
     "@types/ws": "^8.18.1",
     "smol-toml": "1.8.0"
   },

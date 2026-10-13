@@ -21,8 +21,37 @@ import { installClaudeHooks, uninstallClaudeHooks } from "./claude-hooks.js";
 import { installPiExtension, uninstallPiExtension } from "./pi-hooks.js";
 import { reportAgentEvent } from "./agent-events.js";
 import type { NativeSurface } from "@agentonweb/connector-contract";
+import { VERSION, installedVersion } from './version.js';
+import { Updates } from './updates.js';
+import { Maintenance } from './management.js';
+import { updateCommand } from './upgrade.js';
 
 const inputArgs = process.argv.slice(2);
+if (inputArgs.length === 1 && inputArgs[0] === '--version') {
+  console.log(VERSION); process.exit(0);
+}
+if (inputArgs[0] === 'update' || inputArgs[0] === 'check-update') {
+  try {
+    if (inputArgs[0] === 'update') await updateCommand(inputArgs.slice(1));
+    else {
+      const option = inputArgs[1];
+      if (inputArgs.length > 2 || option && !['--enable', '--disable', '--help', '-h'].includes(option)) throw new Error('Usage: aow check-update [--enable|--disable]');
+      const updates = new Updates(serviceDirectory);
+      if (option === '--help' || option === '-h') console.log('Usage: aow check-update [--enable|--disable]\nCheck the stable npm version, or enable/disable automatic checks. Explicit checks still work when disabled.');
+      else if (option) {
+        await updates.configure(option === '--enable');
+        console.log(`Automatic update checks ${option === '--enable' ? 'enabled' : 'disabled'}.`);
+      } else {
+        const status = await updates.check(true);
+        if (status.error) throw new Error(status.error);
+        console.log(`Installed CLI: ${VERSION}\nLatest stable: ${status.latest}\n${status.updateAvailable ? 'Update available. Run aow update from a separate macOS Terminal.' : 'No newer stable version available.'}`);
+      }
+    }
+  } catch (error) {
+    console.error(`aow: ${error instanceof Error ? error.message : String(error)}`); process.exit(1);
+  }
+  process.exit(0);
+}
 if (inputArgs[0] === "native-host") {
   await runNativeHost(inputArgs[1] ?? "", serviceDirectory);
   process.exit(0);
@@ -87,7 +116,7 @@ if (inputArgs[0] === "service") {
 }
 if (inputArgs.length === 1 && inputArgs[0] === "--help") {
   console.log(
-    "Usage: aow setup | aow uninstall | aow terminal | aow codex-hooks install|uninstall | aow claude-hooks install|uninstall | aow pi-extension install|uninstall | aow service [open|install|status|uninstall] (default: open)",
+    "Usage: aow setup | aow uninstall | aow terminal | aow --version | aow check-update [--enable|--disable] | aow update [--force] | aow codex-hooks install|uninstall | aow claude-hooks install|uninstall | aow pi-extension install|uninstall | aow service [open|install|status|restart [--force]|uninstall] (default: open)",
     "\nRun aow setup --help to select CLI integrations with --agents.",
   );
   process.exit(0);
@@ -109,6 +138,8 @@ const agentSessions = new AgentSessions();
 let agentEndpoint = "";
 type HostedSession = { token: string; exited?: boolean; session: TerminalSession; name?: string; directory: string; directoryRefresh?: Promise<void> };
 const sessions = new Map<string, HostedSession>();
+const maintenance = new Maintenance();
+const updates = new Updates(stateDirectory);
 function sessionNames() {
   return [...sessions].map(([id, value]) => ({ id, name: value.name ?? (basename(value.directory) || value.directory) }));
 }
@@ -152,6 +183,7 @@ async function readBody(req: IncomingMessage, limit: number): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 function newSession() {
+  if (maintenance.active) throw new RequestError(409, 'An update or restart is in progress. Try again when the service is ready.');
   if (sessions.size >= 8) throw new RequestError(409, "Close an unused terminal before opening another (maximum 8).");
   const id = randomUUID();
   const token = randomBytes(32).toString("base64url");
@@ -201,6 +233,8 @@ async function saveEndpoint() {
     temp,
     JSON.stringify({
       pid: process.pid,
+      version: VERSION,
+      managedService: inputArgs.includes('--service'),
       nativeToken,
       launchUrl: `${origin}/launch?token=${launchToken}`,
     }),
@@ -211,6 +245,33 @@ async function saveEndpoint() {
 const publicRoot = new URL("./public/", import.meta.url);
 const server = createServer(async (req, res) => {
   try {
+    if (req.url === '/service-control') {
+      // Local CLI only: never accept a browser Origin or delegated/admin cookie.
+      if (req.headers.origin || req.headers.host !== new URL(origin).host
+        || !matchesSecret((req.headers.authorization ?? '').replace(/^Bearer /u, ''), nativeToken)) {
+        res.writeHead(403).end(); return;
+      }
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'GET') {
+        res.end(JSON.stringify({ version: VERSION, activeTerminals: [...sessions.values()].filter(item => !item.exited).length,
+          managedService: inputArgs.includes('--service') })); return;
+      }
+      if (req.method !== 'POST') { res.writeHead(405).end(); return; }
+      let action;
+      try { action = JSON.parse(await readBody(req, 4096)); }
+      catch { throw new RequestError(400, 'Invalid service action.'); }
+      if (!action || typeof action !== 'object' || Array.isArray(action)) throw new RequestError(400, 'Invalid service action.');
+      if (action.action === 'prepare' && (action.force === undefined || typeof action.force === 'boolean')) {
+        try {
+          const token = maintenance.prepare([...sessions.values()].filter(item => !item.exited).length, action.force === true);
+          res.end(JSON.stringify({ token }));
+        } catch (error) { throw new RequestError(409, (error as Error).message); }
+      } else if (action.action === 'release' && typeof action.token === 'string') {
+        maintenance.release(action.token); res.end('{}');
+      } else throw new RequestError(400, 'Invalid service action.');
+      return;
+    }
     if (req.url === "/native-pair") {
       if (req.method !== "POST" || req.headers.origin || req.headers.host !== new URL(origin).host
         || !matchesSecret((req.headers.authorization ?? "").replace(/^Bearer /u, ""), nativeToken)) {
@@ -265,6 +326,13 @@ const server = createServer(async (req, res) => {
       "Content-Security-Policy",
       "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors http: https: chrome-extension: moz-extension: safari-web-extension:",
     );
+    if (url.pathname === '/api/updates') {
+      if (!isAdmin(req.headers.cookie) || req.headers['x-agentonweb-terminal'] !== '1'
+        || req.headers.origin && req.headers.origin !== origin) { res.writeHead(403).end(); return; }
+      if (req.method !== 'GET') { res.writeHead(405).end(); return; }
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ ...await updates.status(), installedVersion: installedVersion(), runningVersion: VERSION })); return;
+    }
     if (url.pathname === "/api/terminals" || url.pathname === "/api/connections") {
       const admin = isAdmin(req.headers.cookie);
       const permitted = url.pathname === "/api/connections" ? admin : authenticated(req.headers.cookie);
@@ -497,10 +565,14 @@ console.log(
   `AgentOnWeb · Local shell\nExecutable: ${executable}\nInitial directory: ${cwd}\nConnector: ${connector.port}\nOpen once: ${origin}/launch?token=${launchToken}\nApprove your browser through the private setup page.`,
 );
 await saveEndpoint();
+const stopUpdateChecks = updates.start(status => {
+  console.log(`AgentOnWeb ${status.latest} is available (running ${VERSION}). Run aow update after closing terminal sessions.`);
+});
 let stopping = false;
 async function stop() {
   if (stopping) return;
   stopping = true;
+  stopUpdateChecks();
   await cleanup([
     ...[...sessions.values()].map(({ session }) => () => session.dispose()),
     () => unlink(join(stateDirectory, "endpoint.json")).catch((error: NodeJS.ErrnoException) => {

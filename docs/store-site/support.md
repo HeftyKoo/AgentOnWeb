@@ -36,13 +36,13 @@ If no runtime is found, check that `dsh web` is running and restart it after ins
 
 [Setup guide](index.html) · [Privacy policy](privacy.html) · [Source and releases](https://github.com/HeftyKoo/AgentOnWeb)
 
-## Local terminal (0.2.0)
+## Local terminal
 
 Use Codex or Claude Code on your websites with macOS + Chrome. Install the Chrome store extension and follow the [one-command setup guide](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md). The installer configures the terminal service and Chrome connection, detects installed CLIs on `PATH`, and asks which Codex/Claude Code/Pi notification integrations to install.
 
 If Local terminal is missing, check `aow service status` or keep `aow terminal` running. Use `aow service open` to reopen private pairing/connection management. Type `cd` and your CLI commands inside the browser shell. All connected views can type into the same shell; focus its view to control terminal dimensions. If the shell exited, use **+** to create another one. Refreshing a view preserves a running shell; a host or computer restart ends live shell processes.
 
-Reinstalling a running service does not load new host code immediately. Finish your terminal work before stopping and reinstalling the service. Never include the private setup URL or raw service logs in public issues.
+Terminal host 0.4.1 checks the stable npm version daily without installing code or interrupting tasks. Its private management page shows available updates and installed versus running versions. Use `aow check-update` to check now or `aow check-update --disable` to turn automatic checks off. Run `aow update` or `aow service restart` in a separate macOS Terminal after exiting or closing all live shells. Explicit `--force` ends their tasks. For the first upgrade from 0.4.0 or earlier, finish terminal work, run `aow service uninstall`, then rerun the installer. Saved history, browser grants and integration settings remain. Never include the private setup URL or raw service logs in public issues.
 
 ## Setup, notifications and removal
 

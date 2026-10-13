@@ -3,6 +3,8 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { hostRequest, liveEndpoint, prepareHost } from './management.js';
+import { VERSION } from './version.js';
 
 const label = 'com.agentonweb.terminal';
 export const serviceDirectory = join(homedir(), '.agentonweb', 'terminal');
@@ -20,14 +22,14 @@ export function launchAgent(node: string, entry: string, home: string, path: str
     '<key>StandardErrorPath</key>' + string(join(home, '.agentonweb/terminal/service.log')) + '</dict></plist>\n';
 }
 export async function serviceCommand(args: string[]): Promise<void> {
-  const usage = 'Usage: aow service [open | install [--no-open] | status | uninstall] (default: open)';
+  const usage = 'Usage: aow service [open | install [--no-open] | status | restart [--force] | uninstall] (default: open)';
   if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
     console.log(usage);
     return;
   }
   const action = args[0] ?? 'open';
-  if (!['install', 'open', 'status', 'uninstall'].includes(action) ||
-      (args.length > 1 && !(action === 'install' && args.length === 2 && args[1] === '--no-open'))) {
+  if (!['install', 'open', 'status', 'restart', 'uninstall'].includes(action) ||
+      (args.length > 1 && !(args.length === 2 && (action === 'install' && args[1] === '--no-open' || action === 'restart' && args[1] === '--force')))) {
     throw new Error(usage);
   }
   if (process.platform !== 'darwin') throw new Error('Automatic service installation currently supports macOS. Run aow terminal on this platform.');
@@ -48,11 +50,57 @@ export async function serviceCommand(args: string[]): Promise<void> {
   else if (action === 'status') {
     try { execFileSync('/bin/launchctl', ['print', domain + '/' + label], { stdio: 'ignore' }); console.log('AgentOnWeb terminal service is loaded.'); }
     catch { console.log('AgentOnWeb terminal service is not loaded.'); }
+    console.log(`Installed CLI: ${VERSION}`);
+    const endpoint = await liveEndpoint(serviceDirectory);
+    if (endpoint) {
+      try {
+        const status = await hostRequest(endpoint);
+        console.log(`Running host: ${status.version} · ${status.activeTerminals} active terminal(s).`);
+        if (status.version !== VERSION) console.log('Installed version differs from the running host. Run aow service restart after closing terminals.');
+      } catch { console.log('Running host version unavailable. Finish terminal work and restart the older host manually.'); }
+    }
+  } else if (action === 'restart') {
+    const prepared = await prepareHost(serviceDirectory, args.includes('--force'));
+    try { await reloadService(VERSION); }
+    finally { await prepared.release(); }
   } else if (action === 'uninstall') {
     try { execFileSync('/bin/launchctl', ['bootout', domain + '/' + label], { stdio: 'pipe' }); } catch {}
     await unlink(plist).catch(error => { if (error.code !== 'ENOENT') throw error; });
     console.log('Automatic startup removed. Service terminals stopped; saved CLI history is unchanged.');
   }
+}
+export function serviceLoaded(): boolean {
+  try { execFileSync('/bin/launchctl', ['print', `gui/${process.getuid!()}/${label}`], { stdio: 'ignore' }); return true; }
+  catch { return false; }
+}
+/** Caller holds the host's maintenance lease before reaching this point. */
+export async function reloadService(expectedVersion: string) {
+  const old = await liveEndpoint(serviceDirectory);
+  if (serviceLoaded()) {
+    if (!old) throw new Error('The loaded service is not ready. Check service.log before restarting; no service was stopped.');
+    execFileSync('/bin/launchctl', ['bootout', `gui/${process.getuid!()}/${label}`], { stdio: 'pipe', timeout: 10000 });
+    let stopped = false;
+    for (let i = 0; i < 100; i++) {
+      try { process.kill(old.pid, 0); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === 'ESRCH') { stopped = true; break; } throw error; }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (!stopped) throw new Error('The previous host did not stop. Check service.log before starting another host.');
+  }
+  await serviceCommand(['install', '--no-open']);
+  for (let i = 0; i < 50; i++) {
+    try {
+      const endpoint = await liveEndpoint(serviceDirectory);
+      if (endpoint && endpoint.pid !== old?.pid) {
+        const status = await hostRequest(endpoint);
+        if (status.version === expectedVersion && status.managedService) {
+          console.log(`AgentOnWeb service is running version ${expectedVersion}.`); return;
+        }
+      }
+    } catch { /* Wait for the new host to publish its endpoint. */ }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  throw new Error(`Service restart did not confirm version ${expectedVersion}. Check ~/.agentonweb/terminal/service.log and run aow setup to repair it.`);
 }
 async function openService() {
   for (let attempt = 0; attempt < 50; attempt++) {
