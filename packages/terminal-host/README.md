@@ -10,7 +10,7 @@ Install [the Chrome extension](https://chromewebstore.google.com/detail/agentonw
 curl -fsSL https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh | bash
 ```
 
-The installer configures the terminal service, Chrome connection and Codex/Claude Code/Pi notifications. Open a website, click AgentOnWeb and run:
+The installer configures the terminal service and Chrome connection. It detects `codex`, `claude` and `pi` executables on `PATH` and asks which notification integrations to install in a numbered terminal menu, including when run through `curl | bash`. Choose all detected CLIs, comma-separated numbers/names, or `0` to skip integrations. Missing CLIs are always skipped. Open a website, click AgentOnWeb and run:
 
 ```sh
 cd ~/your-project
@@ -18,6 +18,8 @@ codex
 ```
 
 For notifications, review and trust **AgentOnWeb session status** in Codex `/hooks`, then start a new Codex session. Your existing Codex settings are preserved.
+
+Use `aow setup` to choose integrations again, or pass `--agents codex,claude`, `--agents all` or `--agents none` to select them without prompting. `all` includes only detected CLIs; skipped integrations are left as they are. For unattended shell installation, append options with `| bash -s -- --agents all`. `aow setup --help` lists the options. Global npm installation without a terminal skips automatic setup and prints how to run it explicitly.
 
 The installer configures zsh, bash and detected fish installations. It also links `aow` into Node's command directory when that directory is already on PATH and writable, so the current terminal can use it without sourcing a profile. If another program owns that command or the directory is protected, use `"$HOME/.local/bin/aow" service` directly.
 

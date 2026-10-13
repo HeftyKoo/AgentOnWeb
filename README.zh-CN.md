@@ -50,7 +50,7 @@ AgentOnWeb 将你的编程工作区带到你当前打开的页面上。一边看
 curl -fsSL https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh | bash
 ```
 
-安装器会配置本机终端、登录自动启动、Chrome 连接和 Codex / Claude Code / Pi 通知，并保留已有的 CLI 设置。
+安装器会配置本机终端、登录自动启动和 Chrome 连接，先检测 `PATH` 中的 Codex / Claude Code / Pi，再显示终端交互菜单，让你选择安装全部、部分已检测到的 CLI 集成，或跳过。已有的 CLI 设置会保留。也可以用 `aow setup --agents codex,claude`、`--agents all` 或 `--agents none` 显式选择。
 
 安装命令兼容 zsh、bash 和 fish。如果 Node 命令目录已在 PATH 中且可写，安装器会在其中创建 `aow` 入口，同一个终端安装后即可运行 `aow service`，无需 source。新开的 zsh/bash 窗口及检测到的 fish 也会配置 `aow` 路径。如果该目录受保护或已有其他程序的 `aow` 命令，可直接运行 `"$HOME/.local/bin/aow" service`。
 
