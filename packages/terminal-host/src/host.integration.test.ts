@@ -519,6 +519,8 @@ it('pairs through the native bridge once, rejects web callers and preserves revo
   const launchUrl = /Open once: (http:\/\/[^\s]+)/u.exec(output)![1]!;
   const origin = new URL(launchUrl).origin;
   const state = join(directory, '.agentonweb/terminal');
+  // The startup message precedes the atomic endpoint write used by native clients.
+  await expect.poll(() => stat(join(state, 'endpoint.json')).then(() => true, () => false), { timeout: 10000 }).toBe(true);
   const endpoint = JSON.parse(await readFile(join(state, 'endpoint.json'), 'utf8'));
   expect(await nativeRequest(state, extension, { type: 'probe' })).toEqual({ ok: true, canPair: true });
   const native = spawn(process.execPath, [cli, 'native-host', extension + '/'], { env: { ...process.env, HOME: directory }, stdio: ['pipe', 'pipe', 'pipe'] });
