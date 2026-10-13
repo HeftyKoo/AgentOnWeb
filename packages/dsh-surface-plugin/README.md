@@ -1,6 +1,6 @@
 # AgentOnWeb DSH integration
 
-`@agentonweb/dsh-surface` **0.3.0** connects the native DeepSeek Harness Web workspace to AgentOnWeb. Conversations, models, tools, approvals and DSH plugins stay in DSH's own interface. AgentOnWeb also supports a separate local terminal; this package supplies only the DSH integration.
+`@agentonweb/dsh-surface` **0.4.0** connects the native DeepSeek Harness Web workspace to AgentOnWeb. Conversations, models, tools, approvals and DSH plugins stay in DSH's own interface. AgentOnWeb also supports a separate local terminal; this package supplies only the DSH integration.
 
 ## Install and connect
 
@@ -8,7 +8,7 @@ Use Node.js **22.19+**. Install the latest DSH. This release was verified agains
 
 ```sh
 npm install -g @deepseek-ai/dsh@latest
-dsh plugin --profile web add @agentonweb/dsh-surface@0.3.0
+dsh plugin --profile web add @agentonweb/dsh-surface@0.4.0
 dsh web
 ```
 

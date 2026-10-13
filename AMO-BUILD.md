@@ -1,6 +1,6 @@
 # Reproduce the Firefox extension
 
-This source archive contains the complete tracked source for AgentOnWeb 0.3.0.
+This source archive contains the complete tracked source for AgentOnWeb 0.4.0.
 Use Node.js 22.19.0 and pnpm 11.5.0 on Linux or macOS. No API keys, local
 terminal service, model credentials or private signing configuration are needed.
 
