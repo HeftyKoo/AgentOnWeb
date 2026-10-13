@@ -45,6 +45,7 @@ function createChrome() {
       set: vi.fn(async (values: Record<string, unknown>) => { Object.assign(data, structuredClone(values)); }),
     } },
     cookies: {
+      onChanged: event(),
       getPartitionKey: vi.fn(async () => ({ partitionKey: { topLevelSite: "https://example.org" } })),
       set: vi.fn(async (_details: unknown) => ({ name: "native-session" })), remove: vi.fn(async () => ({})),
     },
@@ -70,6 +71,17 @@ beforeEach(() => {
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("cross-browser native connection lifecycle", () => {
+  it("restores a delegated cookie removed while its connector remains connected", async () => {
+    await boot();
+    await message("runtime.connect", undefined, { runtimeId: runtime.id });
+    transport.callbacks!.ready("saved-credential");
+    await vi.waitFor(() => expect(chromeMock.cookies.set).toHaveBeenCalledOnce());
+    const changed = chromeMock.cookies.onChanged.addListener.mock.calls[0]?.[0];
+    expect(changed).toBeTypeOf("function");
+    changed({ removed: true, cause: "explicit", cookie: { domain: "localhost", name: nativeSurface.cookie.name } });
+    await vi.waitFor(() => expect(chromeMock.cookies.set).toHaveBeenCalledTimes(2));
+    expect((await message("state.get")).result.connection).toBe("connected");
+  });
   it("persists bounded read attention IDs before acknowledging and restores them after a worker restart", async () => {
     data = { [STATE_STORAGE_KEY]: { readAttentionIds: [null, 12, '', 'x'.repeat(201), 'already-read'] } };
     await boot();

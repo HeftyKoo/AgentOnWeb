@@ -19,7 +19,7 @@ interface SafariCookieEffects {
  */
 export class SafariCookieLeaseManager {
   readonly #scopes = new Map<string, SafariCookieScope>();
-  readonly #installed = new Map<string, NativeSurface>();
+  readonly #installed = new Map<string, { surface: NativeSurface; expires: number }>();
   #operations: Promise<unknown> = Promise.resolve();
   constructor(readonly effects: SafariCookieEffects) {}
 
@@ -35,7 +35,8 @@ export class SafariCookieLeaseManager {
   ensure(surface: NativeSurface, current: () => boolean): Promise<boolean> {
     return this.#enqueue(async () => {
       if (!isSafariCookieUrl(surface.url) || !current()) return false;
-      if (this.#installed.get(surface.runtimeId) === surface) return true;
+      const installed = this.#installed.get(surface.runtimeId);
+      if (installed?.surface === surface && installed.expires > Date.now()) return true;
       const details = { url: surface.url, name: surface.cookie.name, value: surface.cookie.value,
         path: "/" as const, httpOnly: true as const, secure: false as const,
         sameSite: "no_restriction" as const, expirationDate: Date.now() / 1000 + surface.cookie.maxAgeSeconds };
@@ -44,7 +45,7 @@ export class SafariCookieLeaseManager {
         await this.effects.remove({ url: details.url, name: details.name });
         return false;
       }
-      this.#installed.set(surface.runtimeId, surface);
+      this.#installed.set(surface.runtimeId, { surface, expires: details.expirationDate * 1000 });
       this.#scopes.set(surface.runtimeId, { runtimeId: surface.runtimeId, url: details.url, name: details.name });
       await this.effects.persist([...this.#scopes.values()]);
       return true;

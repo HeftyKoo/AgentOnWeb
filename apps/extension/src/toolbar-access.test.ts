@@ -14,6 +14,7 @@ it("gives a visible fallback when a toolbar click cannot reach a page", async ()
   vi.stubEnv("BROWSER", "safari");
   vi.stubGlobal("browser", {
     runtime: { id: "test", getURL: (path: string) => `safari-web-extension://test/${path}`, onMessage: event() },
+    cookies: { onChanged: event() },
     storage: { local: { get: async () => ({}), set: async () => {} } },
     declarativeNetRequest: { getSessionRules: async () => [], updateSessionRules: async () => {} },
     alarms: { create: async () => {}, onAlarm: event() },

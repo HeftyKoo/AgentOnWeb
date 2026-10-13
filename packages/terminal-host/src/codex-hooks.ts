@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile, rename, copyFile } from "node:fs/promises";
 import { join, dirname, resolve } from "node:path";
 import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { configureNotify, removeNotify } from "./codex-notify.js";
 import { cleanup } from "./cleanup.js";
 
@@ -37,7 +38,7 @@ export async function installCodexHooks(directory = codexDirectory()): Promise<s
   const path = join(directory, "hooks.json");
   const source = await readOptional(path);
   const value: unknown = source === undefined ? {} : JSON.parse(source);
-  const command = `${quote(process.execPath)} ${quote(resolve(process.argv[1]!))} agent-event`;
+  const command = `${quote(process.execPath)} ${quote(fileURLToPath(new URL("./agent-hook.js", import.meta.url)))} codex`;
   const updated = mergeCodexHooks(value, command);
   if (JSON.stringify(value) !== JSON.stringify(updated)) await saveConfig(path, source, JSON.stringify(updated, null, 2) + "\n");
   const configPath = join(directory, "config.toml");

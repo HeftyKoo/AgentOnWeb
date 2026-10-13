@@ -62,6 +62,9 @@ const apiHeaders = {
   "X-AgentOnWeb-Terminal": "1",
   "Content-Type": "application/json",
 };
+class HttpError extends Error {
+  constructor(readonly status: number, message: string) { super(message); }
+}
 async function api(path: string, action?: object) {
   const response = await fetch(path, {
     headers: apiHeaders,
@@ -75,7 +78,7 @@ async function api(path: string, action?: object) {
         : response.status === 403
           ? "Connect through AgentOnWeb or open the private setup link."
           : "Terminal host request failed.";
-    throw new Error(message);
+    throw new HttpError(response.status, message);
   }
   return response.json();
 }
@@ -157,10 +160,14 @@ async function refreshSessions(current: number) {
     lastActivation = target.requestId;
     const exists = list.some(item => item.id === target.id);
     parent.postMessage({ source: "agentonweb-surface", type: "terminal.activated", nonce, requestId: target.requestId, ok: exists }, "*");
-    if (!exists) throw new Error("This terminal has closed. Choose another session.");
+    if (!exists) throw new HttpError(404, "This terminal has closed. Choose another session.");
     sessionId = target.id;
   }
   if (!list.some((item) => item.id === sessionId)) sessionId = list[0]?.id || "";
+  reconcileSessions(list);
+  sessionStorage.setItem("agentonweb-terminal", sessionId);
+}
+function reconcileSessions(list: { id: string; name: string }[]) {
   hideFolderTooltip();
   closeTabMenu();
   const existing = new Map([...sessionPicker.querySelectorAll<HTMLElement>(".terminal-tab")].map(tab => [tab.dataset.session!, tab]));
@@ -243,11 +250,11 @@ async function refreshSessions(current: number) {
     });
   const retained = new Set(tabs);
   for (const tab of existing.values()) if (!retained.has(tab)) tab.remove();
+  for (const id of sessionStates.keys()) if (!list.some(item => item.id === id)) sessionStates.delete(id);
   tabs.forEach((tab, index) => {
     const atIndex = sessionPicker.children[index] ?? null;
     if (atIndex !== tab) sessionPicker.insertBefore(tab, atIndex);
   });
-  sessionStorage.setItem("agentonweb-terminal", sessionId);
   applySessionNames(list);
 }
 
@@ -259,6 +266,13 @@ let epoch = "",
   ready = false,
   retry: ReturnType<typeof setTimeout> | undefined;
 let generation = 0;
+let retryDelay = 1500;
+function scheduleRetry(current: number) {
+  if (current !== generation) return;
+  clearTimeout(retry);
+  retry = setTimeout(() => { void connect(true); }, retryDelay);
+  retryDelay = Math.min(retryDelay * 2, 15_000);
+}
 let focusOnConnect = false;
 let outputNoticeAt = 0;
 function send(message: object) {
@@ -321,6 +335,7 @@ async function connect(automaticRetry = false) {
   if (parent !== window && !authorizedParent) return;
   const current = ++generation;
   clearTimeout(retry);
+  if (!automaticRetry) retryDelay = 1500;
   for (const [id, state] of sessionStates) {
     if (id !== sessionId && (state === "connected" || state === "connecting")) sessionStates.set(id, "background");
   }
@@ -337,13 +352,15 @@ async function connect(automaticRetry = false) {
     if (!sessionId) {
       terminal.reset();
       showStatus("No terminals. Click + to open your local shell.");
+      // No PTY socket exists to carry registry changes from other pages yet.
+      scheduleRetry(current);
       return;
     }
     setConnectionState("connecting");
     const response = await fetch("/ticket?session=" + encodeURIComponent(sessionId), {
       headers: { "X-AgentOnWeb-Terminal": "1" },
     });
-    if (!response.ok) throw new Error("Session expired. Reconnect from AgentOnWeb.");
+    if (!response.ok) throw new HttpError(response.status, "Session expired. Reconnect from AgentOnWeb.");
     const info = await response.json();
     if (current !== generation) return;
     const ws = new WebSocket(`ws://${location.host}/terminal`, info.token);
@@ -352,8 +369,13 @@ async function connect(automaticRetry = false) {
       if (current !== generation) return;
       const m = JSON.parse(event.data);
       if (m.type === "session-names") {
-        applySessionNames(m.sessions);
+        reconcileSessions(m.sessions);
+        if (sessionId && !m.sessions.some((item: { id: string }) => item.id === sessionId)) {
+          sessionId = "";
+          void connect();
+        }
       } else if (m.type === "snapshot") {
+        retryDelay = 1500;
         epoch = m.epoch;
         setConnectionState(m.exitCode !== undefined ? "exited" : "connected");
         terminal.reset();
@@ -411,12 +433,13 @@ async function connect(automaticRetry = false) {
         event.code === 4401
           ? "Authorization revoked. Connect again from AgentOnWeb."
           : "Disconnected · process stays in the local host");
-      if (event.code !== 4401) retry = setTimeout(() => { void connect(true); }, 1500);
+      if (event.code !== 4401) scheduleRetry(current);
     };
   } catch (error) {
     if (current === generation) {
       setConnectionState("disconnected");
       showStatus(error instanceof Error ? error.message : "Connection failed");
+      if (!(error instanceof HttpError && error.status >= 400 && error.status < 500 && error.status !== 429)) scheduleRetry(current);
     }
   }
 }
@@ -542,6 +565,8 @@ async function showConnections() {
             await showConnections();
           } catch (error) {
             showStatus(String(error));
+          } finally {
+            button.disabled = false;
           }
         };
         row.append(button);

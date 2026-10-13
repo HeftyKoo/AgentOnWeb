@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SafariCookieLeaseManager } from "./safari-cookie-leases.js";
 
 const surface = { runtimeId: "native-test", displayName: "Native test", url: "http://localhost:3080/",
   cookie: { name: "native-session", value: "delegated-secret", maxAgeSeconds: 60 } };
+afterEach(() => vi.useRealTimers());
 function setup() {
   const set = vi.fn(async (_details: unknown) => true);
   const remove = vi.fn(async (_details: unknown) => {});
@@ -10,6 +11,17 @@ function setup() {
   return { leases: new SafariCookieLeaseManager({ set, remove, persist }), set, remove, persist };
 }
 describe("Safari storage-access cookie lease", () => {
+  it("reinstalls an expired or invalidated delegated cookie", async () => {
+    vi.useFakeTimers();
+    const { leases, set } = setup();
+    await leases.ensure(surface, () => true);
+    await vi.advanceTimersByTimeAsync(61_000);
+    await leases.ensure(surface, () => true);
+    expect(set).toHaveBeenCalledTimes(2);
+    leases.invalidate();
+    await leases.ensure(surface, () => true);
+    expect(set).toHaveBeenCalledTimes(3);
+  });
   it("keeps the delegated session HttpOnly on loopback and persists no credential", async () => {
     const { leases, set, persist } = setup();
     expect(await leases.ensure(surface, () => true)).toBe(true);

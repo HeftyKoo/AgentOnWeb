@@ -50,6 +50,74 @@ it("retries a disconnected authorized runtime after 3 seconds, backs off while o
 });
 
 describe("ConnectionCoordinator", () => {
+  it("waits for an in-flight renewal before returning a surface to another page", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1000);
+    let callbacks!: ConnectorCallbacks;
+    let release!: (value: unknown) => void;
+    const request = vi.fn().mockResolvedValueOnce(surface).mockImplementation(() => new Promise(resolve => { release = resolve; }));
+    const coordinator = new ConnectionCoordinator({
+      discover: async () => [available],
+      createTransport(next) { callbacks = next; return { connect() {}, close() {}, request }; },
+      effects: { changed() {}, saveCredentials: async () => {}, openApproval: async () => {}, revokeDelegation: async () => {} },
+    });
+    await coordinator.connect(); callbacks.ready("credential"); await coordinator.idle();
+    vi.setSystemTime(62_000);
+    const alarm = coordinator.refreshSurfacesIfNeeded();
+    let pageReturned = false;
+    const page = coordinator.refreshSurfacesIfNeeded(runtime.id).then(() => { pageReturned = true; });
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    expect(pageReturned).toBe(false);
+    expect(request).toHaveBeenCalledTimes(2);
+    release({ ...surface, cookie: { ...surface.cookie, value: "renewed" } });
+    await Promise.all([alarm, page]);
+    expect(coordinator.snapshot.surface?.cookie.value).toBe("renewed");
+  });
+  it("renews a signed surface before expiry without reconnecting its transport", async () => {
+    vi.useFakeTimers();
+    let callbacks!: ConnectorCallbacks;
+    const refreshed = { ...surface, cookie: { ...surface.cookie, value: "fresh-signed-session" } };
+    const request = vi.fn().mockResolvedValueOnce(surface).mockResolvedValue(refreshed);
+    const close = vi.fn();
+    const coordinator = new ConnectionCoordinator({
+      discover: async () => [available],
+      createTransport(next) { callbacks = next; return { connect() {}, close, request }; },
+      effects: { changed() {}, saveCredentials: async () => {}, openApproval: async () => {}, revokeDelegation: async () => {} },
+    });
+    await coordinator.connect(); callbacks.ready("credential"); await coordinator.idle();
+    await vi.advanceTimersByTimeAsync(48_000);
+    await coordinator.idle();
+    expect(coordinator.snapshot.surface?.cookie.value).toBe("fresh-signed-session");
+    expect(coordinator.snapshot.view.connection).toBe("connected");
+    expect(close).not.toHaveBeenCalled();
+  });
+  it("delivers terminal notifications and selection while another runtime waits for its surface", async () => {
+    const terminal = { ...available, runtime: { ...runtime, id: "terminal" }, endpoint: "ws://127.0.0.1:3848" };
+    const callbacks: ConnectorCallbacks[] = [];
+    let release!: (value: unknown) => void;
+    const slowSurface = new Promise(resolve => { release = resolve; });
+    const coordinator = new ConnectionCoordinator({
+      discover: async () => [available, terminal],
+      createTransport(callback) {
+        const index = callbacks.push(callback) - 1;
+        return { connect() {}, close() {}, request: async () => index === 0 ? { ...surface, runtimeId: "terminal" } : slowSurface };
+      },
+      effects: { changed() {}, saveCredentials: async () => {}, openApproval: async () => {}, revokeDelegation: async () => {} },
+    });
+    await coordinator.connect("terminal"); callbacks[0]!.ready("terminal-grant"); await coordinator.idle();
+    await coordinator.connect(runtime.id); callbacks[1]!.ready("dsh-grant");
+    const session = { id: "approval", runtimeId: "terminal", terminalId: "one", agent: "Codex", title: "Approve", detail: "", status: "approval" as const, updatedAt: 1, attentionId: "attention" };
+    callbacks[0]!.sessions?.([session]);
+    let activated = false;
+    const activation = coordinator.activate("terminal").then(() => { activated = true; });
+    try {
+      await vi.waitFor(() => {
+        expect(activated).toBe(true);
+        expect(coordinator.snapshot.view.agentSessions).toEqual([session]);
+        expect(coordinator.snapshot.view.runtimeId).toBe("terminal");
+      });
+    } finally { release(surface); await activation; await coordinator.idle(); }
+  });
   it("owns pairing, credential persistence and surface acquisition behind its Interface", async () => {
     let callbacks!: ConnectorCallbacks;
     const connect = vi.fn();

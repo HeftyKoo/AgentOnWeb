@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export const EXTENSION_ORIGIN = /^(?:chrome-extension:\/\/[a-p]{32}|moz-extension:\/\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|safari-web-extension:\/\/[a-z0-9][a-z0-9.-]{0,254})$/iu;
@@ -76,19 +76,18 @@ export class Authorization {
     if (!allow) { pending.reject(new AuthorizationError("DENIED", "Connection was declined in the runtime.")); return; }
     const credential = randomBytes(32).toString("base64url");
     const grant = { id: randomUUID(), origin: pending.origin, hash: hash(credential), createdAt: Date.now() };
-    this.#grants.push(grant);
-    try { await this.persist(); pending.resolve({ id: grant.id, credential }); }
+    try { await this.updateGrants(grants => [...grants, grant]); pending.resolve({ id: grant.id, credential }); }
     catch (error) {
-      this.#grants = this.#grants.filter((g) => g.id !== grant.id);
       pending.reject(new AuthorizationError("STORAGE_ERROR", "Could not save connection authorization."));
       throw error;
     }
   }
 
   async revoke(id: string): Promise<void> {
-    if (!this.#grants.some((g) => g.id === id)) throw new Error("Connection does not exist.");
-    this.#grants = this.#grants.filter((g) => g.id !== id);
-    await this.persist();
+    await this.updateGrants(grants => {
+      if (!grants.some(g => g.id === id)) throw new Error("Connection does not exist.");
+      return grants.filter(g => g.id !== id);
+    });
     for (const callback of this.#revoked) callback(id);
   }
 
@@ -109,12 +108,19 @@ export class Authorization {
     pending.reject(new AuthorizationError(code, message));
   }
 
-  private persist(): Promise<void> {
-    const body = JSON.stringify(this.#grants, null, 2) + "\n";
+  private updateGrants(update: (grants: readonly Grant[]) => Grant[]): Promise<void> {
     const write = async () => {
+      const next = update(this.#grants);
+      const body = JSON.stringify(next, null, 2) + "\n";
       const temporary = join(this.directory, `connections.${randomUUID()}.tmp`);
-      await writeFile(temporary, body, { mode: 0o600 });
-      await rename(temporary, join(this.directory, "connections.json"));
+      try {
+        await writeFile(temporary, body, { mode: 0o600 });
+        await rename(temporary, join(this.directory, "connections.json"));
+        // Publish only committed state: failed revocations stay visible and retryable.
+        this.#grants = next;
+      } finally {
+        await unlink(temporary).catch(() => {});
+      }
     };
     this.#writes = this.#writes.catch(() => {}).then(write);
     return this.#writes;
