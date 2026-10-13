@@ -1,16 +1,16 @@
-# AgentOnWeb terminal for Codex and Claude Code
+# AgentOnWeb terminal for Codex, Claude Code and Pi
 
-Run Codex or Claude Code in your browser, keep several project terminals open, and return to the right session when a task finishes or needs approval.
+Run Codex, Claude Code or Pi in your browser, keep several project terminals open, and return to the right session when a task finishes or needs approval.
 
 ## Install on macOS
 
-Install [the Chrome extension](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe), Node.js 22.19+ and your preferred CLI (Codex or Claude Code), then run:
+Install [the Chrome extension](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe), Node.js 22.19+ and your preferred CLI (Codex, Claude Code or Pi 1.1+), then run:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh | bash
 ```
 
-The installer configures the terminal service, Chrome connection and Codex/Claude Code notifications. Open a website, click AgentOnWeb and run:
+The installer configures the terminal service, Chrome connection and Codex/Claude Code/Pi notifications. Open a website, click AgentOnWeb and run:
 
 ```sh
 cd ~/your-project
@@ -22,6 +22,8 @@ For notifications, review and trust **AgentOnWeb session status** in Codex `/hoo
 The installer configures zsh, bash and detected fish installations. It also links `aow` into Node's command directory when that directory is already on PATH and writable, so the current terminal can use it without sourcing a profile. If another program owns that command or the directory is protected, use `"$HOME/.local/bin/aow" service` directly.
 
 For Claude Code, run `claude` in the same terminal. Setup installs observational hooks in `CLAUDE_CONFIG_DIR/settings.json` (default `~/.claude/settings.json`). Review **AgentOnWeb session status** in Claude Code `/hooks`, then start a new session. To repair or remove only this integration, use `aow claude-hooks install` or `aow claude-hooks uninstall`. Models, permissions, other hooks and history are preserved.
+
+For Pi 1.1+, run `pi` in the same terminal. Setup adds an observational extension at `PI_CODING_AGENT_DIR/extensions/agentonweb.ts` (default `~/.pi/agent/extensions/agentonweb.ts`). Start a new Pi process or use `/reload`. `aow pi-extension install` repairs it; `aow pi-extension uninstall` removes it, followed by `/reload` to unload it. Settings, models, other extensions and history are preserved. Blocking extension dialogs request attention; completed notifications wait for all automatic work to settle. No hook trust step is needed for Pi.
 
 ## Terminal controls
 

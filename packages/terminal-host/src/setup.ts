@@ -4,6 +4,7 @@ import { constants } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { installCodexHooks, uninstallCodexHooks } from './codex-hooks.js';
 import { installClaudeHooks, uninstallClaudeHooks } from './claude-hooks.js';
+import { installPiExtension, uninstallPiExtension } from './pi-hooks.js';
 import { installNativeBridge, uninstallNativeBridge, extensionOrigin, STORE_EXTENSION_ID } from './native-bridge.js';
 import { serviceCommand, serviceDirectory } from './service.js';
 import { cleanup } from './cleanup.js';
@@ -30,6 +31,8 @@ export async function setup(args: string[]) {
   console.log('Codex hooks installed; existing settings preserved. Any skipped notify configuration is reported above.');
   await installClaudeHooks();
   console.log('Claude Code hooks installed; existing settings preserved. Review them in /hooks and start a new Claude Code session.');
+  await installPiExtension();
+  console.log('Pi extension installed; existing settings preserved. Start Pi 1.1+ in an AgentOnWeb terminal, or use /reload in Pi.');
   await installNativeBridge(entry, ids);
   await serviceCommand(['install', '--no-open']);
   let ready = false;
@@ -59,6 +62,7 @@ export async function uninstall(): Promise<void> {
   await cleanup([
     () => uninstallCodexHooks(),
     () => uninstallClaudeHooks(),
+    () => uninstallPiExtension(),
     () => uninstallNativeBridge(),
     async () => { if (process.platform === 'darwin') await serviceCommand(['uninstall']); },
   ], 'AgentOnWeb uninstall is incomplete. All integrations were attempted; fix the reported errors and rerun aow uninstall before removing the npm package.');
