@@ -1,4 +1,4 @@
-import { OptionTapTracker, isMacPlatform, isSurfaceShortcut } from "@agentonweb/connector-contract";
+import { OptionTapTracker, isMacPlatform, isSurfaceShortcut, type AgentOnWebMode } from "@agentonweb/connector-contract";
 import { hasDefaultModeShortcut, type ModeShortcutBinding } from "./mode-shortcuts.js";
 import { createDock } from "./dock.js";
 import { browser } from "./browser-api.js";
@@ -63,9 +63,28 @@ if (!document.getElementById(HOST_ID)) {
   // broadcasts never reopen a page; the dock remains its explicit entry point.
   let visible = false;
   let receivedUpdate = false;
+  let pendingSurfaceFocus = false;
+  let requestedMode: AgentOnWebMode | undefined;
   let previousFocus = document.activeElement instanceof HTMLElement && document.activeElement !== host
     ? document.activeElement : undefined;
   const optionLatch = new DoubleTapLatch();
+  document.addEventListener("focusin", event => {
+    if (event.target === host) return;
+    const target = event.composedPath()[0];
+    if (target instanceof HTMLElement) previousFocus = target;
+    pendingSurfaceFocus = false;
+    requestedMode = undefined;
+  });
+  const restoreWebsiteFocus = () => {
+    if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    if (document.activeElement !== host && document.activeElement !== document.body) return;
+    // A deleted/disabled previous control still needs a keyboard destination.
+    const tabindex = document.body.getAttribute("tabindex");
+    document.body.tabIndex = -1;
+    document.body.focus({ preventScroll: true });
+    if (tabindex === null) document.body.removeAttribute("tabindex");
+    else document.body.setAttribute("tabindex", tabindex);
+  };
 
   const send = (request: ContentRequest) => {
     browser.runtime.sendMessage(request).catch(() => undefined);
@@ -96,7 +115,8 @@ if (!document.getElementById(HOST_ID)) {
     optionTap.reset();
     setSitePass(false);
     optionLatch.reset();
-    setVisible(true);
+    setVisible(true, false);
+    requestedMode = mode;
     send({ source: "agentonweb-content", type: "mode.set", mode });
   };
   // The background owns both keyboard paths, including deduplication and the
@@ -113,31 +133,59 @@ if (!document.getElementById(HOST_ID)) {
   };
 
   const postToSurface = (message: Record<string, unknown>) => {
-    if (!readyFrames.has(frame) || !frame.contentWindow || !frameNonce || !surfaceOrigin) return;
+    if (!readyFrames.has(frame) || !frame.contentWindow || !frameNonce || !surfaceOrigin) return false;
     frame.contentWindow.postMessage({
       source: "agentonweb-extension",
       nonce: frameNonce,
       ...message,
     }, surfaceOrigin);
+    return true;
   };
   const postMode = () => postToSurface({ type: "mode.set", mode: state.mode });
+  const postModeShortcuts = () => postToSurface({ type: "mode.shortcuts",
+    modes: (["chill", "focus", "watch"] as const).filter(mode => hasDefaultModeShortcut(modeShortcuts, mode, isMacPlatform())),
+  });
+  const postSurfaceFocus = () => {
+    if (!pendingSurfaceFocus) return;
+    if (!document.hasFocus() || shadow.activeElement !== frame || state.mode !== "focus" || !visible) {
+      pendingSurfaceFocus = false;
+      return;
+    }
+    if (postToSurface({ type: "surface.focus" })) pendingSurfaceFocus = false;
+  };
+  const focusForMode = () => {
+    if (!visible || host.hidden || !document.hasFocus()) return;
+    if (!state.surface) { setup.element.focus({ preventScroll: true }); return; }
+    if (state.mode === "watch") restoreWebsiteFocus();
+    else if (state.mode === "focus") {
+      pendingSurfaceFocus = true;
+      if (shadow.activeElement !== frame) frame.focus({ preventScroll: true });
+      postSurfaceFocus();
+    }
+    // Chill deliberately preserves the current website or terminal focus.
+  };
   const postOpacity = (opacity: number) => {
     if (state.runtime?.capabilities.translucency !== false) postToSurface({ type: "opacity.set", opacity });
   };
   const postPresentation = () => {
     postMode();
     postOpacity(state.opacity);
+    postModeShortcuts();
     if (pendingTerminal && pendingTerminal.runtimeId === state.surface?.runtimeId)
       postToSurface({ type: "terminal.activate", terminalId: pendingTerminal.terminalId, requestId: pendingTerminal.requestId });
+    postSurfaceFocus();
   };
   const render = (next: SurfaceViewState) => {
+    const releaseFocus = next.mode === "watch" && state.mode !== "watch" && document.activeElement === host;
     state = next;
+    if (!visible || state.mode !== "focus") pendingSurfaceFocus = false;
     for (const [id, saved] of frames) {
       // Hiding a focused iframe clears its native input focus, even if it is
       // shown again in the same render. Only hide inactive workspaces.
       saved.hidden = !visible || state.mode === "watch" || id !== state.surface?.runtimeId;
       if (state.surfaces && !state.surfaces.some(item => item.runtimeId === id)) { saved.remove(); frames.delete(id); }
     }
+    if (releaseFocus) restoreWebsiteFocus();
     host.dataset.mode = state.mode;
     root.dataset.mode = state.mode;
     host.style.setProperty("--agentonweb-surface-opacity", String(state.opacity));
@@ -203,11 +251,11 @@ if (!document.getElementById(HOST_ID)) {
     if (!sourceChanged) postPresentation();
   };
 
-  const setVisible = (next: boolean) => {
+  const setVisible = (next: boolean, focusOnOpen = true, nextState = state) => {
     receivedUpdate = true;
     send({ source: "agentonweb-content", type: "visibility.set", visible: next });
     if (next === visible) {
-      render(state);
+      render(nextState);
       if (next && !state.surface) setup.element.focus({ preventScroll: true });
       return;
     }
@@ -219,11 +267,11 @@ if (!document.getElementById(HOST_ID)) {
     setSitePass(false);
     optionLatch.reset();
     dock.setExpanded(false);
-    render(state);
+    render(nextState);
     if (!next) {
       if (hadFocus && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
       previousFocus = undefined;
-    } else if (!host.hidden) {
+    } else if (!host.hidden && focusOnOpen) {
       if (!state.surface) setup.element.focus({ preventScroll: true });
       else if (state.mode === "watch") dock.focus();
       else frame.focus({ preventScroll: true });
@@ -235,12 +283,13 @@ if (!document.getElementById(HOST_ID)) {
       if (!receivedUpdate) visible = message.state.dismissed !== true;
       receivedUpdate = true;
       render(message.state);
+      if (requestedMode === state.mode) { requestedMode = undefined; focusForMode(); }
     }
     if (isSurfaceCommand(message)) {
       receivedUpdate = true;
-      state = message.state;
       const next = message.type === "surface.toggle" ? !visible : true;
-      setVisible(next);
+      setVisible(next, message.type === "surface.toggle", message.state);
+      if (message.type === "surface.show") focusForMode();
     }
   });
 
@@ -315,9 +364,20 @@ if (!document.getElementById(HOST_ID)) {
       return;
     }
     if (message.type === "surface.pointerdown") { dock.setExpanded(false); return; }
+    if (message.type === "surface.focused") {
+      // Hiding an out-of-process native iframe can asynchronously focus its
+      // wrapper after Watch already restored the website. Release that late
+      // focus too, without moving focus from another website/dock control.
+      if (state.mode === "watch") {
+        if (shadow.activeElement === frame) restoreWebsiteFocus();
+      } else refreshModeShortcuts();
+      return;
+    }
     if (message.type === "surface.shortcut") {
-      if (isSurfaceShortcut(message.action) && message.action === "runtime.toggle" &&
-        visible && !host.hidden && !!state.surface && state.mode !== "watch" && !sitePassActive) dock.shortcut(message.action);
+      if (isSurfaceShortcut(message.action) && visible && !host.hidden && !!state.surface && state.mode !== "watch" && !sitePassActive) {
+        if (message.action === "runtime.toggle") dock.shortcut(message.action);
+        else if (hasDefaultModeShortcut(modeShortcuts, message.action, isMacPlatform())) dock.onModeShortcut(message.action);
+      }
       return;
     }
     if (message.type !== "site-pass.option-tap") return;
@@ -331,20 +391,30 @@ if (!document.getElementById(HOST_ID)) {
   }, true);
   window.addEventListener("blur", () => optionTap.reset());
   // Returning from extension shortcut settings refreshes remaps and removals.
-  window.addEventListener("focus", () => {
+  const refreshModeShortcuts = () => {
     const revision = ++modeShortcutsRevision;
-    modeShortcuts = [];
+    // Replace the last known bindings atomically. Clearing them while focus
+    // crosses the two frames drops rapid keys between getAll and its reply.
     browser.runtime.sendMessage({ source: "agentonweb-content", type: "mode.shortcuts.get" } satisfies ContentRequest)
       .then((response: { ok?: boolean; result?: ModeShortcutBinding[] } | undefined) => {
         if (revision !== modeShortcutsRevision) return;
         modeShortcuts = response?.ok && Array.isArray(response.result) ? response.result : [];
-      }).catch(() => { if (revision === modeShortcutsRevision) modeShortcuts = []; });
-  });
+        postModeShortcuts();
+      }).catch(() => {
+        if (revision !== modeShortcutsRevision) return;
+        modeShortcuts = [];
+        postModeShortcuts();
+      });
+  };
+  window.addEventListener("focus", refreshModeShortcuts);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshModeShortcuts(); });
 
   browser.runtime.sendMessage({ source: "agentonweb-content", type: "state.get" } satisfies ContentRequest)
     .then((response: { ok?: boolean; result?: SurfaceViewState; modeShortcuts?: ModeShortcutBinding[] } | undefined) => {
-      if (modeShortcutsRevision === 0)
+      if (modeShortcutsRevision === 0) {
         modeShortcuts = response?.ok && Array.isArray(response.modeShortcuts) ? response.modeShortcuts : [];
+        postModeShortcuts();
+      }
       // A slow initial snapshot must not overwrite a newer explicit open/update.
       if (response?.result && !receivedUpdate) {
         visible = response.result.dismissed !== true;
