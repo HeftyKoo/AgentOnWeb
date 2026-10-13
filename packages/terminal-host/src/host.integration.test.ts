@@ -5,10 +5,12 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { once } from "node:events";
 import { request } from "node:http";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import WebSocket from "ws";
+import { VERSION } from './version.js';
 let host: ChildProcess | undefined;
 let directory = "";
+beforeEach(() => { vi.stubEnv('AOW_UPDATE_CHECK', '0'); });
 afterEach(async () => {
   if (host && host.exitCode === null) {
     const stopped = once(host, "exit");
@@ -18,6 +20,52 @@ afterEach(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
   directory = "";
   host = undefined;
+  vi.unstubAllEnvs();
+});
+
+it('restricts update status to admins and maintenance to the local CLI, preserving shells when busy', async () => {
+  directory = await mkdtemp(join(tmpdir(), 'aow-maintenance-test-'));
+  host = spawn(process.execPath, [resolve('packages/terminal-host/lib/cli.js'), 'terminal', '--service'], {
+    env: { ...process.env, HOME: directory, SHELL: '/bin/sh', ENV: undefined, BASH_ENV: undefined, ZDOTDIR: undefined },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  let output = ''; host.stdout!.on('data', chunk => { output += chunk; });
+  await expect.poll(() => output.includes('Open once:'), { timeout: 10000 }).toBe(true);
+  const launchUrl = /Open once: (http:\/\/[^\s]+)/u.exec(output)![1]!;
+  const origin = new URL(launchUrl).origin;
+  let endpoint: { nativeToken: string };
+  await expect.poll(async () => {
+    try { endpoint = JSON.parse(await readFile(join(directory, '.agentonweb/terminal/endpoint.json'), 'utf8')); return true; }
+    catch { return false; }
+  }).toBe(true);
+  const launch = await fetch(launchUrl);
+  const cookies = launch.headers.getSetCookie().map(value => value.split(';')[0]!);
+  await launch.text();
+  const headers = { Cookie: cookies.join('; '), 'X-AgentOnWeb-Terminal': '1', Origin: origin };
+  const delegated = cookies.find(cookie => !cookie.startsWith('aow_admin_'))!;
+  expect((await fetch(origin + '/api/updates', { headers: { ...headers, Cookie: delegated } })).status).toBe(403);
+  expect((await fetch(origin + '/api/updates')).status).toBe(403);
+  const update = await fetch(origin + '/api/updates', { headers });
+  expect(await update.json()).toMatchObject({ enabled: false, installedVersion: VERSION, runningVersion: VERSION });
+  const authorization = `Bearer ${endpoint!.nativeToken}`;
+  expect((await fetch(origin + '/service-control', { headers })).status).toBe(403);
+  expect((await fetch(origin + '/service-control', { headers: { authorization, Origin: origin } })).status).toBe(403);
+  const control = (action?: object) => fetch(origin + '/service-control', {
+    headers: { authorization }, ...(action ? { method: 'POST', body: JSON.stringify(action) } : {}),
+  });
+  expect(await (await control()).json()).toMatchObject({ activeTerminals: 1, managedService: true });
+  expect((await control({ action: 'prepare' })).status).toBe(409);
+  expect(await (await control()).json()).toMatchObject({ activeTerminals: 1 });
+  const { token } = await (await control({ action: 'prepare', force: true })).json();
+  expect((await control({ action: 'prepare', force: true })).status).toBe(409);
+  const create = () => fetch(origin + '/api/terminals', { headers, method: 'POST', body: JSON.stringify({ action: 'new' }) });
+  expect((await create()).status).toBe(409);
+  await control({ action: 'release', token: 'wrong' }); expect((await create()).status).toBe(409);
+  await control({ action: 'release', token }); expect((await create()).status).toBe(200);
+  const terminals = await (await fetch(origin + '/api/terminals', { headers })).json();
+  for (const item of terminals) await fetch(origin + '/api/terminals', { headers, method: 'POST', body: JSON.stringify({ action: 'close', id: item.id }) });
+  await expect.poll(async () => (await (await control()).json()).activeTerminals).toBe(0);
+  expect((await control({ action: 'prepare' })).status).toBe(200);
 });
 it("preserves Unicode terminal names split across HTTP body chunks and publishes terminal registry changes", async () => {
   directory = await mkdtemp(join(tmpdir(), "aow-unicode-test-"));

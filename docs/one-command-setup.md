@@ -77,14 +77,21 @@ Run `aow pi-extension install`, then start Pi 1.1+ in an AgentOnWeb terminal or 
 
 ## Update or repair
 
-Rerun the installation command to install the current AgentOnWeb terminal package and repair its configuration. Installation leaves active terminal sessions running. To load an updated service, finish your work, then run:
+The host automatically checks the stable npm version at most once a day and displays updates in its private management page and service log. Checks do not install code or restart your terminals. Run these commands in a separate macOS Terminal:
 
 ```sh
-aow service uninstall
-aow setup
+aow --version
+aow service status
+aow check-update
+aow update
+aow service restart
 ```
 
-Stopping the service ends its live shells. Your saved CLI history and browser connections remain. If you move or remove the Node.js installation used by AgentOnWeb, rerun the installer under the Node version you intend to keep, then restart the service as above.
+`aow update` retains the existing global npm prefix, installs the checked stable version, and restarts a running macOS service. Exit or close every terminal first; an idle live shell also blocks maintenance. `aow service restart` reloads already-installed code without reinstalling the package. Both commands reject execution inside an AgentOnWeb terminal; use your Mac's Terminal app. `--force` explicitly permits ending all live shells and their tasks. Restart confirms the new process and version before reporting success. Saved CLI history, browser grants, selected integrations and enrolled extension IDs remain.
+
+Use `aow check-update --disable` to persistently turn automatic checks off, and `--enable` to restore them. Setting `AOW_UPDATE_CHECK=0` in the host environment also disables them; CI skips automatic checks. Explicit checks and upgrades still work. A network failure leaves terminals running, uses cached results and retries with increasing delays. Automatic requests query only npm package metadata, with a three-second timeout. See the [privacy policy](store-site/privacy.md).
+
+These commands require a host version that includes update support. For an older installed host, finish terminal work, run `aow service uninstall`, then rerun the installation command once. The installer remains version-pinned and repairs configuration. Development/npx/other package-manager installations require their original upgrade workflow. If you move or remove Node, rerun the installer under the Node version you intend to keep. npm failure does not trigger a service restart; if the package installed but the service is not ready, inspect `~/.agentonweb/terminal/service.log` and run `aow setup`.
 
 ## Uninstall
 
