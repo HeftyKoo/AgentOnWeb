@@ -20,11 +20,23 @@ async function initialize() {
     frame.name = `agentonweb:${nonce}`;
     const nativeUrl = new URL(url);
     nativeUrl.hash = new URLSearchParams({ agentonweb: nonce }).toString();
-    let modeMessage: unknown;
+    let modeMessage: { mode: string } | undefined;
     let opacityMessage: unknown;
+    let shortcutsMessage: unknown;
+    let focusRequested = false;
     let activationMessage: { requestId: string } | undefined;
     let loaded = false;
     const post = (message: unknown) => { if (loaded) frame.contentWindow?.postMessage(message, nativeOrigin); };
+    const focusNative = () => {
+      if (!loaded || !focusRequested) return;
+      focusRequested = false;
+      if (!document.hasFocus() || modeMessage?.mode !== "focus") return;
+      if (document.activeElement !== frame) frame.focus({ preventScroll: true });
+      post({ source: "agentonweb-extension", type: "surface.focus", nonce });
+    };
+    window.addEventListener("focus", () => {
+      window.parent.postMessage({ source: "agentonweb-surface", type: "surface.focused", nonce }, parentOrigin);
+    });
     window.addEventListener("message", (event) => {
       const message = event.data;
       if (!message || message.nonce !== nonce) return;
@@ -35,13 +47,21 @@ async function initialize() {
           post(message);
         } else if (message.type === "mode.set" && ["watch", "chill", "focus"].includes(message.mode)) {
           modeMessage = message;
+          if (message.mode !== "focus") focusRequested = false;
           post(message);
         } else if (message.type === "opacity.set" && typeof message.opacity === "number" && message.opacity >= 0 && message.opacity <= 1) {
           opacityMessage = message;
           post(message);
+        } else if (message.type === "mode.shortcuts" && Array.isArray(message.modes)
+          && message.modes.length <= 3 && message.modes.every((mode: unknown) => mode === "chill" || mode === "focus" || mode === "watch")) {
+          shortcutsMessage = message;
+          post(message);
+        } else if (message.type === "surface.focus") {
+          focusRequested = true;
+          focusNative();
         }
       } else if (event.source === frame.contentWindow && event.origin === nativeOrigin
-        && message.source === "agentonweb-surface" && ["site-pass.option-tap", "surface.output", "surface.shortcut", "surface.pointerdown", "terminal.activated"].includes(message.type)) {
+        && message.source === "agentonweb-surface" && ["site-pass.option-tap", "surface.output", "surface.shortcut", "surface.pointerdown", "surface.focused", "terminal.activated"].includes(message.type)) {
         if (message.type === "terminal.activated" && message.requestId === activationMessage?.requestId) activationMessage = undefined;
         window.parent.postMessage({ source: "agentonweb-surface", type: message.type, nonce, ...(message.type === "surface.shortcut" ? { action: message.action } : {}), ...(message.type === "terminal.activated" ? { requestId: message.requestId, ok: message.ok } : {}) }, parentOrigin);
       }
@@ -51,7 +71,9 @@ async function initialize() {
       post({ source: "agentonweb-extension", type: "surface.ready", nonce });
       if (modeMessage) post(modeMessage);
       if (opacityMessage) post(opacityMessage);
+      if (shortcutsMessage) post(shortcutsMessage);
       if (activationMessage) post(activationMessage);
+      focusNative();
     });
     // The content script must not infer our origin from iframe load: the
     // initial about:blank and CSP error documents also dispatch that event.

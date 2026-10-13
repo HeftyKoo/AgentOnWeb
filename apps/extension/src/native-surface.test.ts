@@ -98,6 +98,33 @@ describe("native workspace extension document", () => {
       [opacity, "http://localhost:3080"],
     ]);
   });
+
+  it("buffers shortcut policy and one explicit focus request, and relays native focus notifications", async () => {
+    const window = await page("chrome-extension");
+    window.document.body.tabIndex = -1;
+    window.document.body.focus();
+    const frame = window.document.querySelector("iframe")!;
+    const native = { postMessage: vi.fn() };
+    Object.defineProperty(frame, "contentWindow", { value: native });
+    const focus = vi.spyOn(frame, "focus");
+    const emit = (message: object, origin = "https://example.org", sender: unknown = window.parent) =>
+      window.dispatchEvent(new window.MessageEvent("message", { origin, source: sender as Window,
+        data: { source: "agentonweb-extension", nonce: "test-nonce", ...message } }));
+    emit({ type: "mode.shortcuts", modes: ["watch"] }, "https://attacker.example");
+    emit({ type: "surface.focus" }, "https://attacker.example");
+    emit({ type: "mode.set", mode: "focus" });
+    emit({ type: "mode.shortcuts", modes: ["chill", "focus"] });
+    emit({ type: "surface.focus" });
+    expect(focus).not.toHaveBeenCalled();
+    frame.dispatchEvent(new window.Event("load"));
+    expect(native.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "mode.shortcuts", modes: ["chill", "focus"] }), "http://localhost:3080");
+    expect(native.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: "surface.focus" }), "http://localhost:3080");
+    expect(focus).toHaveBeenCalledOnce();
+    frame.dispatchEvent(new window.Event("load"));
+    expect(focus).toHaveBeenCalledOnce();
+    emit({ source: "agentonweb-surface", type: "surface.focused" }, "http://localhost:3080", native);
+    expect(window.parent.postMessage).toHaveBeenCalledWith({ source: "agentonweb-surface", type: "surface.focused", nonce: "test-nonce" }, "https://example.org");
+  });
 });
 
 it("does not load an iframe forged by a webpage without the background lease", async () => { expect((await page("chrome-extension", "http://localhost:3080/", false)).document.querySelector("iframe")).toBeNull(); });

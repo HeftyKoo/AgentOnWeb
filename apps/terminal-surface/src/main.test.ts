@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { JSDOM } from "jsdom";
 import { afterEach, expect, it, vi } from "vitest";
 const terminalMock = vi.hoisted(() => ({
+  focus: vi.fn(),
   writes: [] as (() => void)[],
   input: undefined as ((data: string) => void) | undefined,
   binary: undefined as ((data: string) => void) | undefined,
@@ -12,7 +13,7 @@ vi.mock("@xterm/xterm", () => ({
     parser = { registerCsiHandler() {}, registerOscHandler() {} };
     loadAddon() {}
     open() {}
-    focus() {}
+    focus() { terminalMock.focus(); }
     reset() {}
     resize() {}
     onData(callback: (data: string) => void) {
@@ -41,6 +42,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.resetModules();
   terminalMock.writes.length = 0;
+  terminalMock.focus.mockClear();
   terminalMock.input = terminalMock.binary = undefined;
 });
 async function terminalFixture() {
@@ -508,35 +510,66 @@ it("renames a background terminal without reconnecting and updates its close lab
   expect(dom.window.document.querySelector('.terminal-tab[data-session="two"] .tab-close')!.getAttribute("aria-label")).toBe("Close API server");
 });
 
-it("reserves only the runtime switch in an authorized embedded terminal", async () => {
+it.each(["MacIntel", "Win32"])("forwards enabled mode keys from terminal input on %s without leaking them to the shell", async platform => {
   dom = new JSDOM(await readFile(new URL("./index.html", import.meta.url), "utf8"), {
     url: "http://localhost:1234/#agentonweb=frame-nonce",
   });
   for (const key of ["window", "document", "location", "sessionStorage"]) vi.stubGlobal(key, (dom.window as any)[key]);
-  vi.stubGlobal("navigator", { platform: "MacIntel" });
+  vi.stubGlobal("navigator", { platform });
   const parent = { postMessage: vi.fn() };
   vi.stubGlobal("parent", parent);
   vi.stubGlobal("ResizeObserver", class { observe() {} });
   vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
   await import("./main.js");
   const delivered = vi.fn();
-  dom.window.document.addEventListener("keydown", delivered);
-  const key = (code: string) => {
-    const event = new dom.window.KeyboardEvent("keydown", { code, ctrlKey: true, bubbles: true, cancelable: true });
-    dom.window.document.body.dispatchEvent(event);
+  const input = dom.window.document.createElement("textarea");
+  dom.window.document.body.append(input);
+  input.focus();
+  input.addEventListener("keydown", delivered);
+  const key = (code: string, fields: KeyboardEventInit = {}) => {
+    const event = new dom.window.KeyboardEvent("keydown", { code, ctrlKey: platform === "MacIntel", altKey: platform !== "MacIntel", bubbles: true, cancelable: true, ...fields });
+    input.dispatchEvent(event);
     return event;
   };
+  const message = (data: object, origin = "chrome-extension://test-extension", sender = parent) =>
+    dom.window.dispatchEvent(new dom.window.MessageEvent("message", {
+      source: sender as any, origin, data: { source: "agentonweb-extension", nonce: "frame-nonce", ...data },
+    }));
   expect(key("Backquote").defaultPrevented).toBe(false);
-  dom.window.dispatchEvent(new dom.window.MessageEvent("message", {
-    source: parent as any, origin: "chrome-extension://test-extension",
-    data: { source: "agentonweb-extension", type: "surface.ready", nonce: "frame-nonce" },
-  }));
+  message({ type: "surface.ready" });
   delivered.mockClear();
   for (const code of ["Digit1", "Digit2", "Digit3"]) expect(key(code).defaultPrevented).toBe(false);
   expect(delivered).toHaveBeenCalledTimes(3);
   expect(key("Backquote").defaultPrevented).toBe(true);
   expect(delivered).toHaveBeenCalledTimes(3);
   expect(parent.postMessage).toHaveBeenCalledWith({ source: "agentonweb-surface", type: "surface.shortcut", nonce: "frame-nonce", action: "runtime.toggle" }, "*");
+  message({ type: "mode.shortcuts", modes: ["chill", "focus", "watch"] });
+  delivered.mockClear();
+  parent.postMessage.mockClear();
+  for (const [code, action] of [["Digit1", "chill"], ["Digit2", "focus"], ["Digit3", "watch"]]) {
+    expect(key(code!).defaultPrevented).toBe(true);
+    expect(parent.postMessage).toHaveBeenLastCalledWith({ source: "agentonweb-surface", type: "surface.shortcut", nonce: "frame-nonce", action }, "*");
+  }
+  expect(delivered).not.toHaveBeenCalled();
+  expect(dom.window.document.activeElement).toBe(input);
+  parent.postMessage.mockClear();
+  expect(key("Digit3", { repeat: true }).defaultPrevented).toBe(true);
+  expect(key("Digit3", { isComposing: true }).defaultPrevented).toBe(false);
+  expect(key("Digit3", { shiftKey: true }).defaultPrevented).toBe(false);
+  expect(key("Escape", { key: "Escape", ctrlKey: false, altKey: false }).defaultPrevented).toBe(false);
+  expect(key("KeyA", { key: "a", ctrlKey: false, altKey: false }).defaultPrevented).toBe(false);
+  expect(parent.postMessage).not.toHaveBeenCalled();
+  message({ type: "mode.shortcuts", modes: [] }, "https://attacker.example");
+  expect(key("Digit3").defaultPrevented).toBe(true);
+  message({ type: "mode.shortcuts", modes: ["focus"] });
+  expect(key("Digit1").defaultPrevented).toBe(false);
+  expect(key("Digit3").defaultPrevented).toBe(false);
+  expect(key("Digit2").defaultPrevented).toBe(true);
+  message({ type: "surface.focus" });
+  expect(terminalMock.focus).toHaveBeenCalledOnce();
+  message({ type: "mode.set", mode: "watch" });
+  message({ type: "surface.focus" });
+  expect(terminalMock.focus).toHaveBeenCalledOnce();
 });
 
 it("activates an authenticated target before the initial list resolves and rejects missing terminal targets", async () => {

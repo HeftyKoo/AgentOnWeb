@@ -215,7 +215,7 @@ export function createDock(options: {
       ? options.localModeShortcuts(action) : options.localModeShortcuts)) return;
     if (action === "runtime.toggle" && !expanded && !options.runtimeShortcutEnabled?.()) return;
     // Keep website editors' own shortcuts intact. Native workspace iframes
-    // forward the one explicitly reserved runtime switch separately.
+    // forward their reserved shortcuts through the authenticated frame path.
     if (event.composedPath().some(target => target instanceof HTMLElement &&
       (target.matches("input, textarea, select, [role=textbox]") || target.isContentEditable))) return;
     event.preventDefault();
