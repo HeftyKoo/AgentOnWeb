@@ -92,7 +92,9 @@ function syncNativeView(sessions: Sessions): Cleanup {
     return state.current ? { sessionId: state.current, ...(state.currentAddress ? { subagentAddress: state.currentAddress } : {}) } : {};
   };
   const save = (value: ReturnType<typeof selection>) => {
+    const current = hydration;
     writes = writes.catch(() => {}).then(async () => {
+      if (stopped || current !== hydration || document.visibilityState !== "visible") return;
       const response = await fetch("/api/agentonweb/native-view", {
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(value), keepalive: true,
       });
@@ -102,11 +104,13 @@ function syncNativeView(sessions: Sessions): Cleanup {
   };
   const restore = async () => {
     const current = ++hydration;
+    const before = JSON.stringify(selection());
     restoring = true;
     try {
       await writes.catch(() => {});
+      if (stopped || current !== hydration) return;
       await sessions.refresh();
-      const before = JSON.stringify(selection());
+      if (stopped || current !== hydration) return;
       const response = await fetch("/api/agentonweb/native-view", { cache: "no-store" });
       if (!response.ok) throw new Error("Unable to restore the native DSH view.");
       const body = await response.json() as { selection: { sessionId?: string; subagentAddress?: SessionAddress } | null };
@@ -125,12 +129,15 @@ function syncNativeView(sessions: Sessions): Cleanup {
     }
   };
   const unsubscribe = sessions.list.subscribe(() => {
-    if (stopped || restoring || sessions.list.getSnapshot().phase !== "ready") return;
+    if (stopped || restoring || document.visibilityState !== "visible" || sessions.list.getSnapshot().phase !== "ready") return;
     const value = selection();
     const key = JSON.stringify(value);
     if (key !== last) { last = key; save(value); }
   });
-  const onVisible = () => { if (document.visibilityState === "visible") restore(); };
+  const onVisible = () => {
+    if (document.visibilityState === "visible") void restore();
+    else { ++hydration; restoring = true; }
+  };
   document.addEventListener("visibilitychange", onVisible);
   // Only the foreground website may reconcile the shared native bookmark.
   // On a runtime restart every partitioned iframe reloads at once; allowing

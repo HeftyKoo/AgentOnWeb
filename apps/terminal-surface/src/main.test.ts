@@ -43,6 +43,84 @@ afterEach(() => {
   terminalMock.writes.length = 0;
   terminalMock.input = terminalMock.binary = undefined;
 });
+async function terminalFixture() {
+  dom = new JSDOM(await readFile(new URL("./index.html", import.meta.url), "utf8"), { url: "http://localhost:1234/" });
+  for (const key of ["window", "document", "location", "sessionStorage"]) vi.stubGlobal(key, (dom.window as any)[key]);
+  vi.stubGlobal("parent", dom.window);
+  vi.stubGlobal("ResizeObserver", class { observe() {} });
+  vi.useFakeTimers({ toFake: ["setTimeout", "setInterval"] });
+  const sockets: any[] = [];
+  vi.stubGlobal("WebSocket", class {
+    static OPEN = 1;
+    readyState = 1;
+    constructor() { sockets.push(this); }
+    send() {}
+    close() { this.readyState = 3; }
+  });
+  let failure = 0;
+  const list = [{ id: "one", name: "One" }];
+  const fetch = vi.fn(async (path: string) => {
+    if (path === "/api/connections") return new Response("", { status: 403 });
+    if (failure) return new Response("{}", { status: failure });
+    if (path === "/api/terminals") return Response.json(list);
+    return Response.json({ token: "ticket" });
+  });
+  vi.stubGlobal("fetch", fetch);
+  await import("./main.js");
+  await vi.waitFor(() => expect(sockets).toHaveLength(1));
+  return { sockets, list, fetch, fail: (status: number) => { failure = status; } };
+}
+
+it("continues automatic retries after a temporary HTTP failure and stops on revoked access", async () => {
+  const fixture = await terminalFixture();
+  fixture.fail(503);
+  fixture.sockets[0].onclose({ code: 1006 });
+  await vi.advanceTimersByTimeAsync(1500);
+  expect(fixture.sockets).toHaveLength(1);
+  fixture.fail(0);
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(fixture.sockets).toHaveLength(2);
+  fixture.fail(403);
+  fixture.sockets[1].onclose({ code: 1006 });
+  await vi.advanceTimersByTimeAsync(15_000);
+  const requests = fixture.fetch.mock.calls.length;
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(fixture.fetch.mock.calls.filter(([path]) => path !== "/api/connections")).toHaveLength(
+    requests - fixture.fetch.mock.calls.slice(0, requests).filter(([path]) => path === "/api/connections").length,
+  );
+});
+
+it("reconciles terminals created and closed in another page without reconnecting the selected shell", async () => {
+  const fixture = await terminalFixture();
+  const one = dom.window.document.querySelector('.terminal-tab[data-session="one"]');
+  const publish = () => fixture.sockets[0].onmessage({ data: JSON.stringify({ type: "session-names", sessions: fixture.list }) });
+  fixture.list.push({ id: "two", name: "Two" });
+  publish();
+  expect(dom.window.document.querySelector('.terminal-tab[data-session="two"]')).not.toBeNull();
+  expect(dom.window.document.querySelector('.terminal-tab[data-session="one"]')).toBe(one);
+  expect(fixture.sockets).toHaveLength(1);
+  fixture.list.pop();
+  publish();
+  expect(dom.window.document.querySelector('.terminal-tab[data-session="two"]')).toBeNull();
+  expect(dom.window.document.querySelector('.terminal-tab[data-session="one"]')).toBe(one);
+  expect(fixture.sockets).toHaveLength(1);
+});
+
+it("allows retrying a connection revocation after a host storage failure", async () => {
+  await terminalFixture();
+  const request = vi.mocked(fetch);
+  request.mockImplementation(async (path, options) => {
+    if (options?.method === "POST") return Response.json({ error: "Could not save authorization." }, { status: 500 });
+    if (path === "/api/connections") return Response.json({ pending: [], grants: [{ id: "grant", origin: "chrome-extension://test" }] });
+    return Response.json([]);
+  });
+  await vi.advanceTimersByTimeAsync(2000);
+  const revoke = dom.window.document.querySelector<HTMLButtonElement>("#connection-items button")!;
+  expect(revoke.textContent).toBe("Revoke");
+  revoke.click();
+  await vi.waitFor(() => expect(dom.window.document.querySelector("#status")!.textContent).toContain("Could not save authorization"));
+  expect(revoke.disabled).toBe(false);
+});
 it("ignores stale session lists and ACKs when switching shells, and keeps exited controls disabled", async () => {
   dom = new JSDOM(await readFile(new URL("./index.html", import.meta.url), "utf8"), {
     url: "http://localhost:1234/launch?token=one-time-setup",
