@@ -1,0 +1,92 @@
+import { afterEach, expect, it, vi } from "vitest";
+import piExtension from "./pi-extension.js";
+import { AgentSessions } from "./agent-sessions.js";
+
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+
+it("observes Pi lifecycle, waits for final settlement and does not expose model/tool data", async () => {
+  vi.stubEnv("AOW_AGENT_ENDPOINT", "http://127.0.0.1:1234/agent-event");
+  vi.stubEnv("AOW_AGENT_TOKEN", "test-token");
+  const store = new AgentSessions();
+  const payloads: any[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (_url, options) => {
+    const payload = JSON.parse(options.body);
+    payloads.push(payload);
+    expect(store.ingest("terminal", payload)).toBe(true);
+    return { ok: true };
+  }));
+  const handlers = new Map<string, Function>();
+  piExtension({ on: (name, handler) => { handlers.set(name, handler); } });
+  let session = "one";
+  let idle = false;
+  const ctx = { cwd: "/project", sessionManager: { getSessionId: () => session }, isIdle: () => idle };
+  const emit = async (name: string, fields = {}) => {
+    expect(await handlers.get(name)!({ type: name, ...fields }, ctx)).toBeUndefined();
+  };
+  const current = () => store.snapshot().find(item => item.id.endsWith(`pi:${session}`))!;
+  await emit("session_start");
+  expect(current()).toMatchObject({ agent: "Pi", status: "idle" });
+  await emit("before_agent_start", { prompt: "Pi task", systemPrompt: "private system prompt" });
+  await emit("agent_start");
+  await emit("ui_prompt_start", { title: "Confirm action" });
+  const attention = current().attentionId;
+  await emit("tool_execution_start", { toolName: "bash", toolCallId: "tool", args: { command: "private command" } });
+  await emit("tool_execution_end", { toolName: "bash", toolCallId: "tool", result: "private output" });
+  expect(current()).toMatchObject({ status: "approval", detail: "Confirm action", attentionId: attention });
+  await emit("ui_prompt_end");
+  expect(current().status).toBe("running");
+  await emit("turn_end", { outcome: "error", message: { content: "private response" } });
+  expect(handlers.has("agent_end")).toBe(false);
+  expect(current().status).toBe("running");
+  // An automatic retry is still working, and may complete successfully.
+  await emit("agent_start");
+  await emit("turn_end", { outcome: "completed" });
+  await emit("agent_settled", { aborted: false });
+  const completed = current().attentionId;
+  expect(current()).toMatchObject({ title: "Pi task", status: "completed" });
+  await emit("agent_settled", { aborted: false });
+  expect(current().attentionId).toBe(completed);
+  idle = true;
+  await emit("ui_prompt_start", { title: "Confirm an idle command" });
+  expect(current().status).toBe("approval");
+  await emit("ui_prompt_end");
+  expect(current().status).toBe("idle");
+  idle = false;
+  await emit("before_agent_start", { prompt: "Stop me" });
+  await emit("agent_start");
+  await emit("agent_settled", { aborted: true });
+  expect(current()).toMatchObject({ status: "interrupted", detail: "Turn stopped" });
+  await emit("before_agent_start", { prompt: "Fail me" });
+  await emit("agent_start");
+  await emit("turn_end", { outcome: "error" });
+  await emit("agent_settled", { aborted: false });
+  expect(current().status).toBe("interrupted");
+  await emit("session_shutdown");
+  expect(current().status).toBe("ended");
+  session = "two";
+  idle = true;
+  await emit("session_start");
+  await emit("ui_prompt_start", { title: "Choose a setting" });
+  await emit("ui_prompt_end");
+  expect(current().status).toBe("idle");
+  expect(store.snapshot()).toHaveLength(2);
+  const serialized = JSON.stringify(payloads);
+  expect(serialized).not.toContain("private");
+  expect(serialized).not.toContain("args");
+  expect(serialized).not.toContain("messages");
+});
+
+it("does not attach handlers outside a host-owned terminal and fails open when the host is unavailable", async () => {
+  const handlers = new Map<string, Function>();
+  const api = { on: (name: string, handler: Function) => { handlers.set(name, handler); } };
+  vi.stubEnv("AOW_AGENT_TOKEN", "");
+  piExtension(api);
+  expect(handlers.size).toBe(0);
+  vi.stubEnv("AOW_AGENT_ENDPOINT", "http://127.0.0.1:1234/agent-event");
+  vi.stubEnv("AOW_AGENT_TOKEN", "test-token");
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Host stopped")));
+  piExtension(api);
+  const ctx = { cwd: "/project", sessionManager: { getSessionId: () => "one" }, isIdle: () => false };
+  await expect(handlers.get("session_start")!({}, ctx)).resolves.toBeUndefined();
+  await expect(handlers.get("before_agent_start")!({ prompt: "Keep working" }, ctx)).resolves.toBeUndefined();
+});

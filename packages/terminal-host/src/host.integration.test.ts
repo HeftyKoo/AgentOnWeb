@@ -408,7 +408,7 @@ it("refreshes other authorized browsers after revocation without stopping their 
   }
 }, 15000);
 
-it.each(["codex", "claude-code"])("delivers authenticated %s hooks without a terminal viewer and restores the latest snapshot", async (agent) => {
+it.each(["codex", "claude-code", "pi"])("delivers authenticated %s events without a terminal viewer and restores the latest snapshot", async (agent) => {
   directory = await mkdtemp(join(tmpdir(), "aow-agent-events-"));
   const cli = resolve("packages/terminal-host/lib/cli.js");
   host = spawn(process.execPath, [cli, "terminal"], {
@@ -455,14 +455,16 @@ it.each(["codex", "claude-code"])("delivers authenticated %s hooks without a ter
   terminal.on("message", raw => { const m = JSON.parse(String(raw)); if (m.type === "snapshot") epoch = m.epoch; });
   await expect.poll(() => Boolean(epoch)).toBe(true);
   const quote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'";
-  const report = (event: string) => `printf %s ${quote(JSON.stringify({ hook_event_name: event, session_id: "actual-hook-session", [agent === "claude-code" ? "prompt_id" : "turn_id"]: "turn-one", prompt: "Verify hook transport", tool_name: "Bash" }))} | ${quote(process.execPath)} ${agent === "claude-code" ? `${quote(resolve("packages/terminal-host/lib/agent-hook.js"))} claude-code` : `${quote(cli)} agent-event`}`;
-  terminal.send(JSON.stringify({ type: "input", epoch, data: `${report("UserPromptSubmit")}\nsleep 0.2\n${report("PermissionRequest")}\nsleep 0.2\n${agent === "claude-code" ? report("Stop") : `${quote(process.execPath)} ${quote(cli)} agent-notify ${quote(JSON.stringify({ type: "agent-turn-complete", "thread-id": "actual-hook-session", "turn-id": "turn-one" }))}`}\n` }));
+  const report = (event: string) => `printf %s ${quote(JSON.stringify({ hook_event_name: event, session_id: "actual-hook-session", [agent === "claude-code" ? "prompt_id" : "turn_id"]: "turn-one", prompt: "Verify hook transport", tool_name: "Bash" }))} | ${quote(process.execPath)} ${agent !== "codex" ? `${quote(resolve("packages/terminal-host/lib/agent-hook.js"))} ${agent}` : `${quote(cli)} agent-event`}`;
+  const complete = agent === "claude-code" ? report("Stop") : agent === "pi" ? report("agent_settled")
+    : `${quote(process.execPath)} ${quote(cli)} agent-notify ${quote(JSON.stringify({ type: "agent-turn-complete", "thread-id": "actual-hook-session", "turn-id": "turn-one" }))}`;
+  terminal.send(JSON.stringify({ type: "input", epoch, data: `${report(agent === "pi" ? "before_agent_start" : "UserPromptSubmit")}\nsleep 0.2\n${report(agent === "pi" ? "ui_prompt_start" : "PermissionRequest")}\nsleep 0.2\n${complete}\n` }));
   // Semantic notifications must outlive the xterm viewing connection.
   terminal.close();
   await expect.poll(() => frames.filter(frame => frame.kind === "agent.sessions").some(frame => frame.sessions[0]?.status === "completed"), { timeout: 5000 }).toBe(true);
   const updates = frames.filter(frame => frame.kind === "agent.sessions").flatMap(frame => frame.sessions);
   expect(updates.map(item => item.status)).toEqual(expect.arrayContaining(["running", "approval", "completed"]));
-  expect(updates.every(item => item.terminalId === terminalId && item.agent === (agent === "claude-code" ? "Claude Code" : "Codex"))).toBe(true);
+  expect(updates.every(item => item.terminalId === terminalId && item.agent === (agent === "claude-code" ? "Claude Code" : agent === "pi" ? "Pi" : "Codex"))).toBe(true);
   socket.close();
   const restored = new WebSocket(connectorUrl, { headers: { Origin: extensionOrigin } });
   const snapshots: any[] = [];

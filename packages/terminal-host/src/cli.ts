@@ -18,6 +18,7 @@ import { AgentSessions } from "./agent-sessions.js";
 import { installCodexHooks, uninstallCodexHooks, reportCodexInput } from "./codex-hooks.js";
 import { completionEvent, forwardNotification } from "./codex-notify.js";
 import { installClaudeHooks, uninstallClaudeHooks } from "./claude-hooks.js";
+import { installPiExtension, uninstallPiExtension } from "./pi-hooks.js";
 import { reportAgentEvent } from "./agent-events.js";
 import type { NativeSurface } from "@agentonweb/connector-contract";
 
@@ -44,8 +45,8 @@ if (inputArgs[0] === "agent-notify") {
   process.exit(0);
 }
 if (inputArgs[0] === "agent-event") {
-  if (inputArgs.length === 1 || inputArgs.length === 2 && inputArgs[1] === "claude-code")
-    await reportAgentEvent(inputArgs[1] === "claude-code" ? "claude-code" : "codex").catch(() => {});
+  if (inputArgs.length === 1 || inputArgs.length === 2 && (inputArgs[1] === "claude-code" || inputArgs[1] === "pi"))
+    await reportAgentEvent(inputArgs[1] === "pi" ? "pi" : inputArgs[1] === "claude-code" ? "claude-code" : "codex").catch(() => {});
   process.exit(0);
 }
 if (inputArgs[0] === "claude-hooks" && inputArgs[1] === "install" && inputArgs.length === 2) {
@@ -55,6 +56,15 @@ if (inputArgs[0] === "claude-hooks" && inputArgs[1] === "install" && inputArgs.l
 if (inputArgs[0] === "claude-hooks" && inputArgs[1] === "uninstall" && inputArgs.length === 2) {
   await uninstallClaudeHooks();
   console.log("AgentOnWeb Claude Code hooks removed; other settings preserved.");
+  process.exit(0);
+}
+if (inputArgs[0] === "pi-extension" && inputArgs[1] === "install" && inputArgs.length === 2) {
+  console.log(`Installed observational extension: ${await installPiExtension()}\nStart Pi 1.1+ inside an AgentOnWeb terminal, or use /reload in Pi.`);
+  process.exit(0);
+}
+if (inputArgs[0] === "pi-extension" && inputArgs[1] === "uninstall" && inputArgs.length === 2) {
+  await uninstallPiExtension();
+  console.log("AgentOnWeb Pi extension removed; other settings preserved. Use /reload in Pi to unload it.");
   process.exit(0);
 }
 if (inputArgs[0] === "codex-hooks" && inputArgs[1] === "install") {
@@ -77,7 +87,7 @@ if (inputArgs[0] === "service") {
 }
 if (inputArgs.length === 1 && inputArgs[0] === "--help") {
   console.log(
-    "Usage: aow setup | aow uninstall | aow terminal | aow codex-hooks install|uninstall | aow claude-hooks install|uninstall | aow service [open|install|status|uninstall] (default: open)",
+    "Usage: aow setup | aow uninstall | aow terminal | aow codex-hooks install|uninstall | aow claude-hooks install|uninstall | aow pi-extension install|uninstall | aow service [open|install|status|uninstall] (default: open)",
   );
   process.exit(0);
 }

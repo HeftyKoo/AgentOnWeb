@@ -26,6 +26,16 @@ A project or profile that overrides `notify`, disabled/untrusted hooks, or launc
 
 Claude Code has no universal user-interrupt hook. An interruption or permission denial that emits no supported event can leave the displayed status approximate until the next prompt or session end; an idle notification clears an otherwise running indicator. A separate Stop hook can continue the turn after our observational hook reports completion; subsequent activity restores Working. The native TUI is authoritative. Disabled hooks, managed policy restrictions or a process that drops the inherited event environment prevent reporting. The integration never changes `disableAllHooks`, permission rules or hook trust.
 
+## Pi
+
+`aow setup` also installs an observational extension for Pi 1.1+. Use `aow pi-extension install|uninstall` to manage it separately. The installer adds `extensions/agentonweb.ts` under `PI_CODING_AGENT_DIR` (default `~/.pi/agent`), preserves settings and other extensions, backs up replaced AgentOnWeb entries, and refuses to overwrite an unrelated file with that name. It resolves the packaged lightweight `pi-extension.js` through the module URL, including npm bin-symlink installs. Start Pi or use `/reload` after installing/removing it. It registers no handlers outside a host-owned terminal.
+
+Pi lifecycle events reach the same authenticated per-terminal ingress, ordered and with the same bounded presentation fields and network deadline. `session_start` creates Ready; `before_agent_start` creates a fresh turn and prompt title; `agent_start` and tool execution events show Working. Blocking extension `ui_prompt_start` events show Needs approval; `ui_prompt_end` restores Working or Ready. Tool activity cannot clear a still-open dialog. Confirmation/input decisions stay in Pi; this adapter never returns tool, prompt, context or permission changes.
+
+Completion uses `agent_settled`, after retries, compaction recovery and queued work finish. `agent_end` alone does not complete a task. Aborted settlement or the last turn's error outcome shows Interrupted without a completion notification. `session_shutdown` ends the old session when Pi quits, reloads, starts a new session, resumes or forks; the following `session_start` binds the new runtime. Pi session IDs are independent of Codex and Claude Code. Provider errors, model responses, tool arguments/results and session files are not forwarded.
+
+This integration requires Pi's 1.1+ settlement and UI-prompt events. Force-killing Pi without a shutdown event can leave a snapshot until that host terminal closes. Disabled extensions and shells that drop the inherited event environment prevent reporting.
+
 ## Event flow
 
 1. Each host-owned PTY receives its own `AOW_AGENT_ENDPOINT` and `AOW_AGENT_TOKEN`.
@@ -53,7 +63,7 @@ The registry is host-memory scoped; it does not reconstruct history after a host
 
 ## Extending to other agents
 
-The connector contract `AgentSession` and `SurfaceAdapter.agentSessions` contain no Codex hook names. Another runtime can publish its own normalized sessions through that interface. The Claude Code terminal adapter normalizes its official events in the host. Future adapters should reuse the per-terminal binding and public status contract, not parse colored PTY text or make the frontend know agent-specific hook payloads.
+The connector contract `AgentSession` and `SurfaceAdapter.agentSessions` contain no Codex hook names. Another runtime can publish its own normalized sessions through that interface. The Claude Code and Pi terminal adapters normalize their official events in the host. Future adapters should reuse the per-terminal binding and public status contract, not parse colored PTY text or make the frontend know agent-specific hook payloads.
 
 ## Verification
 
@@ -61,8 +71,8 @@ The connector contract `AgentSession` and `SurfaceAdapter.agentSessions` contain
 
 For the interactive UI fixture: `pnpm build:preview`, `pnpm preview`, then open `http://127.0.0.1:4173/?activity`. The fixture explicitly labels its events as simulated.
 
-Official schemas: [Claude Code hooks](https://code.claude.com/docs/en/hooks), [Claude Code settings](https://code.claude.com/docs/en/settings), [Codex hooks](https://learn.chatgpt.com/docs/hooks), [Codex notify](https://learn.chatgpt.com/docs/config-file/config-advanced#notifications).
+Official schemas: [Pi extensions](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md), [Pi event types](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/extensions/types.ts), [Claude Code hooks](https://code.claude.com/docs/en/hooks), [Claude Code settings](https://code.claude.com/docs/en/settings), [Codex hooks](https://learn.chatgpt.com/docs/hooks), [Codex notify](https://learn.chatgpt.com/docs/config-file/config-advanced#notifications).
 
 ## One-command setup (macOS + Chrome)
 
-The new `aow setup` entry configures the service, Chrome native pairing and Codex/Claude Code notifications together. Global npm installs run it when lifecycle scripts are permitted; the release shell installer calls it explicitly. Codex hook trust remains a first-use user action. Use matching 0.2.0 host and extension builds; release availability is tracked separately. See [One-command setup (macOS + Chrome)](one-command-setup.md).
+The new `aow setup` entry configures the service, Chrome native pairing and Codex/Claude Code/Pi notifications together. Global npm installs run it when lifecycle scripts are permitted; the release shell installer calls it explicitly. Codex hook trust remains a first-use user action. Use matching host and extension builds; release availability is tracked separately. See [One-command setup (macOS + Chrome)](one-command-setup.md).

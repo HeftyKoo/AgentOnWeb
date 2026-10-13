@@ -66,7 +66,7 @@ export function createAgentActivity(activate: (session: AgentSession) => void, r
     if (!current) advance();
     if (!sorted.length) {
       const empty = document.createElement("p"); empty.className = "agent-empty";
-      empty.textContent = "No agent sessions yet. Run aow setup, review AgentOnWeb session status in your CLI's /hooks, then launch Codex or Claude Code in a local terminal.";
+      empty.textContent = "No agent sessions yet. Run aow setup, then launch Codex, Claude Code or Pi in a local terminal. For Codex and Claude Code, review AgentOnWeb session status in /hooks.";
       element.append(empty);
     }
     return { count: sorted.filter(item => item.status === "running" || item.status === "approval").length,
