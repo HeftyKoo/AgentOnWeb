@@ -17,6 +17,7 @@ it('groups commands with descriptions and examples', () => {
   const help = formatHelp('main', terminalUi(output(80), {}));
   for (const title of ['CONNECT', 'SERVICE', 'AGENT INTEGRATIONS', 'MAINTENANCE', 'QUICK START']) expect(help).toContain(`[ ${title} ]`);
   expect(help).toContain('aow setup --agents codex,pi');
+  expect(help).toContain('aow terminal');
   expect(help).toContain('aow <command> --help');
 });
 

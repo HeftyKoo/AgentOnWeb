@@ -34,6 +34,7 @@ const topics: Record<string, Help> = {
       ] },
       { title: 'QUICK START', rows: [
         ['aow setup', 'Choose integrations with a checkbox menu.'],
+        ['aow terminal', 'Run the terminal host in the foreground.'],
         ['aow setup --agents codex,pi', 'Select integrations without prompting.'],
         ['aow service status', 'Check the running service.'],
       ] },
