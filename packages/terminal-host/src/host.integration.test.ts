@@ -126,6 +126,30 @@ it('prints service help and usage errors without a Node stack trace', () => {
   expect(invalid.stdout).toBe('');
   expect(invalid.stderr).toMatch(/^aow: Usage: aow service [^\n]+\n$/);
 });
+it.each([
+  ['--help'], ['-h'], ['help'], ['help', 'setup'], ['setup', '--help'],
+  ['service', '-h'], ['terminal', '--help'], ['uninstall', '--help'],
+  ['update', '--help'], ['check-update', '-h'], ['codex-hooks', '--help'],
+  ['claude-hooks', '--help'], ['pi-extension', '--help'],
+])('prints structured help without starting a host or modifying integrations: %j', (...args) => {
+  const result = spawnSync(process.execPath, [resolve('packages/terminal-host/lib/cli.js'), ...args], {
+    encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: undefined },
+  });
+  expect(result.status).toBe(0);
+  expect(result.stderr).toBe('');
+  expect(result.stdout).toContain('AOW // AGENTONWEB');
+  expect(result.stdout).toContain('Usage: aow');
+  expect(result.stdout).not.toContain('\x1b');
+  expect(result.stdout).not.toContain('Open once:');
+});
+it('keeps version output machine-readable even with forced color', () => {
+  const result = spawnSync(process.execPath, [resolve('packages/terminal-host/lib/cli.js'), '--version'], {
+    encoding: 'utf8', env: { ...process.env, NO_COLOR: undefined, FORCE_COLOR: '1' },
+  });
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe(VERSION + '\n');
+  expect(result.stderr).toBe('');
+});
 it("keeps shell sessions alive across viewers and isolates setup authorization from delegated terminals", async () => {
   directory = await mkdtemp(join(tmpdir(), "aow-shell-test-"));
   host = spawn(process.execPath, [resolve("packages/terminal-host/lib/cli.js"), "terminal"], {

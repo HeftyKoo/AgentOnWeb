@@ -7,6 +7,8 @@ import { packageDirectory, installedVersion } from './version.js';
 import { outsideTerminal, prepareHost, liveEndpoint } from './management.js';
 import { serviceDirectory, serviceLoaded, reloadService } from './service.js';
 import { Updates } from './updates.js';
+import { formatHelp } from './cli-help.js';
+import { printStatus } from './cli-ui.js';
 
 export function npmPrefix(root: string) {
   const prefix = dirname(dirname(dirname(dirname(root))));
@@ -30,7 +32,7 @@ async function install(prefix: string, version: string) {
 }
 export async function updateCommand(args: string[]) {
   if (args.length === 1 && ['--help', '-h'].includes(args[0]!)) {
-    console.log('Usage: aow update [--force]\nInstall the newer stable npm version into the existing prefix and restart the macOS service. Close terminals first. --force ends their tasks.'); return;
+    console.log(formatHelp('update')); return;
   }
   if (args.length > 1 || args.length === 1 && args[0] !== '--force') throw new Error('Usage: aow update [--force]');
   outsideTerminal();
@@ -41,7 +43,7 @@ export async function updateCommand(args: string[]) {
   const updates = new Updates(serviceDirectory);
   const status = await updates.check(true);
   if (status.error) throw new Error(status.error);
-  if (!status.updateAvailable) { console.log(`AgentOnWeb ${status.currentVersion} is up to date; no package was changed.`); return; }
+  if (!status.updateAvailable) { printStatus('ok', `AgentOnWeb ${status.currentVersion} is up to date; no package was changed.`); return; }
   if (status.node && !semver.satisfies(process.versions.node, status.node)) throw new Error(`Version ${status.latest} requires Node.js ${status.node}. Update Node and rerun the installer.`);
   await mkdir(serviceDirectory, { recursive: true, mode: 0o700 });
   const guard = join(serviceDirectory, 'update.guard');
@@ -54,7 +56,7 @@ export async function updateCommand(args: string[]) {
     const prepared = await prepareHost(serviceDirectory, args.includes('--force'));
     try {
       if (!prepared.status && serviceLoaded()) throw new Error('The service is loaded but cannot be checked. No package was changed; repair the service first.');
-      console.log(`Updating AgentOnWeb ${status.currentVersion} → ${status.latest} in ${prefix}.`);
+      printStatus('info', `Updating AgentOnWeb ${status.currentVersion} → ${status.latest} in ${prefix}.`);
       await install(prefix, status.latest!);
       if (installedVersion() !== status.latest) throw new Error('npm did not install the expected version. The service was not restarted.');
       // Hooks/native registration keep the same absolute paths. Skipping setup
@@ -62,7 +64,7 @@ export async function updateCommand(args: string[]) {
       if (prepared.status) await reloadService(status.latest!);
       else {
         if (await liveEndpoint(serviceDirectory)) throw new Error('A host started during installation. Close its terminals, then run aow service restart to activate the installed version.');
-        console.log(`Installed ${status.latest}. Run aow setup if you want to configure the service.`);
+        printStatus('ok', `Installed ${status.latest}. Run aow setup if you want to configure the service.`);
       }
     } finally { await prepared.release(); }
   } finally { await rmdir(guard); }

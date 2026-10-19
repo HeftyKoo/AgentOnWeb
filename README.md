@@ -49,7 +49,7 @@ Run this once in your Mac's Terminal:
 curl -fsSL https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh | bash
 ```
 
-The installer sets up the local terminal, automatic startup and Chrome connection. It detects Codex, Claude Code and Pi on `PATH`, then shows a terminal menu to choose all or some detected CLI integrations, or skip them. Existing CLI settings are preserved. You can also choose explicitly with `aow setup --agents codex,claude`, `--agents all` or `--agents none`.
+The installer sets up the local terminal, automatic startup and Chrome connection. It detects Codex, Claude Code and Pi on `PATH`, then shows a checkbox menu: Up/Down to move, Space to toggle, A to select/clear all, I to invert, and Enter to confirm. Clear all to skip integrations. Existing CLI settings are preserved. You can also choose explicitly with `aow setup --agents codex,claude`, `--agents all` or `--agents none`.
 
 The install command works from zsh, bash and fish. When Node's command directory is writable and already on PATH, the installer adds an `aow` entry there, so the same terminal can run `aow service` immediately without sourcing a profile. New zsh/bash windows and detected fish installations also get `aow` on their PATH. If that directory is protected or has an unrelated `aow` command, use `"$HOME/.local/bin/aow" service` directly.
 
