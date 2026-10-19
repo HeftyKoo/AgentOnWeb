@@ -5,6 +5,8 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { hostRequest, liveEndpoint, prepareHost } from './management.js';
 import { VERSION } from './version.js';
+import { formatHelp } from './cli-help.js';
+import { printStatus } from './cli-ui.js';
 
 const label = 'com.agentonweb.terminal';
 export const serviceDirectory = join(homedir(), '.agentonweb', 'terminal');
@@ -24,7 +26,7 @@ export function launchAgent(node: string, entry: string, home: string, path: str
 export async function serviceCommand(args: string[]): Promise<void> {
   const usage = 'Usage: aow service [open | install [--no-open] | status | restart [--force] | uninstall] (default: open)';
   if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
-    console.log(usage);
+    console.log(formatHelp('service'));
     return;
   }
   const action = args[0] ?? 'open';
@@ -44,20 +46,20 @@ export async function serviceCommand(args: string[]): Promise<void> {
     if (!running) {
       execFileSync('/bin/launchctl', ['bootstrap', domain, plist], { stdio: 'pipe' });
     }
-    console.log(running ? 'Service configuration updated for next login. Existing terminals remain running.' : 'AgentOnWeb terminal service starts automatically at login.');
+    printStatus('ok', running ? 'Service configuration updated for next login. Existing terminals remain running.' : 'AgentOnWeb terminal service starts automatically at login.');
     if (!args.includes('--no-open')) await openService();
   } else if (action === 'open') await openService();
   else if (action === 'status') {
-    try { execFileSync('/bin/launchctl', ['print', domain + '/' + label], { stdio: 'ignore' }); console.log('AgentOnWeb terminal service is loaded.'); }
-    catch { console.log('AgentOnWeb terminal service is not loaded.'); }
-    console.log(`Installed CLI: ${VERSION}`);
+    try { execFileSync('/bin/launchctl', ['print', domain + '/' + label], { stdio: 'ignore' }); printStatus('ok', 'AgentOnWeb terminal service is loaded.'); }
+    catch { printStatus('warn', 'AgentOnWeb terminal service is not loaded.'); }
+    printStatus('info', `Installed CLI: ${VERSION}`);
     const endpoint = await liveEndpoint(serviceDirectory);
     if (endpoint) {
       try {
         const status = await hostRequest(endpoint);
-        console.log(`Running host: ${status.version} · ${status.activeTerminals} active terminal(s).`);
-        if (status.version !== VERSION) console.log('Installed version differs from the running host. Run aow service restart after closing terminals.');
-      } catch { console.log('Running host version unavailable. Finish terminal work and restart the older host manually.'); }
+        printStatus('info', `Running host: ${status.version} · ${status.activeTerminals} active terminal(s).`);
+        if (status.version !== VERSION) printStatus('warn', 'Installed version differs from the running host. Run aow service restart after closing terminals.');
+      } catch { printStatus('warn', 'Running host version unavailable. Finish terminal work and restart the older host manually.'); }
     }
   } else if (action === 'restart') {
     const prepared = await prepareHost(serviceDirectory, args.includes('--force'));
@@ -66,7 +68,7 @@ export async function serviceCommand(args: string[]): Promise<void> {
   } else if (action === 'uninstall') {
     try { execFileSync('/bin/launchctl', ['bootout', domain + '/' + label], { stdio: 'pipe' }); } catch {}
     await unlink(plist).catch(error => { if (error.code !== 'ENOENT') throw error; });
-    console.log('Automatic startup removed. Service terminals stopped; saved CLI history is unchanged.');
+    printStatus('ok', 'Automatic startup removed. Service terminals stopped; saved CLI history is unchanged.');
   }
 }
 export function serviceLoaded(): boolean {
@@ -94,7 +96,7 @@ export async function reloadService(expectedVersion: string) {
       if (endpoint && endpoint.pid !== old?.pid) {
         const status = await hostRequest(endpoint);
         if (status.version === expectedVersion && status.managedService) {
-          console.log(`AgentOnWeb service is running version ${expectedVersion}.`); return;
+          printStatus('ok', `AgentOnWeb service is running version ${expectedVersion}.`); return;
         }
       }
     } catch { /* Wait for the new host to publish its endpoint. */ }

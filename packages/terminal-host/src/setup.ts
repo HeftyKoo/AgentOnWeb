@@ -10,12 +10,14 @@ import type { SetupAgent } from './setup-agents.js';
 import { installNativeBridge, uninstallNativeBridge, extensionOrigin, STORE_EXTENSION_ID } from './native-bridge.js';
 import { serviceCommand, serviceDirectory } from './service.js';
 import { cleanup } from './cleanup.js';
+import { formatHelp, SETUP_USAGE } from './cli-help.js';
+import { printStatus, terminalUi } from './cli-ui.js';
 
-export const SETUP_USAGE = 'Usage: aow setup [--agents all|none|codex,claude,pi] [--extension-id CHROME_EXTENSION_ID]';
+export { SETUP_USAGE } from './cli-help.js';
 
 export async function setup(args: string[]) {
   if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
-    console.log(`${SETUP_USAGE}\nDefault: detect CLIs on PATH, then ask which integrations to install in your terminal.\n--agents selects a comma-separated subset without prompting; all selects all detected CLIs, none skips integrations.\nMissing CLIs are always skipped. Selection does not remove existing integrations.`);
+    console.log(formatHelp('setup'));
     return;
   }
   if (process.platform !== 'darwin') throw new Error('One-command setup currently supports macOS + Chrome. Other platforms can use aow terminal.');
@@ -48,6 +50,7 @@ export async function setup(args: string[]) {
   // This also works when npm blocks lifecycle scripts.
   const require = createRequire(import.meta.url);
   const helper = join(dirname(require.resolve('node-pty/package.json')), 'prebuilds', `darwin-${process.arch}`, 'spawn-helper');
+  console.log(terminalUi().banner('SETUP'));
   const selected = await planAgentSetup(agents);
   await chmod(helper, 0o755);
   await installSelectedAgents(selected);
@@ -68,9 +71,9 @@ export async function setup(args: string[]) {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   if (!ready) throw new Error('Setup saved, but the running host is not ready for automatic pairing. Finish active terminal work, then run aow service uninstall && aow setup. See ~/.agentonweb/terminal/service.log.');
-  console.log('Local service is ready.');
-  console.log('Setup records absolute Node/package paths. Before removing that Node installation or moving the package, reinstall under the intended Node version and rerun aow setup.');
-  console.log('First installation: Chrome connects automatically on its next setup check (up to 5 minutes after failed attempts). Previously revoked or reset connections require manual pairing.');
+  printStatus('ok', 'Local service is ready.');
+  printStatus('info', 'Setup records absolute Node/package paths. Before removing that Node installation or moving the package, reinstall under the intended Node version and rerun aow setup.');
+  printStatus('info', 'First installation: Chrome connects automatically on its next setup check (up to 5 minutes after failed attempts). Previously revoked or reset connections require manual pairing.');
 }
 
 export async function uninstall(): Promise<void> {
@@ -83,5 +86,5 @@ export async function uninstall(): Promise<void> {
     () => uninstallNativeBridge(),
     async () => { if (process.platform === 'darwin') await serviceCommand(['uninstall']); },
   ], 'AgentOnWeb uninstall is incomplete. All integrations were attempted; fix the reported errors and rerun aow uninstall before removing the npm package.');
-  console.log('AgentOnWeb hooks, notify forwarding, native bridge and service removed. Backups, browser grants, pairing receipts and CLI history are retained. You can now run npm uninstall -g @agentonweb/terminal-host.');
+  printStatus('ok', 'AgentOnWeb hooks, notify forwarding, native bridge and service removed. Backups, browser grants, pairing receipts and CLI history are retained. You can now run npm uninstall -g @agentonweb/terminal-host.');
 }

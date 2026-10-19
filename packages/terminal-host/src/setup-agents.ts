@@ -3,6 +3,7 @@ import { installCodexHooks } from './codex-hooks.js';
 import { installClaudeHooks } from './claude-hooks.js';
 import { installPiExtension } from './pi-hooks.js';
 import { promptAgentSelection } from './setup-selection.js';
+import { printStatus } from './cli-ui.js';
 
 export const SETUP_AGENTS = ['codex', 'claude', 'pi'] as const;
 export type SetupAgent = typeof SETUP_AGENTS[number];
@@ -23,18 +24,18 @@ export async function planAgentSetup(requested?: readonly SetupAgent[]): Promise
     catch { return { integration, path: undefined }; }
   }));
   const names = detected.filter(value => value.path).map(value => value.integration.name);
-  console.log(`Detected CLIs on PATH: ${names.length ? names.join(', ') : 'none'}.`);
+  printStatus('info', `Detected CLIs on PATH: ${names.length ? names.join(', ') : 'none'}.`);
   const available = detected.filter(value => value.path).map(value => value.integration.id);
   const selected = requested ?? (available.length ? await promptAgentSelection(available) : []);
   for (const { integration, path } of detected) {
     const label = `${integration.name} ${integration.kind}`;
     if (!path) {
-      console.log(`Skipped ${label}: CLI "${integration.id}" not found on PATH.`);
+      printStatus('skip', `${label}: CLI "${integration.id}" not found on PATH.`);
     } else if (!selected.includes(integration.id)) {
-      console.log(`Skipped ${label}: not selected.`);
+      printStatus('skip', `${label}: not selected.`);
     }
   }
-  if (!names.length) console.log('Install your preferred CLI and add it to PATH, then rerun aow setup to enable its notifications.');
+  if (!names.length) printStatus('info', 'Install your preferred CLI and add it to PATH, then rerun aow setup to enable its notifications.');
   return available.filter(agent => selected.includes(agent));
 }
 
@@ -42,6 +43,7 @@ export async function installSelectedAgents(selected: readonly SetupAgent[]): Pr
   for (const integration of integrations) {
     if (!selected.includes(integration.id)) continue;
     await integration.install();
-    console.log(`${integration.name} ${integration.kind} installed; existing settings preserved. ${integration.guidance}`);
+    printStatus('ok', `${integration.name} ${integration.kind} installed; existing settings preserved.`);
+    printStatus('info', integration.guidance);
   }
 }
