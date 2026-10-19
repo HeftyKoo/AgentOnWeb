@@ -65,6 +65,7 @@ if (!document.getElementById(HOST_ID)) {
   let receivedUpdate = false;
   let pendingSurfaceFocus = false;
   let requestedMode: AgentOnWebMode | undefined;
+  let modeRequestRevision = 0;
   let previousFocus = document.activeElement instanceof HTMLElement && document.activeElement !== host
     ? document.activeElement : undefined;
   const optionLatch = new DoubleTapLatch();
@@ -117,7 +118,16 @@ if (!document.getElementById(HOST_ID)) {
     optionLatch.reset();
     setVisible(true, false);
     requestedMode = mode;
-    send({ source: "agentonweb-content", type: "mode.set", mode });
+    const revision = ++modeRequestRevision;
+    // A page transition can miss the active-tab broadcast. The request reply
+    // also acknowledges this selection; apply only its mode so live session
+    // and connection updates received in the meantime remain intact.
+    void browser.runtime.sendMessage({ source: "agentonweb-content", type: "mode.set", mode } satisfies ContentRequest)
+      .then((response: { ok?: boolean; result?: SurfaceViewState } | undefined) => {
+        if (revision !== modeRequestRevision || !response?.ok || response.result?.mode !== mode) return;
+        render({ ...state, mode });
+        if (requestedMode === mode) { requestedMode = undefined; focusForMode(); }
+      }).catch(() => {});
   };
   // The background owns both keyboard paths, including deduplication and the
   // explicit reveal of this tab. Mode buttons keep their existing direct path.
@@ -286,6 +296,8 @@ if (!document.getElementById(HOST_ID)) {
       if (requestedMode === state.mode) { requestedMode = undefined; focusForMode(); }
     }
     if (isSurfaceCommand(message)) {
+      // A later keyboard/open command supersedes any pending button reply.
+      modeRequestRevision++;
       receivedUpdate = true;
       const next = message.type === "surface.toggle" ? !visible : true;
       setVisible(next, message.type === "surface.toggle", message.state);
