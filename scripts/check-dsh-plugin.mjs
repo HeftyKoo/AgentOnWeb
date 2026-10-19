@@ -70,7 +70,13 @@ try {
   await page.goto(url);
   // Fresh DSH onboarding is completed without credentials or model requests.
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Configure later", exact: true }).click();
+  // DSH 0.2.1 offers account sign-in first; older releases open the API-key
+  // editor directly. Dismiss only the known first-run dialog in either flow.
+  await page.getByRole("button", { name: "Configure later", exact: true })
+    .or(page.getByRole("dialog", { name: "Get started", exact: true }).getByRole("button", { name: "Close", exact: true })).click();
+  // Recent DSH releases keep Settings in the account menu.
+  const accountMenu = page.getByRole("button", { name: "Account menu", exact: true });
+  if (await accountMenu.isVisible()) await accountMenu.click();
   await page.getByText("Settings", { exact: true }).click();
   await page.getByText("AgentOnWeb", { exact: true }).click();
   await page.getByText("No authorized browser connections.", { exact: true }).waitFor();

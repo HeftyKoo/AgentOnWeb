@@ -13,6 +13,7 @@
 - After the fix: the complete suite passed **386 tests**, with one existing optional DSH test skipped, across 56 files. This includes real Pi RPC and authenticated host/PTY lifecycle integration.
 - Three regression scenarios cover successful acknowledgement without broadcast after body replacement, out-of-order replies preserving newer state, and keyboard precedence/failed replies.
 - TypeScript, architecture and privacy checks, the Chrome extension build and `git diff --check` passed. The final content test was rerun after extending its assertion to preserve live Pi session state.
+- The DSH smoke test was also verified against native DSH **0.2.1-rc.2**. Its account-first onboarding shows **Get started → Close**, while older releases show **Configure later**. The test now handles both and opens Settings through the account menu when present. The original command reproduced the old button timeout; the updated command passed plugin installation, authenticated API checks and the native AgentOnWeb settings page with no page errors.
 
 ## Native Arc verification
 
