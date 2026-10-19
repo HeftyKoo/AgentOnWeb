@@ -10,7 +10,7 @@ Install [the Chrome extension](https://chromewebstore.google.com/detail/agentonw
 curl -fsSL https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh | bash
 ```
 
-The installer configures the terminal service and Chrome connection. It detects `codex`, `claude` and `pi` executables on `PATH` and asks which notification integrations to install in a numbered terminal menu, including when run through `curl | bash`. Choose all detected CLIs, comma-separated numbers/names, or `0` to skip integrations. Missing CLIs are always skipped. Open a website, click AgentOnWeb and run:
+The installer configures the terminal service and Chrome connection. It detects `codex`, `claude` and `pi` executables on `PATH` and asks which notification integrations to install in a checkbox menu, including when run through `curl | bash`. Use Up/Down to move, Space to toggle, A to select/clear all, I to invert, and Enter to confirm. All detected CLIs start selected; clear all to configure the service only. Missing CLIs are always skipped. Open a website, click AgentOnWeb and run:
 
 ```sh
 cd ~/your-project
@@ -87,3 +87,5 @@ npm uninstall --global --prefix "$HOME/.local" @agentonweb/terminal-host
 If you installed through npm directly, uninstall from your original npm prefix instead. User settings, CLI history and backups remain.
 
 [Setup and troubleshooting](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/one-command-setup.md) · [Agent notifications](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/agent-notifications.md) · [Source development](https://github.com/HeftyKoo/AgentOnWeb/blob/main/docs/development.md)
+
+The human-facing CLI uses a compact Matrix-inspired green theme, grouped help and status labels. Run `aow --help` (or `aow help`) and `aow <command> --help` for details. Help adapts to terminal width; redirected output is plain text. Set `NO_COLOR=1` to disable color.

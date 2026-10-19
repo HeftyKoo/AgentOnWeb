@@ -25,104 +25,115 @@ import { VERSION, installedVersion } from './version.js';
 import { Updates } from './updates.js';
 import { Maintenance } from './management.js';
 import { updateCommand } from './upgrade.js';
+import { formatHelp, hasHelp } from './cli-help.js';
+import { printError, printStatus, terminalUi } from './cli-ui.js';
 
 const inputArgs = process.argv.slice(2);
-if (inputArgs.length === 1 && inputArgs[0] === '--version') {
-  console.log(VERSION); process.exit(0);
-}
-if (inputArgs[0] === 'update' || inputArgs[0] === 'check-update') {
-  try {
-    if (inputArgs[0] === 'update') await updateCommand(inputArgs.slice(1));
-    else {
-      const option = inputArgs[1];
-      if (inputArgs.length > 2 || option && !['--enable', '--disable', '--help', '-h'].includes(option)) throw new Error('Usage: aow check-update [--enable|--disable]');
-      const updates = new Updates(serviceDirectory);
-      if (option === '--help' || option === '-h') console.log('Usage: aow check-update [--enable|--disable]\nCheck the stable npm version, or enable/disable automatic checks. Explicit checks still work when disabled.');
-      else if (option) {
-        await updates.configure(option === '--enable');
-        console.log(`Automatic update checks ${option === '--enable' ? 'enabled' : 'disabled'}.`);
-      } else {
-        const status = await updates.check(true);
-        if (status.error) throw new Error(status.error);
-        console.log(`Installed CLI: ${VERSION}\nLatest stable: ${status.latest}\n${status.updateAvailable ? 'Update available. Run aow update from a separate macOS Terminal.' : 'No newer stable version available.'}`);
+try {
+  if (inputArgs.length === 1 && ['--help', '-h', 'help'].includes(inputArgs[0]!)) {
+    console.log(formatHelp()); process.exit(0);
+  }
+  if (inputArgs.length === 2 && (inputArgs[0] === 'help' && hasHelp(inputArgs[1]!) ||
+      ['--help', '-h'].includes(inputArgs[1]!) && hasHelp(inputArgs[0]!))) {
+    console.log(formatHelp(inputArgs[0] === 'help' ? inputArgs[1] : inputArgs[0])); process.exit(0);
+  }
+  if (inputArgs.length === 1 && inputArgs[0] === '--version') {
+    console.log(VERSION); process.exit(0);
+  }
+  if (inputArgs[0] === 'update' || inputArgs[0] === 'check-update') {
+    try {
+      if (inputArgs[0] === 'update') await updateCommand(inputArgs.slice(1));
+      else {
+        const option = inputArgs[1];
+        if (inputArgs.length > 2 || option && !['--enable', '--disable', '--help', '-h'].includes(option)) throw new Error('Usage: aow check-update [--enable|--disable]');
+        const updates = new Updates(serviceDirectory);
+        if (option === '--help' || option === '-h') console.log(formatHelp('check-update'));
+        else if (option) {
+          await updates.configure(option === '--enable');
+          printStatus('ok', `Automatic update checks ${option === '--enable' ? 'enabled' : 'disabled'}.`);
+        } else {
+          const status = await updates.check(true);
+          if (status.error) throw new Error(status.error);
+          printStatus('info', `Installed CLI: ${VERSION}`);
+          printStatus('info', `Latest stable: ${status.latest}`);
+          printStatus(status.updateAvailable ? 'warn' : 'ok', status.updateAvailable ? 'Update available. Run aow update from a separate macOS Terminal.' : 'No newer stable version available.');
+        }
       }
+    } catch (error) {
+      printError(error); process.exit(1);
     }
-  } catch (error) {
-    console.error(`aow: ${error instanceof Error ? error.message : String(error)}`); process.exit(1);
+    process.exit(0);
   }
-  process.exit(0);
-}
-if (inputArgs[0] === "native-host") {
-  await runNativeHost(inputArgs[1] ?? "", serviceDirectory);
-  process.exit(0);
-}
-if (inputArgs[0] === "setup") {
-  await setup(inputArgs.slice(1));
-  process.exit(0);
-}
-if (inputArgs[0] === "uninstall" && inputArgs.length === 1) {
-  await uninstall();
-  process.exit(0);
-}
-if (inputArgs[0] === "agent-notify") {
-  const payload = inputArgs.at(-1) ?? "";
-  try {
-    const event = completionEvent(JSON.parse(payload));
-    if (event) await reportCodexInput(event);
-  } catch { /* Notifications must never interfere with Codex. */ }
-  await forwardNotification(inputArgs.slice(1, -1), payload).catch(() => {});
-  process.exit(0);
-}
-if (inputArgs[0] === "agent-event") {
-  if (inputArgs.length === 1 || inputArgs.length === 2 && (inputArgs[1] === "claude-code" || inputArgs[1] === "pi"))
-    await reportAgentEvent(inputArgs[1] === "pi" ? "pi" : inputArgs[1] === "claude-code" ? "claude-code" : "codex").catch(() => {});
-  process.exit(0);
-}
-if (inputArgs[0] === "claude-hooks" && inputArgs[1] === "install" && inputArgs.length === 2) {
-  console.log(`Installed observational hooks: ${await installClaudeHooks()}\nReview AgentOnWeb session status in Claude Code /hooks, then start a new Claude Code session inside an AgentOnWeb terminal.`);
-  process.exit(0);
-}
-if (inputArgs[0] === "claude-hooks" && inputArgs[1] === "uninstall" && inputArgs.length === 2) {
-  await uninstallClaudeHooks();
-  console.log("AgentOnWeb Claude Code hooks removed; other settings preserved.");
-  process.exit(0);
-}
-if (inputArgs[0] === "pi-extension" && inputArgs[1] === "install" && inputArgs.length === 2) {
-  console.log(`Installed observational extension: ${await installPiExtension()}\nStart Pi 1.1+ inside an AgentOnWeb terminal, or use /reload in Pi.`);
-  process.exit(0);
-}
-if (inputArgs[0] === "pi-extension" && inputArgs[1] === "uninstall" && inputArgs.length === 2) {
-  await uninstallPiExtension();
-  console.log("AgentOnWeb Pi extension removed; other settings preserved. Use /reload in Pi to unload it.");
-  process.exit(0);
-}
-if (inputArgs[0] === "codex-hooks" && inputArgs[1] === "install") {
-  console.log(`Installed observational hooks: ${await installCodexHooks()}\nIn Codex, open /hooks and review/trust AgentOnWeb session status hooks, then start a new session inside an AgentOnWeb terminal.`);
-  process.exit(0);
-}
-if (inputArgs[0] === "codex-hooks" && inputArgs[1] === "uninstall") {
-  await uninstallCodexHooks();
-  console.log('AgentOnWeb hooks removed and the previous notify command restored.');
-  process.exit(0);
-}
-if (inputArgs[0] === "service") {
-  try {
-    await serviceCommand(inputArgs.slice(1));
-  } catch (error) {
-    console.error(`aow: ${error instanceof Error ? error.message : String(error)}`);
-    process.exit(1);
+  if (inputArgs[0] === "native-host") {
+    await runNativeHost(inputArgs[1] ?? "", serviceDirectory);
+    process.exit(0);
   }
-  process.exit(0);
-}
-if (inputArgs.length === 1 && inputArgs[0] === "--help") {
-  console.log(
-    "Usage: aow setup | aow uninstall | aow terminal | aow --version | aow check-update [--enable|--disable] | aow update [--force] | aow codex-hooks install|uninstall | aow claude-hooks install|uninstall | aow pi-extension install|uninstall | aow service [open|install|status|restart [--force]|uninstall] (default: open)",
-    "\nRun aow setup --help to select CLI integrations with --agents.",
-  );
-  process.exit(0);
-}
-if (inputArgs.length && (inputArgs[0] !== "terminal" || inputArgs.slice(1).some((arg) => arg !== "--service"))) {
-  throw new Error("Usage: aow setup | aow terminal | aow service install | aow --help");
+  if (inputArgs[0] === "setup") {
+    await setup(inputArgs.slice(1));
+    process.exit(0);
+  }
+  if (inputArgs[0] === "uninstall" && inputArgs.length === 1) {
+    await uninstall();
+    process.exit(0);
+  }
+  if (inputArgs[0] === "agent-notify") {
+    const payload = inputArgs.at(-1) ?? "";
+    try {
+      const event = completionEvent(JSON.parse(payload));
+      if (event) await reportCodexInput(event);
+    } catch { /* Notifications must never interfere with Codex. */ }
+    await forwardNotification(inputArgs.slice(1, -1), payload).catch(() => {});
+    process.exit(0);
+  }
+  if (inputArgs[0] === "agent-event") {
+    if (inputArgs.length === 1 || inputArgs.length === 2 && (inputArgs[1] === "claude-code" || inputArgs[1] === "pi"))
+      await reportAgentEvent(inputArgs[1] === "pi" ? "pi" : inputArgs[1] === "claude-code" ? "claude-code" : "codex").catch(() => {});
+    process.exit(0);
+  }
+  if (inputArgs[0] === "claude-hooks" && inputArgs[1] === "install" && inputArgs.length === 2) {
+    printStatus('ok', `Installed observational hooks: ${await installClaudeHooks()}`);
+    printStatus('info', 'Review AgentOnWeb session status in Claude Code /hooks, then start a new Claude Code session inside an AgentOnWeb terminal.');
+    process.exit(0);
+  }
+  if (inputArgs[0] === "claude-hooks" && inputArgs[1] === "uninstall" && inputArgs.length === 2) {
+    await uninstallClaudeHooks();
+    printStatus('ok', 'AgentOnWeb Claude Code hooks removed; other settings preserved.');
+    process.exit(0);
+  }
+  if (inputArgs[0] === "pi-extension" && inputArgs[1] === "install" && inputArgs.length === 2) {
+    printStatus('ok', `Installed observational extension: ${await installPiExtension()}`);
+    printStatus('info', 'Start Pi 1.1+ inside an AgentOnWeb terminal, or use /reload in Pi.');
+    process.exit(0);
+  }
+  if (inputArgs[0] === "pi-extension" && inputArgs[1] === "uninstall" && inputArgs.length === 2) {
+    await uninstallPiExtension();
+    printStatus('ok', 'AgentOnWeb Pi extension removed; other settings preserved. Use /reload in Pi to unload it.');
+    process.exit(0);
+  }
+  if (inputArgs[0] === "codex-hooks" && inputArgs[1] === "install" && inputArgs.length === 2) {
+    printStatus('ok', `Installed observational hooks: ${await installCodexHooks()}`);
+    printStatus('info', 'In Codex, open /hooks and review/trust AgentOnWeb session status hooks, then start a new session inside an AgentOnWeb terminal.');
+    process.exit(0);
+  }
+  if (inputArgs[0] === "codex-hooks" && inputArgs[1] === "uninstall" && inputArgs.length === 2) {
+    await uninstallCodexHooks();
+    printStatus('ok', 'AgentOnWeb hooks removed and the previous notify command restored.');
+    process.exit(0);
+  }
+  if (inputArgs[0] === "service") {
+    try {
+      await serviceCommand(inputArgs.slice(1));
+    } catch (error) {
+      printError(error);
+      process.exit(1);
+    }
+    process.exit(0);
+  }
+  if (inputArgs.length && (inputArgs[0] !== "terminal" || inputArgs.slice(1).some((arg) => arg !== "--service"))) {
+    throw new Error("Usage: aow setup | aow terminal | aow service install | aow --help");
+  }
+} catch (error) {
+  printError(error); process.exit(1);
 }
 const { command, args } = shellLaunch();
 const executable = await executablePath(command);
@@ -562,11 +573,12 @@ authority.onRevoke(() => {
   connector.refreshSurfaces();
 });
 console.log(
-  `AgentOnWeb · Local shell\nExecutable: ${executable}\nInitial directory: ${cwd}\nConnector: ${connector.port}\nOpen once: ${origin}/launch?token=${launchToken}\nApprove your browser through the private setup page.`,
+  `${terminalUi().banner('LOCAL SHELL')}\nExecutable: ${executable}\nInitial directory: ${cwd}\nConnector: ${connector.port}\nOpen once: ${origin}/launch?token=${launchToken}`,
 );
+printStatus('info', 'Approve your browser through the private setup page.');
 await saveEndpoint();
 const stopUpdateChecks = updates.start(status => {
-  console.log(`AgentOnWeb ${status.latest} is available (running ${VERSION}). Run aow update after closing terminal sessions.`);
+  printStatus('warn', `AgentOnWeb ${status.latest} is available (running ${VERSION}). Run aow update after closing terminal sessions.`);
 });
 let stopping = false;
 async function stop() {

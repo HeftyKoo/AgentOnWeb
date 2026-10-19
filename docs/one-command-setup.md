@@ -20,7 +20,7 @@ For an already-open terminal, the installer also creates a link to the installed
 
 ## Choose CLI integrations
 
-By default, both the installer and `aow setup` show a numbered terminal menu for the detected CLIs. Enter a number, several comma-separated numbers (for example `1,2`), or CLI names (for example `codex,claude`). Press Enter or type `all` to choose every detected CLI; enter `0` or `none` to configure only the terminal service. The installer reads the choice from your terminal even when run through `curl | bash`. Cancel with Control+C before integration/service configuration starts.
+By default, both the installer and `aow setup` show a checkbox menu for the detected CLIs. All detected CLIs start selected. Use **Up/Down** to move, **Space** to toggle a checkbox, **A** to select/clear all, **I** to invert, and **Enter** to confirm. Clear all checkboxes to configure only the terminal service. The installer reads the choice from your terminal even when run through `curl | bash`. Cancel with Control+C or Esc before integration/service configuration starts.
 
 To choose explicitly without an interactive menu:
 

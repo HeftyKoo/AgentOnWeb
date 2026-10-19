@@ -84,7 +84,7 @@ it('restarts after maintenance and confirms the new PID and running version', as
   }));
   await serviceCommand(['restart']);
   expect(bootedOut).toBe(true); expect(bootstrapped).toBe(true);
-  expect(log).toHaveBeenCalledWith(`AgentOnWeb service is running version ${VERSION}.`);
+  expect(log).toHaveBeenCalledWith(expect.stringContaining(`AgentOnWeb service is running version ${VERSION}.`));
 });
 
 it('reports readiness failure instead of claiming a successful restart', async () => {
