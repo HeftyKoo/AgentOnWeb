@@ -124,6 +124,63 @@ async function page(
 }
 
 describe("page-local AgentOnWeb visibility", () => {
+  it("applies an acknowledged mode click after a page update even without a background broadcast", async () => {
+    const p = await page(connected);
+    // SPA/HMR page replacement must not make mode buttons depend on receiving
+    // an unsolicited broadcast: the mode.set reply already confirms the mode.
+    p.window.document.body.replaceChildren(p.window.document.createElement("main"));
+    p.sendMessage.mockImplementation(async request => ({ ok: true,
+      result: request.type === "mode.set" ? { ...connected, mode: request.mode } : connected,
+    }));
+    p.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!.click();
+    for (const mode of ["focus", "watch", "chill"] as const) {
+      p.shadow.querySelector<HTMLButtonElement>(`[aria-label^="${mode[0]!.toUpperCase() + mode.slice(1)} mode"]`)!.click();
+      await vi.waitFor(() => expect(p.host.dataset.mode).toBe(mode));
+      expect(p.frame.hidden).toBe(mode === "watch");
+    }
+  });
+
+  it("ignores an older mode click reply and preserves newer presentation state", async () => {
+    const p = await page(connected);
+    const replies = new Map<string, (value: { ok: boolean; result: SurfaceViewState }) => void>();
+    p.sendMessage.mockImplementation(request => request.type === "mode.set"
+      ? new Promise(resolve => replies.set(request.mode, resolve))
+      : Promise.resolve({ ok: true, result: connected }));
+    p.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!.click();
+    p.shadow.querySelector<HTMLButtonElement>('[aria-label^="Focus mode"]')!.click();
+    p.shadow.querySelector<HTMLButtonElement>('[aria-label^="Watch mode"]')!.click();
+    p.emit("state.update", { ...connected, opacity: 0.8, agentSessions: [{
+      id: "pi:new", terminalId: "terminal", runtimeId: "native-test", agent: "Pi", title: "New live task",
+      detail: "", status: "running", updatedAt: Date.now(), attentionId: "",
+    }] });
+    replies.get("watch")!({ ok: true, result: { ...connected, mode: "watch" } });
+    await vi.waitFor(() => expect(p.host.dataset.mode).toBe("watch"));
+    replies.get("focus")!({ ok: true, result: { ...connected, mode: "focus" } });
+    await Promise.resolve();
+    expect(p.host.dataset.mode).toBe("watch");
+    expect(p.host.style.getPropertyValue("--agentonweb-surface-opacity")).toBe("0.8");
+    expect(p.shadow.querySelector(".agent-session")!.textContent).toContain("New live task");
+  });
+
+  it("lets a later keyboard command supersede a pending mode click and ignores failed replies", async () => {
+    const p = await page(connected);
+    let reply!: (value: { ok: boolean; result: SurfaceViewState }) => void;
+    p.sendMessage.mockImplementation(request => request.type === "mode.set"
+      ? new Promise(resolve => { reply = resolve; })
+      : Promise.resolve({ ok: true, result: connected }));
+    p.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!.click();
+    const focus = p.shadow.querySelector<HTMLButtonElement>('[aria-label^="Focus mode"]')!;
+    focus.click();
+    p.emit("surface.show", { ...connected, mode: "watch" });
+    reply({ ok: true, result: { ...connected, mode: "focus" } });
+    await Promise.resolve();
+    expect(p.host.dataset.mode).toBe("watch");
+    focus.click();
+    reply({ ok: false, result: { ...connected, mode: "focus" } });
+    await Promise.resolve();
+    expect(p.host.dataset.mode).toBe("watch");
+  });
+
   it("keeps the active iframe visible and focused across status and presentation updates", async () => {
     const p = await page(connected);
     p.frame.focus();
