@@ -1,7 +1,7 @@
 {
   "name": "agentonweb",
   "description": "Your local terminal and DSH workspace on the website you are using.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "license": "MIT",
   "type": "module",
