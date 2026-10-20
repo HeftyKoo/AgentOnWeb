@@ -1,5 +1,17 @@
 # Changelog
 
+## Terminal host 0.4.2 / Extension 0.4.1 — 2026-10-20
+
+- Select terminal text with an ordinary mouse or trackpad drag, including inside TUIs with mouse reporting. Right-click to copy, or use the existing copy shortcut. Preserve app clicks, scrolling, native word/line selection and scrollbar interaction.
+- Keep selection gestures from triggering the double-Option website interaction shortcut.
+- Include keyboard-driven checkbox agent setup and readable Matrix-style CLI output in terminal host 0.4.2.
+- Apply acknowledged mode-button clicks immediately and ignore stale replies in extension 0.4.1.
+- Safari uses version 0.4.1, build 10. DSH remains 0.4.0; connector protocol remains 1.
+
+### Upgrade
+
+The terminal copy fix requires terminal host 0.4.2. Finish active shell work, then run `aow update` from a separate macOS Terminal. Update browser extensions when each store approves 0.4.1; store submission and public availability are separate states.
+
 ## Terminal host 0.4.1 — 2026-10-13
 
 - Add terminal-host version reporting, daily asynchronous npm update checks with caching/backoff, persistent opt-out, and reminders in the private management page and service log.

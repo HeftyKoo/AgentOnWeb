@@ -3,6 +3,7 @@ import { OptionTapTracker } from "@agentonweb/connector-contract";
 import { Terminal } from "@xterm/xterm";
 import { splitInput } from "./input.js";
 import { installCellBackgroundOpacity } from "./cell-backgrounds.js";
+import { installMouseSelection } from "./mouse-selection.js";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import "./style.css";
@@ -14,11 +15,14 @@ const terminal = new Terminal({
   fontFamily: "Menlo, Consolas, monospace",
   fontSize: 14,
   scrollback: 3000,
+  // Keep text selectable while native TUIs enable mouse reporting.
+  macOptionClickForcesSelection: true,
   theme: { background: "#15171cff", foreground: "#f1f3f5" },
 });
 const fit = new FitAddon();
 terminal.loadAddon(fit);
 const container = document.querySelector<HTMLElement>("#terminal")!;
+container.title = "Drag to select text · Right-click to copy";
 const status = document.querySelector<HTMLElement>("#status")!;
 const notice = document.querySelector<HTMLElement>("#connection-notice")!;
 
@@ -28,6 +32,7 @@ function showStatus(message: string) {
   notice.hidden = message === "Connected";
 }
 terminal.open(container);
+installMouseSelection(terminal, container);
 const setCellBackgroundOpacity = installCellBackgroundOpacity(terminal, container);
 const sessionPicker = document.querySelector<HTMLElement>("#sessions")!;
 const newButton = document.querySelector<HTMLButtonElement>("#new")!;
@@ -660,6 +665,7 @@ window.addEventListener("focus", () => {
     parent.postMessage({ source: "agentonweb-surface", type: "surface.focused", nonce }, "*");
 });
 window.addEventListener("pointerdown", () => {
+  optionTap.reset();
   if (nonce && parent !== window && authorizedParent) parent.postMessage({ source: "agentonweb-surface", type: "surface.pointerdown", nonce }, "*");
 }, true);
 window.addEventListener(
