@@ -36,7 +36,7 @@ A 100-second walkthrough of DSH setup, Chrome Web Store installation, Connect au
 | --- | --- |
 | Chrome | [Install from Chrome Web Store](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe) |
 | Firefox | [Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/agentonweb/) |
-| Safari | Coming soon — Mac App Store link will be added after approval. |
+| Safari | [Install from Mac App Store](https://apps.apple.com/cn/app/agentonweb/id6810022891) |
 
 ## Use Codex, Claude Code and Pi
 
