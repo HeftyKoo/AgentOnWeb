@@ -10,6 +10,7 @@ const terminalMock = vi.hoisted(() => ({
 vi.mock("@xterm/xterm", () => ({
   Terminal: class {
     options: any = {};
+    modes = { mouseTrackingMode: "none" };
     parser = { registerCsiHandler() {}, registerOscHandler() {} };
     loadAddon() {}
     open() {}
@@ -570,6 +571,24 @@ it.each(["MacIntel", "Win32"])("forwards enabled mode keys from terminal input o
   message({ type: "mode.set", mode: "watch" });
   message({ type: "surface.focus" });
   expect(terminalMock.focus).toHaveBeenCalledOnce();
+});
+
+it("does not treat Option-drag selection as an Option tap, while preserving bare Option taps", async () => {
+  dom = new JSDOM(await readFile(new URL("./index.html", import.meta.url), "utf8"), { url: "http://localhost:1234/#agentonweb=nonce" });
+  for (const key of ["window", "document", "location", "sessionStorage"]) vi.stubGlobal(key, (dom.window as any)[key]);
+  const parent = { postMessage: vi.fn() };
+  vi.stubGlobal("parent", parent);
+  vi.stubGlobal("ResizeObserver", class { observe() {} });
+  await import("./main.js");
+  const alt = (type: string) => dom.window.dispatchEvent(new dom.window.KeyboardEvent(type, { key: "Alt", altKey: type === "keydown" }));
+  const taps = () => parent.postMessage.mock.calls.filter(([message]) => message.type === "site-pass.option-tap");
+  alt("keydown");
+  dom.window.document.querySelector("#terminal")!.dispatchEvent(new dom.window.MouseEvent("pointerdown", { bubbles: true, altKey: true }));
+  alt("keyup");
+  expect(taps()).toHaveLength(0);
+  alt("keydown");
+  alt("keyup");
+  expect(taps()).toHaveLength(1);
 });
 
 it("activates an authenticated target before the initial list resolves and rejects missing terminal targets", async () => {
