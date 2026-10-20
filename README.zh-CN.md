@@ -36,7 +36,7 @@ AgentOnWeb 将你的编程工作区带到你当前打开的页面上。一边看
 | --- | --- |
 | Chrome | [从 Chrome 应用商店安装](https://chromewebstore.google.com/detail/agentonweb/lhbmeokjjcmklamnepcechnpcdjgkcoe) |
 | Firefox | [从 Firefox 附加组件安装](https://addons.mozilla.org/en-US/firefox/addon/agentonweb/) |
-| Safari | 即将上线——Mac App Store 链接将在审核通过后添加。 |
+| Safari | [从 Mac App Store 安装](https://apps.apple.com/cn/app/agentonweb/id6810022891) |
 
 ## 使用 Codex、Claude Code 和 Pi
 
