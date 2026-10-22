@@ -70,7 +70,7 @@ codex
 
 点击终端标签栏的 **+** 打开另一个项目，点击标签切换，双击名称重命名，点击 **×** 关闭。隐藏工作区或刷新网页不会中断正在运行的会话。
 
-终端主机 0.4.1 每天检查 npm 正式版，并在本地管理页显示更新提醒。运行 `aow check-update` 可立即检查，`aow check-update --disable` 可关闭自动检查。退出或关闭所有终端后，在 Mac 的独立“终端”窗口运行 `aow update` 升级；`aow service restart` 用于加载已安装的新代码。从 0.4.0 或更早版本首次升级时，请先完成终端任务，运行 `aow service uninstall`，再重新运行安装命令。
+终端主机 0.4.3 每天检查 npm 正式版，并在本地管理页显示更新提醒。运行 `aow check-update` 可立即检查，`aow check-update --disable` 可关闭自动检查。退出或关闭所有终端后，在 Mac 的独立“终端”窗口运行 `aow update` 升级；`aow service restart` 用于加载已安装的新代码。CLI 0.4.3 还支持通过 `aow update --force` 重新安装并重启已核实归属的旧服务，这会结束其活动任务。如果旧 CLI 提示无法准备更新，请先完成终端任务，运行 `aow service uninstall`，再重新运行安装命令一次。
 
 [安装与常见问题](docs/one-command-setup.md) · [终端指南](packages/terminal-host/README.md)
 

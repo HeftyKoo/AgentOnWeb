@@ -4,8 +4,8 @@ import { dirname, join } from 'node:path';
 import { spawn } from 'node:child_process';
 import semver from 'semver';
 import { packageDirectory, installedVersion } from './version.js';
-import { outsideTerminal, prepareHost, liveEndpoint } from './management.js';
-import { serviceDirectory, serviceLoaded, reloadService } from './service.js';
+import { outsideTerminal, liveEndpoint } from './management.js';
+import { serviceDirectory, serviceLoaded, prepareService, reloadService } from './service.js';
 import { Updates } from './updates.js';
 import { formatHelp } from './cli-help.js';
 import { printStatus } from './cli-ui.js';
@@ -43,7 +43,9 @@ export async function updateCommand(args: string[]) {
   const updates = new Updates(serviceDirectory);
   const status = await updates.check(true);
   if (status.error) throw new Error(status.error);
-  if (!status.updateAvailable) { printStatus('ok', `AgentOnWeb ${status.currentVersion} is up to date; no package was changed.`); return; }
+  const force = args.includes('--force');
+  const reinstall = force && status.latest === status.currentVersion;
+  if (!status.updateAvailable && !reinstall) { printStatus('ok', `AgentOnWeb ${status.currentVersion} is up to date; no package was changed.`); return; }
   if (status.node && !semver.satisfies(process.versions.node, status.node)) throw new Error(`Version ${status.latest} requires Node.js ${status.node}. Update Node and rerun the installer.`);
   await mkdir(serviceDirectory, { recursive: true, mode: 0o700 });
   const guard = join(serviceDirectory, 'update.guard');
@@ -53,15 +55,15 @@ export async function updateCommand(args: string[]) {
     throw error;
   }
   try {
-    const prepared = await prepareHost(serviceDirectory, args.includes('--force'));
+    const prepared = await prepareService(force);
     try {
-      if (!prepared.status && serviceLoaded()) throw new Error('The service is loaded but cannot be checked. No package was changed; repair the service first.');
-      printStatus('info', `Updating AgentOnWeb ${status.currentVersion} → ${status.latest} in ${prefix}.`);
+      if (!prepared.status && !prepared.legacyPid && serviceLoaded()) throw new Error('The service is loaded but cannot be checked. No package was changed; repair the service first.');
+      printStatus('info', reinstall ? `Reinstalling AgentOnWeb ${status.latest} in ${prefix}.` : `Updating AgentOnWeb ${status.currentVersion} → ${status.latest} in ${prefix}.`);
       await install(prefix, status.latest!);
       if (installedVersion() !== status.latest) throw new Error('npm did not install the expected version. The service was not restarted.');
       // Hooks/native registration keep the same absolute paths. Skipping setup
       // preserves the selected CLIs and enrolled unpacked extension origins.
-      if (prepared.status) await reloadService(status.latest!);
+      if (prepared.status || prepared.legacyPid) await reloadService(status.latest!, prepared.legacyPid);
       else {
         if (await liveEndpoint(serviceDirectory)) throw new Error('A host started during installation. Close its terminals, then run aow service restart to activate the installed version.');
         printStatus('ok', `Installed ${status.latest}. Run aow setup if you want to configure the service.`);

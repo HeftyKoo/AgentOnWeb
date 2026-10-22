@@ -1,9 +1,9 @@
-import { mkdir, readFile, writeFile, unlink } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, unlink, rmdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { hostRequest, liveEndpoint, prepareHost } from './management.js';
+import { HostControlError, hostRequest, liveEndpoint, prepareHost } from './management.js';
 import { VERSION } from './version.js';
 import { formatHelp } from './cli-help.js';
 import { printStatus } from './cli-ui.js';
@@ -59,11 +59,11 @@ export async function serviceCommand(args: string[]): Promise<void> {
         const status = await hostRequest(endpoint);
         printStatus('info', `Running host: ${status.version} · ${status.activeTerminals} active terminal(s).`);
         if (status.version !== VERSION) printStatus('warn', 'Installed version differs from the running host. Run aow service restart after closing terminals.');
-      } catch { printStatus('warn', 'Running host version unavailable. Finish terminal work and restart the older host manually.'); }
+      } catch (error) { printStatus('warn', `Running host version unavailable. ${(error as Error).message}`); }
     }
   } else if (action === 'restart') {
-    const prepared = await prepareHost(serviceDirectory, args.includes('--force'));
-    try { await reloadService(VERSION); }
+    const prepared = await prepareService(args.includes('--force'));
+    try { await reloadService(VERSION, prepared.legacyPid); }
     finally { await prepared.release(); }
   } else if (action === 'uninstall') {
     try { execFileSync('/bin/launchctl', ['bootout', domain + '/' + label], { stdio: 'pipe' }); } catch {}
@@ -75,9 +75,39 @@ export function serviceLoaded(): boolean {
   try { execFileSync('/bin/launchctl', ['print', `gui/${process.getuid!()}/${label}`], { stdio: 'ignore' }); return true; }
   catch { return false; }
 }
-/** Caller holds the host's maintenance lease before reaching this point. */
-export async function reloadService(expectedVersion: string) {
+function managedServicePid(): number | undefined {
+  try {
+    const output = execFileSync('/bin/launchctl', ['print', `gui/${process.getuid!()}/${label}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const pid = Number(/^\s*pid = ([1-9]\d*)\s*$/mu.exec(output)?.[1]);
+    return Number.isSafeInteger(pid) && pid > 0 ? pid : undefined;
+  } catch { return undefined; }
+}
+export async function prepareService(force: boolean): Promise<Awaited<ReturnType<typeof prepareHost>> & { legacyPid?: number }> {
+  try { return await prepareHost(serviceDirectory, force); }
+  catch (error) {
+    if (!force || !(error instanceof HostControlError) || !error.legacyPid) throw error;
+    const pid = error.legacyPid;
+    if (managedServicePid() !== pid) throw new Error('The older host is not the managed service. Stop aow terminal before updating or restarting; no service was stopped.');
+    const guard = join(serviceDirectory, 'legacy-maintenance.guard');
+    try { await mkdir(guard, { mode: 0o700 }); }
+    catch (failure) {
+      if ((failure as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('Another update or restart is in progress. If an earlier legacy update was interrupted, remove the legacy-maintenance.guard directory only after confirming it has stopped.');
+      throw failure;
+    }
+    try {
+      const endpoint = await liveEndpoint(serviceDirectory);
+      if (endpoint?.pid !== pid || endpoint.version !== undefined || endpoint.managedService !== undefined || managedServicePid() !== pid)
+        throw new Error('The running host changed during preparation. Retry after checking aow service status; no service was stopped.');
+      printStatus('warn', 'The older service cannot pause or count terminals. --force will end all its terminal tasks when it restarts.');
+      return { status: undefined, legacyPid: pid, release: async () => { await rmdir(guard); } };
+    } catch (failure) { await rmdir(guard); throw failure; }
+  }
+}
+/** Caller holds the host's maintenance lease or the verified legacy-service guard. */
+export async function reloadService(expectedVersion: string, legacyPid?: number) {
   const old = await liveEndpoint(serviceDirectory);
+  if (legacyPid !== undefined && (old?.pid !== legacyPid || managedServicePid() !== legacyPid))
+    throw new Error('The older service changed before restart. No service was stopped; run aow service status before retrying.');
   if (serviceLoaded()) {
     if (!old) throw new Error('The loaded service is not ready. Check service.log before restarting; no service was stopped.');
     execFileSync('/bin/launchctl', ['bootout', `gui/${process.getuid!()}/${label}`], { stdio: 'pipe', timeout: 10000 });

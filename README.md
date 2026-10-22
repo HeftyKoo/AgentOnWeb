@@ -70,7 +70,7 @@ For Pi 1.1+, run `pi` in the same terminal. Setup adds `extensions/agentonweb.ts
 
 Use **+** in the terminal tab bar to open another project, click a tab to switch, double-click its name to rename it, or click **×** to close it. Hiding the workspace or refreshing the page keeps your sessions running.
 
-Terminal host 0.4.1 checks for stable npm updates daily and shows reminders in its private management page. Use `aow check-update` to check now or `aow check-update --disable` to turn automatic checks off. After closing live terminals, run `aow update` in a separate macOS Terminal; `aow service restart` reloads already-installed code. For the first upgrade from 0.4.0 or earlier, finish terminal work, run `aow service uninstall`, then rerun the installer.
+Terminal host 0.4.3 checks for stable npm updates daily and shows reminders in its private management page. Use `aow check-update` to check now or `aow check-update --disable` to turn automatic checks off. After closing live terminals, run `aow update` in a separate macOS Terminal; `aow service restart` reloads already-installed code. CLI 0.4.3 also supports `aow update --force` to reinstall and restart a verified older service, ending its live tasks. If an older CLI cannot prepare an update, finish terminal work, run `aow service uninstall`, then rerun the installer once.
 
 [Setup and troubleshooting](docs/one-command-setup.md) · [Terminal guide](packages/terminal-host/README.md)
 

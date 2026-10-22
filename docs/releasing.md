@@ -1,16 +1,16 @@
 # Release AgentOnWeb
 
-## Terminal copy patch release
+## Terminal host update patch release
 
-Terminal host **0.4.2** enables direct mouse/trackpad text selection while TUIs capture the mouse, preserves app clicks and scrolling, and includes the checkbox setup and CLI output improvements merged since 0.4.1. Extension **0.4.1** includes acknowledged mode-click updates and the matching Safari package. Safari uses marketing version **0.4.1**, build **10**. DSH remains **0.4.0** and connector protocol remains **1**.
+Terminal host **0.4.3** repairs forced updates when an older host is still running, reinstalls the current stable version on explicit force, and retries transient manual npm checks with longer deadlines. It retains the direct terminal selection improvements from 0.4.2. Extension **0.4.1**, Safari marketing version **0.4.1** / build **10**, DSH **0.4.0** and connector protocol **1** remain unchanged; this release publishes only the terminal host.
 
-The copy fix is bundled in the terminal host. Updating the browser extension alone does not install it. After finishing live shells, update the host with `aow update` from a separate macOS Terminal. The DSH compatibility baseline remains **0.1.7-rc.2**; `dsh-latest` checks the currently published upstream version.
+After finishing live shells, update the host with `aow update` from a separate macOS Terminal. If CLI 0.4.1/0.4.2 cannot prepare an update against an older running host, run `aow service uninstall`, then rerun the installer to install and start 0.4.3. The recovery path requires CLI 0.4.3; it cannot change code already running in an older updater. The DSH compatibility baseline remains **0.1.7-rc.2**; `dsh-latest` checks the currently published upstream version.
 
 | Artifact | Version field | Delivery |
 | --- | --- | --- |
-| Chrome/Firefox extension ZIPs and source | `extensionVersion` | `ext-v0.4.1`, then store submission |
+| Chrome/Firefox extension ZIPs and source | `extensionVersion` | Remains 0.4.1; no publication |
 | DSH plugin TGZ | `pluginVersion` | Remains 0.4.0; no publication |
-| Terminal host TGZ + installer | `terminalHostVersion` | `terminal-v0.4.2`, npm + GitHub release |
+| Terminal host TGZ + installer | `terminalHostVersion` | `terminal-v0.4.3`, npm + GitHub release |
 
 A merged branch or GitHub release does not mean a browser store has approved the update. Live terminal acceptance currently covers macOS/Chrome. Firefox/Safari builds and Linux CI do not establish live terminal support on those platforms. Automatic setup targets macOS + Chrome only.
 
@@ -52,25 +52,25 @@ The `dsh-latest` CI job installs `@deepseek-ai/dsh@latest`, builds the actual pl
 After the relevant release is public, users can run:
 
 ```sh
-npm install -g @agentonweb/terminal-host@0.4.2
+npm install -g @agentonweb/terminal-host@0.4.3
 # Repair setup or run it explicitly when lifecycle scripts were blocked:
 aow setup
 ```
 
-The release installer at `https://github.com/HeftyKoo/AgentOnWeb/releases/download/terminal-v0.4.2/install.sh` pins the package to 0.4.2 and explicitly calls setup. The user-facing command downloads `https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh`. Both that script and its pinned npm package must be live before announcing the installation flow. The installer uses the user-owned `~/.local` npm prefix, configures zsh/bash/fish startup paths, and links `aow` beside Node when that directory is writable and already on PATH. Existing AgentOnWeb npm links are updated; unrelated commands are preserved. The versioned release URL is a publication target, not proof that the asset exists. Download and inspect it before running it; do not advertise it until the release and clean-install test succeed.
+The release installer at `https://github.com/HeftyKoo/AgentOnWeb/releases/download/terminal-v0.4.3/install.sh` pins the package to 0.4.3 and explicitly calls setup. The user-facing command downloads `https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh`. Both that script and its pinned npm package must be live before announcing the installation flow. The installer uses the user-owned `~/.local` npm prefix, configures zsh/bash/fish startup paths, and links `aow` beside Node when that directory is writable and already on PATH. Existing AgentOnWeb npm links are updated; unrelated commands are preserved. The versioned release URL is a publication target, not proof that the asset exists. Download and inspect it before running it; do not advertise it until the release and clean-install test succeed.
 
 ## Local installation and upgrades
 
 Before publishing, use the audited archive with the source-built extension:
 
 ```sh
-AOW_SKIP_SETUP=1 npm install -g ./release/agentonweb-terminal-host-0.4.2.tgz
+AOW_SKIP_SETUP=1 npm install -g ./release/agentonweb-terminal-host-0.4.3.tgz
 aow setup --extension-id YOUR_UNPACKED_CHROME_EXTENSION_ID
 ```
 
 For manual pairing without Chrome/CLI integration, use `aow service install` and the private setup page instead. Setup registers absolute Node/package paths; rerun it when paths change. The official native host allowlist includes the official Chrome extension ID; unpacked IDs must be enrolled explicitly.
 
-Installing over a running service does not reload its code. With update-capable hosts, close all live shells and run `aow update` from a separate macOS Terminal; it retains the original npm prefix, skips setup to preserve integrations/enrolled extension IDs, installs the checked stable version and verifies the restarted service. `aow service restart` activates code already installed. Both refuse live shells unless `--force` is explicit. Hosts without the maintenance interface need `aow service uninstall`, then the installer or `aow setup` (include the unpacked ID when needed) once. Saved CLI history, browser grants and pairing receipts remain. Restart `dsh web` separately after updating its plugin.
+Installing over a running service does not reload its code. With update-capable hosts, close all live shells and run `aow update` from a separate macOS Terminal; it retains the original npm prefix, skips setup to preserve integrations/enrolled extension IDs, installs the checked stable version and verifies the restarted service. `aow service restart` activates code already installed. Both refuse live shells unless `--force` is explicit. An updated CLI can also recover a host without the maintenance interface using `aow update --force` or `aow service restart --force`, after verifying the host PID belongs to the macOS service; this ends all its terminal tasks. Older CLIs need `aow service uninstall`, then the installer or `aow setup` (include the unpacked ID when needed) once. Saved CLI history, browser grants and pairing receipts remain. Restart `dsh web` separately after updating its plugin.
 
 Automatic host checks query the public npm metadata endpoint, cache successful results for 24 hours and back off on failures. They never install code. Publish and verify npm before advancing the public installer pin; versioned release installers remain immutable/pinned. Validate active-shell refusal, original-prefix installation, npm failure, disabled/offline checks, installed-versus-running status and restart readiness with every updater change. Terminal-host checks/commands and its bundled private management page can ship without an extension protocol change. Reminders in extension settings require a separate extension release.
 
