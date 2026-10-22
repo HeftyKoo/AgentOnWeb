@@ -1,5 +1,15 @@
 # Changelog
 
+## Terminal host 0.4.3 — 2026-10-22
+
+- Recognize an older running terminal host after the CLI package has been upgraded. Report its missing maintenance interface and allow explicit `aow update --force` or `aow service restart --force` only after confirming the host PID belongs to the macOS service. Preserve the running service if npm installation fails.
+- Make `aow update --force` reinstall and restart even when the CLI already matches the stable npm version, while still refusing downgrades.
+- Give manual npm update checks a 15-second request timeout and one retry for transient failures. Keep automatic checks at three seconds with existing backoff, and report HTTP failures separately from timeouts.
+
+### Upgrade
+
+CLI 0.4.1/0.4.2 cannot recover an older running host through the new force path until the updated CLI is installed. Finish terminal work, run `aow service uninstall`, then rerun the installer to install 0.4.3 and start its host. CLI 0.4.3 can use `aow update --force` to reinstall the stable version and restart a verified older macOS service. Saved history, browser grants and integration settings remain. Extension 0.4.1, DSH 0.4.0 and connector protocol 1 are unchanged.
+
 ## Terminal host 0.4.2 / Extension 0.4.1 — 2026-10-20
 
 - Select terminal text with an ordinary mouse or trackpad drag, including inside TUIs with mouse reporting. Right-click to copy, or use the existing copy shortcut. Preserve app clicks, scrolling, native word/line selection and scrollbar interaction.

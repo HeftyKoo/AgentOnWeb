@@ -8,6 +8,9 @@ const DAY = 24 * 60 * 60 * 1000;
 const registry = 'https://registry.npmjs.org/@agentonweb%2Fterminal-host/latest';
 type Cache = { latest?: string; node?: string; checkedAt?: number; nextCheck?: number; failures?: number; error?: string };
 export type UpdateStatus = Cache & { enabled: boolean; currentVersion: string; updateAvailable: boolean };
+class RegistryError extends Error {
+  constructor(message: string, readonly retryable = false) { super(message); }
+}
 
 async function readJson(path: string): Promise<unknown> {
   try { return JSON.parse(await readFile(path, 'utf8')); }
@@ -29,7 +32,8 @@ function cacheValue(value: unknown): Cache {
   if (typeof v.node === 'string' && semver.validRange(v.node)) result.node = v.node;
   for (const key of ['checkedAt', 'nextCheck', 'failures'] as const)
     if (typeof v[key] === 'number' && Number.isFinite(v[key]) && v[key] >= 0) result[key] = v[key];
-  if (typeof v.error === 'string') result.error = 'Could not check npm for updates. Try aow check-update later.';
+  if (typeof v.error === 'string') result.error = /^Could not check npm for updates \((?:HTTP \d{3}|invalid npm metadata|request timed out|network request failed)\)\. Try aow check-update later\.$/u.test(v.error)
+    ? v.error : 'Could not check npm for updates. Try aow check-update later.';
   return result;
 }
 
@@ -55,28 +59,39 @@ export class Updates {
     this.pending = this.query(manual).finally(() => { this.pending = undefined; });
     return this.pending;
   }
+  private async metadata(manual: boolean): Promise<{ latest: string; node?: string }> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const response = await (this.options.fetch ?? fetch)(registry, {
+          signal: AbortSignal.timeout(manual ? 15000 : 3000), redirect: 'error', headers: { accept: 'application/json' },
+        });
+        if (!response.ok) throw new RegistryError(`HTTP ${response.status}`, response.status === 429 || response.status >= 500);
+        let metadata: { name?: string; version?: string; engines?: { node?: string } } | null;
+        try { metadata = await response.json(); }
+        catch (error) { if (error instanceof SyntaxError) throw new RegistryError('invalid npm metadata'); throw error; }
+        if (metadata?.name !== '@agentonweb/terminal-host' || typeof metadata.version !== 'string'
+          || !semver.valid(metadata.version) || semver.prerelease(metadata.version)
+          || metadata.engines?.node !== undefined && !semver.validRange(metadata.engines.node)) throw new RegistryError('invalid npm metadata');
+        return { latest: metadata.version, ...(metadata.engines?.node ? { node: metadata.engines.node } : {}) };
+      } catch (error) {
+        if (!manual || attempt >= 1 || error instanceof RegistryError && !error.retryable) throw error;
+      }
+    }
+  }
   private async query(manual: boolean) {
     const status = await this.status();
     const now = (this.options.now ?? Date.now)();
     if (!manual && (!status.enabled || now < (status.nextCheck ?? 0))) return status;
     let cache: Cache;
     try {
-      const response = await (this.options.fetch ?? fetch)(registry, {
-        signal: AbortSignal.timeout(3000), redirect: 'error', headers: { accept: 'application/json' },
-      });
-      if (!response.ok) throw new Error('Registry unavailable');
-      const metadata = await response.json() as { name?: string; version?: string; engines?: { node?: string } };
-      if (metadata.name !== '@agentonweb/terminal-host' || typeof metadata.version !== 'string'
-        || !semver.valid(metadata.version) || semver.prerelease(metadata.version)) throw new Error('Invalid stable version');
-      if (metadata.engines?.node !== undefined && !semver.validRange(metadata.engines.node)) throw new Error('Invalid Node requirement');
-      cache = { latest: metadata.version, ...(metadata.engines?.node ? { node: metadata.engines.node } : {}),
-        checkedAt: now, nextCheck: now + DAY, failures: 0 };
-    } catch {
+      cache = { ...await this.metadata(manual), checkedAt: now, nextCheck: now + DAY, failures: 0 };
+    } catch (error) {
       const failures = Math.min((status.failures ?? 0) + 1, 8);
+      const reason = error instanceof RegistryError ? error.message : (error as Error)?.name === 'TimeoutError' ? 'request timed out' : 'network request failed';
       cache = { ...(status.latest ? { latest: status.latest } : {}), ...(status.node ? { node: status.node } : {}),
         ...(status.checkedAt !== undefined ? { checkedAt: status.checkedAt } : {}), failures,
         nextCheck: now + Math.min(DAY, 15 * 60 * 1000 * 2 ** (failures - 1)),
-        error: 'Could not check npm for updates. Try aow check-update later.' };
+        error: `Could not check npm for updates (${reason}). Try aow check-update later.` };
     }
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
     await saveJson(join(this.directory, 'update-cache.json'), cache);

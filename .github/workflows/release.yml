@@ -7,7 +7,7 @@ on:
         description: Existing release tag to publish or retry
         required: true
         type: choice
-        options: [terminal-v0.4.2, ext-v0.4.1, terminal-v0.4.1, dsh-v0.4.0, terminal-v0.4.0, ext-v0.4.0, dsh-v0.3.0, terminal-v0.3.0, ext-v0.3.0, dsh-v0.2.0, terminal-v0.2.0, terminal-v0.2.1, ext-v0.2.0, ext-v0.2.1]
+        options: [terminal-v0.4.3, terminal-v0.4.2, ext-v0.4.1, terminal-v0.4.1, dsh-v0.4.0, terminal-v0.4.0, ext-v0.4.0, dsh-v0.3.0, terminal-v0.3.0, ext-v0.3.0, dsh-v0.2.0, terminal-v0.2.0, terminal-v0.2.1, ext-v0.2.0, ext-v0.2.1]
   push:
     tags: ["ext-v*", "dsh-v*", "terminal-v*"]
 

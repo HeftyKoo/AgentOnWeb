@@ -3,7 +3,10 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 export type HostStatus = { version: string; activeTerminals: number; managedService: boolean };
-type Endpoint = { pid: number; nativeToken: string; launchUrl: string };
+type Endpoint = { pid: number; nativeToken: string; launchUrl: string; version?: string; managedService?: boolean };
+export class HostControlError extends Error {
+  constructor(message: string, readonly status: number, readonly legacyPid?: number) { super(message); }
+}
 export class Maintenance {
   private lease: { token: string; expires: number } | undefined;
   get active() { return !!this.lease && this.lease.expires > Date.now(); }
@@ -35,7 +38,11 @@ export async function hostRequest(endpoint: Endpoint, action?: object) {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => undefined) as { error?: string } | undefined;
-    throw new Error(body?.error ?? 'The running host cannot safely prepare an update. Finish terminal work and upgrade/restart it manually.');
+    const legacy = !action && endpoint.version === undefined && endpoint.managedService === undefined && [401, 404, 405].includes(response.status);
+    const message = legacy
+      ? `The running host does not support safe updates (HTTP ${response.status}); its active terminals cannot be checked. Finish terminal work, then run aow service restart --force or aow update --force. This ends all service terminal tasks. For a foreground host, stop aow terminal first.`
+      : `The running host rejected the control request (HTTP ${response.status}). Run aow service status. If this persists, finish terminal work, then run aow service uninstall followed by aow service install.`;
+    throw new HostControlError(typeof body?.error === 'string' ? body.error : message, response.status, legacy ? endpoint.pid : undefined);
   }
   return response.json();
 }
@@ -48,7 +55,7 @@ export async function prepareHost(directory: string, force: boolean) {
   const endpoint = await liveEndpoint(directory);
   if (!endpoint) return { status: undefined, release: async () => {} };
   const status = await hostRequest(endpoint) as HostStatus;
-  if (typeof status.version !== 'string' || !Number.isInteger(status.activeTerminals) || typeof status.managedService !== 'boolean')
+  if (!status || typeof status.version !== 'string' || !Number.isInteger(status.activeTerminals) || status.activeTerminals < 0 || typeof status.managedService !== 'boolean')
     throw new Error('Invalid host status. Restart the host manually after finishing terminal work.');
   if (!status.managedService) throw new Error('A foreground host is running. Stop aow terminal before updating or restarting the service.');
   const { token } = await hostRequest(endpoint, { action: 'prepare', force }) as { token: string };

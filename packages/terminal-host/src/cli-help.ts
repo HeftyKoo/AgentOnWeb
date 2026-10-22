@@ -82,7 +82,7 @@ const topics: Record<string, Help> = {
   update: {
     usage: 'Usage: aow update [--force]',
     summary: 'Install the newer stable npm version into the existing prefix and restart the macOS service. Close terminals first.',
-    sections: [{ title: 'OPTIONS', rows: [['--force', 'End active terminal tasks before restarting.']] }],
+    sections: [{ title: 'OPTIONS', rows: [['--force', 'Reinstall even at the current stable version; end active terminal tasks when restarting.']] }],
   },
   terminal: {
     usage: 'Usage: aow terminal', summary: 'Run the terminal host in the foreground. Keep this process running while using your browser terminal.',
