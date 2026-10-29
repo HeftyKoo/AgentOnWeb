@@ -3,6 +3,7 @@ import { createAgentActivity } from "./agent-activity.js";
 import type { AgentSession } from "@agentonweb/connector-contract";
 import { nextRuntimeId } from "./runtime-navigation.js";
 import { createRuntimePicker } from "./runtime-picker.js";
+import { positionDock } from "./dock-position.js";
 import chillIcon from "@phosphor-icons/core/regular/cloud-sun.svg?raw";
 import focusIcon from "@phosphor-icons/core/regular/crosshair-simple.svg?raw";
 import watchIcon from "@phosphor-icons/core/regular/eye.svg?raw";
@@ -10,7 +11,7 @@ import layersIcon from "@phosphor-icons/core/regular/stack.svg?raw";
 import backIcon from "@phosphor-icons/core/regular/arrow-left.svg?raw";
 import plusIcon from "@phosphor-icons/core/regular/plus.svg?raw";
 import type { AgentOnWebMode } from "@agentonweb/connector-contract";
-import type { SurfaceViewState } from "./shared.js";
+import type { DockPosition, SurfaceViewState } from "./shared.js";
 
 const MODES = [
   { mode: "chill", label: "Chill", icon: chillIcon },
@@ -28,6 +29,7 @@ export interface SurfaceDock {
   onModeShortcut: (mode: AgentOnWebMode) => void;
   onOpacityPreview: (opacity: number) => void;
   onOpacity: (opacity: number) => void;
+  onPosition: (position: DockPosition) => void;
   shortcut: (action: SurfaceShortcut) => void;
   focus: () => void;
   render: (state: SurfaceViewState) => void;
@@ -48,6 +50,8 @@ export function createDock(options: {
   const element = document.createElement("nav");
   element.className = "surface-dock";
   element.setAttribute("aria-label", "AgentOnWeb presentation controls");
+  const panel = document.createElement("div");
+  panel.className = "surface-panel";
   const plate = document.createElement("div");
   plate.className = "surface-plate";
   plate.setAttribute("aria-hidden", "true");
@@ -125,7 +129,9 @@ export function createDock(options: {
   sweep.className = "surface-sweep";
   sweep.setAttribute("aria-hidden", "true");
   const badge = document.createElement("span"); badge.className = "agent-count"; badge.hidden = true; toggle.append(badge);
-  element.append(plate, palette, runtimePicker.element, toggle, sweep, activity.toast);
+  panel.append(plate, palette, runtimePicker.element, sweep);
+  element.append(panel, toggle, activity.toast);
+  const placement = positionDock(element, toggle, panel, activity.toast, position => api.onPosition(position));
   element.addEventListener("keydown", event => {
     if (event.key === "Escape") { event.stopPropagation(); api.setExpanded(false); }
   });
@@ -151,10 +157,11 @@ export function createDock(options: {
     discover.hidden = workspaceView;
     toggle.setAttribute("aria-expanded", String(expanded));
     toggle.setAttribute("aria-label", expanded ? "Collapse AgentOnWeb controls" : "Expand AgentOnWeb controls");
+    placement.layout();
   }
   const api: SurfaceDock = {
     element,
-    onSession: () => {}, onAttentionRead: () => {}, onDiscover: () => {}, onRuntime: () => {}, onMode: () => {}, onOpacityPreview: () => {}, onOpacity: () => {},
+    onSession: () => {}, onAttentionRead: () => {}, onDiscover: () => {}, onRuntime: () => {}, onMode: () => {}, onOpacityPreview: () => {}, onOpacity: () => {}, onPosition: () => {},
     onModeShortcut: mode => api.onMode(mode),
     shortcut(action) {
       if (action !== "runtime.toggle") { api.onMode(action); return; }
@@ -180,6 +187,7 @@ export function createDock(options: {
       opacityControl.dataset.disabled = String(opacityInput.disabled);
       opacityValue.value = `${Math.round(state.opacity * 100)}%`;
       toggle.dataset.unread = String(state.runtimes?.some(runtime => runtime.newOutput) ?? false);
+      placement.render(state.dockPosition);
     },
     setExpanded(next) {
       if (!next && element.contains(element.getRootNode() instanceof ShadowRoot

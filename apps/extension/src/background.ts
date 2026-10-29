@@ -5,7 +5,7 @@ import { HeaderLeaseManager } from "./header-leases.js";
 import { DEFAULT_SURFACE_OPACITY, normalizeSurfaceOpacity } from "./interaction.js";
 import { PartitionLeaseManager } from "./partition-leases.js";
 import { SafariCookieLeaseManager } from "./safari-cookie-leases.js";
-import { COOKIE_SCOPES_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, isContentRequest, type ContentRequest, type StateUpdate, type SurfaceCommand, type SurfaceViewState } from "./shared.js";
+import { COOKIE_SCOPES_STORAGE_KEY, CREDENTIAL_STORAGE_KEY, STATE_STORAGE_KEY, isContentRequest, isDockPosition, type ContentRequest, type StateUpdate, type SurfaceCommand, type SurfaceViewState } from "./shared.js";
 import { nativeSetup, probeNativeSetup } from "./native-setup.js";
 import { topLevelSite } from "./surface-cookie.js";
 import { commandMode } from "./mode-shortcuts.js";
@@ -197,6 +197,7 @@ async function initialize(): Promise<void> {
     mode: storedState?.mode === "watch" || storedState?.mode === "focus" ? storedState.mode : "chill",
     dismissed: storedState?.dismissed === true,
     opacity: normalizeSurfaceOpacity(storedState?.opacity),
+    ...(isDockPosition(storedState?.dockPosition) ? { dockPosition: storedState.dockPosition } : {}),
     ...(Array.isArray(storedState?.readAttentionIds) ? {
       readAttentionIds: [...new Set(storedState.readAttentionIds.filter((id): id is string =>
         typeof id === "string" && id.length > 0 && id.length <= 200))].slice(-256),
@@ -225,6 +226,10 @@ async function handleRequest(request: ContentRequest, tab?: Browser.tabs.Tab): P
       await applyModeShortcut(request.mode, tab, "page");
       return { ok: true };
     case "opacity.set": patch({ opacity: normalizeSurfaceOpacity(request.opacity) }); return viewForTab(tab);
+    case "dock.position.set":
+      patch({ dockPosition: { x: request.position.x, y: request.position.y } });
+      await publication;
+      return { ok: true };
     case "runtime.activate":
     case "runtime.connect":
       if (tab?.id !== undefined && request.runtimeId) tabRuntimes.set(tab.id, request.runtimeId);
@@ -361,6 +366,7 @@ async function broadcast(stateSnapshot: SurfaceViewState, surfaceSnapshot?: Nati
   // Persist presentation preferences, never prompts, approval details or live sessions.
   const preferences = {
     mode: stateSnapshot.mode, opacity: stateSnapshot.opacity,
+    ...(stateSnapshot.dockPosition ? { dockPosition: stateSnapshot.dockPosition } : {}),
     ...(stateSnapshot.dismissed !== undefined ? { dismissed: stateSnapshot.dismissed } : {}),
     ...(stateSnapshot.runtimeId ? { runtimeId: stateSnapshot.runtimeId } : {}),
     ...(stateSnapshot.readAttentionIds ? { readAttentionIds: stateSnapshot.readAttentionIds } : {}),
@@ -397,6 +403,7 @@ async function viewForTab(
     // A queued broadcast can still contain the removed runtime's connection
     // fields. Keep presentation preferences and use the current fallback view.
     stateSnapshot = { mode: stateSnapshot.mode, opacity: stateSnapshot.opacity,
+      ...(stateSnapshot.dockPosition ? { dockPosition: stateSnapshot.dockPosition } : {}),
       ...(stateSnapshot.readAttentionIds ? { readAttentionIds: stateSnapshot.readAttentionIds } : {}),
       ...(stateSnapshot.dismissed === undefined ? {} : { dismissed: stateSnapshot.dismissed }), ...connectionSnapshot.view };
   }

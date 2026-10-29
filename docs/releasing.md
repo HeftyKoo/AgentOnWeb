@@ -1,16 +1,20 @@
 # Release AgentOnWeb
 
+## Extension launcher patch release
+
+Extension **0.4.2** adds mouse and touch dragging for the floating launcher, remembers its position across pages and reloads, and keeps the controls within the viewport. This release targets the Chrome Web Store and Firefox Add-ons. Safari source metadata is prepared at **0.4.2** / build **11**, without submitting a Safari update. Terminal host **0.4.3**, DSH **0.4.0** and connector protocol **1** are unchanged.
+
+| Artifact | Version field | Delivery |
+| --- | --- | --- |
+| Chrome/Firefox extension ZIPs and source | `extensionVersion` | `ext-v0.4.2`, GitHub release and store submissions |
+| DSH plugin TGZ | `pluginVersion` | Remains 0.4.0; no publication |
+| Terminal host TGZ + installer | `terminalHostVersion` | Remains 0.4.3; no publication |
+
 ## Terminal host update patch release
 
 Terminal host **0.4.3** repairs forced updates when an older host is still running, reinstalls the current stable version on explicit force, and retries transient manual npm checks with longer deadlines. It retains the direct terminal selection improvements from 0.4.2. Extension **0.4.1**, Safari marketing version **0.4.1** / build **10**, DSH **0.4.0** and connector protocol **1** remain unchanged; this release publishes only the terminal host.
 
 After finishing live shells, update the host with `aow update` from a separate macOS Terminal. If CLI 0.4.1/0.4.2 cannot prepare an update against an older running host, run `aow service uninstall`, then rerun the installer to install and start 0.4.3. The recovery path requires CLI 0.4.3; it cannot change code already running in an older updater. The DSH compatibility baseline remains **0.1.7-rc.2**; `dsh-latest` checks the currently published upstream version.
-
-| Artifact | Version field | Delivery |
-| --- | --- | --- |
-| Chrome/Firefox extension ZIPs and source | `extensionVersion` | Remains 0.4.1; no publication |
-| DSH plugin TGZ | `pluginVersion` | Remains 0.4.0; no publication |
-| Terminal host TGZ + installer | `terminalHostVersion` | `terminal-v0.4.3`, npm + GitHub release |
 
 A merged branch or GitHub release does not mean a browser store has approved the update. Live terminal acceptance currently covers macOS/Chrome. Firefox/Safari builds and Linux CI do not establish live terminal support on those platforms. Automatic setup targets macOS + Chrome only.
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## Extension 0.4.2 — 2026-10-29
+
+- Drag the floating AgentOnWeb icon with a mouse, trackpad or touch to uncover page controls. Remember its position across pages and reloads, and adapt it when the window changes size.
+- Distinguish dragging from clicking, preserve keyboard activation and restore the original position when a drag is cancelled. Keep the launcher, controls and notifications within the viewport.
+- Publish Chrome and Firefox extension packages. Safari source metadata is prepared as 0.4.2, build 11; Safari store publication is separate. Terminal host remains 0.4.3, DSH remains 0.4.0 and connector protocol remains 1.
+
 ## Terminal host 0.4.3 — 2026-10-22
 
 - Recognize an older running terminal host after the CLI package has been upgraded. Report its missing maintenance interface and allow explicit `aow update --force` or `aow service restart --force` only after confirming the host PID belongs to the macOS service. Preserve the running service if npm installation fails.

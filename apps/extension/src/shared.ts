@@ -6,6 +6,18 @@ export const COOKIE_SCOPES_STORAGE_KEY = "agentonweb.cookie-scopes";
 
 export type SurfaceConnection = "disconnected" | "connecting" | "awaiting-approval" | "connected" | "reconnecting";
 
+export interface DockPosition {
+  readonly x: number;
+  readonly y: number;
+}
+
+export function isDockPosition(value: unknown): value is DockPosition {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<DockPosition>;
+  return typeof candidate.x === "number" && Number.isFinite(candidate.x) && candidate.x >= 0 && candidate.x <= 1
+    && typeof candidate.y === "number" && Number.isFinite(candidate.y) && candidate.y >= 0 && candidate.y <= 1;
+}
+
 export interface NativeSurfaceView {
   readonly runtimeId: string;
   readonly displayName: string;
@@ -18,6 +30,7 @@ export interface SurfaceViewState {
   readonly agentSessions?: readonly import("@agentonweb/connector-contract").AgentSession[];
   readonly mode: AgentOnWebMode;
   readonly opacity: number;
+  readonly dockPosition?: DockPosition;
   readonly dismissed?: boolean;
   readonly connection: SurfaceConnection;
   readonly surface?: NativeSurfaceView;
@@ -39,6 +52,7 @@ export type ContentRequest =
   | { readonly source: "agentonweb-content"; readonly type: "mode.set"; readonly mode: AgentOnWebMode }
   | { readonly source: "agentonweb-content"; readonly type: "mode.shortcut"; readonly mode: AgentOnWebMode }
   | { readonly source: "agentonweb-content"; readonly type: "opacity.set"; readonly opacity: number }
+  | { readonly source: "agentonweb-content"; readonly type: "dock.position.set"; readonly position: DockPosition }
   | { readonly source: "agentonweb-content"; readonly type: "runtime.connect" | "runtime.activate"; readonly runtimeId?: string }
   | { readonly source: "agentonweb-content"; readonly type: "runtime.approval" };
 
@@ -65,13 +79,14 @@ export function isSurfaceCommand(value: unknown): value is SurfaceCommand {
 
 export function isContentRequest(value: unknown): value is ContentRequest {
   if (!value || typeof value !== "object") return false;
-  const candidate = value as { source?: unknown; type?: unknown; mode?: unknown; opacity?: unknown; visible?: unknown; runtimeId?: unknown; attentionId?: unknown };
+  const candidate = value as { source?: unknown; type?: unknown; mode?: unknown; opacity?: unknown; visible?: unknown; runtimeId?: unknown; attentionId?: unknown; position?: unknown };
   if (candidate.source !== "agentonweb-content") return false;
   if (candidate.type === "agent.attention.read") return typeof candidate.attentionId === "string" && candidate.attentionId.length > 0 && candidate.attentionId.length <= 200;
   if (candidate.type === "state.get" || candidate.type === "mode.shortcuts.get" || candidate.type === "runtime.approval") return true;
   if (candidate.type === "visibility.set") return typeof candidate.visible === "boolean";
   if (candidate.type === "mode.set" || candidate.type === "mode.shortcut") return ["chill", "focus", "watch"].includes(String(candidate.mode));
   if (candidate.type === "opacity.set") return typeof candidate.opacity === "number" && Number.isFinite(candidate.opacity);
+  if (candidate.type === "dock.position.set") return isDockPosition(candidate.position);
   return (candidate.type === "runtime.connect" || candidate.type === "runtime.activate") && (candidate.runtimeId === undefined || typeof candidate.runtimeId === "string");
 }
 

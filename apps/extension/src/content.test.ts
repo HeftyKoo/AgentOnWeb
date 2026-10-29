@@ -123,6 +123,112 @@ async function page(
   };
 }
 
+function pointer(ui: Awaited<ReturnType<typeof page>>, target: EventTarget, type: string, clientX: number, clientY: number, fields: Record<string, unknown> = {}) {
+  const event = new ui.window.MouseEvent(type, { clientX, clientY, button: 0, detail: 1, bubbles: true, composed: true, cancelable: true });
+  Object.defineProperties(event, Object.fromEntries(Object.entries({ pointerId: 1, isPrimary: true, ...fields })
+    .map(([name, value]) => [name, { value }])));
+  target.dispatchEvent(event);
+  return event;
+}
+
+describe("floating launcher position", () => {
+  it("keeps small pointer movements as clicks and preserves keyboard activation", async () => {
+    const ui = await page();
+    const toggle = ui.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!;
+    pointer(ui, toggle, "pointerdown", 986, 730);
+    pointer(ui, toggle, "pointermove", 989, 733);
+    pointer(ui, toggle, "pointerup", 989, 733);
+    pointer(ui, toggle, "click", 989, 733);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(ui.sendMessage.mock.calls.some(([request]) => request.type === "dock.position.set")).toBe(false);
+    toggle.click();
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("moves across the page without opening controls and persists only on release", async () => {
+    const ui = await page();
+    const toggle = ui.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!;
+    const dock = ui.shadow.querySelector<HTMLElement>(".surface-dock")!;
+    pointer(ui, toggle, "pointerdown", 986, 730);
+    pointer(ui, ui.window, "pointermove", 120, 160);
+    expect(dock.style.right).toBe("880px");
+    expect(dock.style.bottom).toBe("584px");
+    expect(ui.sendMessage.mock.calls.some(([request]) => request.type === "dock.position.set")).toBe(false);
+    ui.emit("state.update");
+    expect(dock.style.right).toBe("880px");
+    pointer(ui, ui.window, "pointerup", 120, 160);
+    const click = pointer(ui, toggle, "click", 120, 160);
+    expect(click.defaultPrevented).toBe(true);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(ui.sendMessage.mock.calls.filter(([request]) => request.type === "dock.position.set")).toEqual([
+      [{ source: "agentonweb-content", type: "dock.position.set", position: { x: 82 / 948, y: 122 / 692 } }],
+    ]);
+    ui.emit("state.update");
+    expect(dock.style.right).toBe("880px");
+    toggle.click();
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("clamps dragging at the viewport edges and allows the next click", async () => {
+    const ui = await page();
+    const toggle = ui.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!;
+    const dock = ui.shadow.querySelector<HTMLElement>(".surface-dock")!;
+    pointer(ui, toggle, "pointerdown", 986, 730);
+    pointer(ui, ui.window, "pointerup", -200, -200);
+    expect(dock.style.right).toBe("962px");
+    expect(dock.style.bottom).toBe("706px");
+    expect(ui.sendMessage).toHaveBeenCalledWith({ source: "agentonweb-content", type: "dock.position.set", position: { x: 0, y: 0 } });
+    pointer(ui, toggle, "click", 38, 38);
+    pointer(ui, toggle, "pointerdown", 38, 38);
+    pointer(ui, toggle, "pointerup", 38, 38);
+    pointer(ui, toggle, "click", 38, 38);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it.each(["pointercancel", "lostpointercapture", "blur"])("rolls back a cancelled drag on %s", async type => {
+    const ui = await page();
+    const toggle = ui.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!;
+    const dock = ui.shadow.querySelector<HTMLElement>(".surface-dock")!;
+    pointer(ui, toggle, "pointerdown", 986, 730);
+    pointer(ui, ui.window, "pointermove", 120, 160);
+    pointer(ui, type === "lostpointercapture" ? toggle : ui.window, type, 120, 160);
+    expect(dock.style.right).toBe("14px");
+    expect(dock.style.bottom).toBe("14px");
+    expect(dock.dataset.dragging).toBeUndefined();
+    expect(ui.sendMessage.mock.calls.some(([request]) => request.type === "dock.position.set")).toBe(false);
+  });
+
+  it("restores the saved position, follows broadcasts and stays visible on resize", async () => {
+    const ui = await page({ ...idle, dockPosition: { x: 0, y: 0 } });
+    const dock = ui.shadow.querySelector<HTMLElement>(".surface-dock")!;
+    expect(dock.style.right).toBe("962px");
+    expect(dock.style.bottom).toBe("706px");
+    ui.emit("state.update", { ...idle, dockPosition: { x: 0.5, y: 0.5 } });
+    expect(dock.style.right).toBe("488px");
+    expect(dock.style.bottom).toBe("360px");
+    Object.assign(ui.window, { innerWidth: 390, innerHeight: 480 });
+    ui.window.dispatchEvent(new ui.window.Event("resize"));
+    expect(dock.style.right).toBe("171px");
+    expect(dock.style.bottom).toBe("216px");
+  });
+
+  it("ignores secondary buttons, non-primary pointers and unrelated pointer IDs", async () => {
+    const ui = await page();
+    const toggle = ui.shadow.querySelector<HTMLButtonElement>(".surface-toggle")!;
+    const dock = ui.shadow.querySelector<HTMLElement>(".surface-dock")!;
+    for (const fields of [{ button: 2 }, { isPrimary: false }]) {
+      pointer(ui, toggle, "pointerdown", 986, 730, fields);
+      pointer(ui, ui.window, "pointermove", 120, 160);
+      pointer(ui, ui.window, "pointerup", 120, 160);
+    }
+    pointer(ui, toggle, "pointerdown", 986, 730);
+    pointer(ui, ui.window, "pointermove", 120, 160, { pointerId: 2 });
+    pointer(ui, ui.window, "pointerup", 120, 160, { pointerId: 2 });
+    expect(dock.style.right).toBe("14px");
+    expect(ui.sendMessage.mock.calls.some(([request]) => request.type === "dock.position.set")).toBe(false);
+  });
+});
+
 describe("page-local AgentOnWeb visibility", () => {
   it("applies an acknowledged mode click after a page update even without a background broadcast", async () => {
     const p = await page(connected);
