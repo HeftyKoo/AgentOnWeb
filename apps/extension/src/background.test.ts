@@ -71,6 +71,29 @@ beforeEach(() => {
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("cross-browser native connection lifecycle", () => {
+  it("persists the launcher position, broadcasts it and restores it after a worker restart", async () => {
+    await boot();
+    const dockPosition = { x: 0.25, y: 0.75 };
+    await message("dock.position.set", undefined, { position: { ...dockPosition, unexpected: "discard" } });
+    expect(data[STATE_STORAGE_KEY]).toMatchObject({ dockPosition });
+    expect((data[STATE_STORAGE_KEY] as Record<string, unknown>).dockPosition).toEqual(dockPosition);
+    expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(tab.id, expect.objectContaining({
+      type: "state.update", state: expect.objectContaining({ dockPosition }),
+    }));
+    vi.resetModules(); chromeMock = createChrome(); vi.stubGlobal("chrome", chromeMock);
+    await boot();
+    expect((await message("state.get")).result.dockPosition).toEqual(dockPosition);
+  });
+
+  it.each([null, {}, { x: -0.1, y: 0 }, { x: 0, y: 1.1 }, { x: NaN, y: 0 }, { x: 0, y: Infinity }, { x: "0", y: 0 }])(
+    "ignores invalid stored and requested launcher positions %j", async dockPosition => {
+      data = { [STATE_STORAGE_KEY]: { dockPosition } };
+      await boot();
+      expect((await message("state.get")).result.dockPosition).toBeUndefined();
+      expect(await message("dock.position.set", undefined, { position: dockPosition })).toBeUndefined();
+    },
+  );
+
   it("restores a delegated cookie removed while its connector remains connected", async () => {
     await boot();
     await message("runtime.connect", undefined, { runtimeId: runtime.id });

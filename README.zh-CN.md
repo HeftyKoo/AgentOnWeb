@@ -16,6 +16,8 @@ AgentOnWeb 将你的编程工作区带到你当前打开的页面上。一边看
 
 切换模式不会中断会话。在 Chill 模式下，双击 **Option / Alt** 可与网页交互；再次双击即可返回工作区。
 
+拖动 AgentOnWeb 悬浮图标即可避开网页上的按钮和内容。位置会在跨页面和刷新后保留，展开的控制面板也会自动保持在窗口内。
+
 ## 观看演示
 
 [![在 YouTube 上观看 AgentOnWeb 演示](docs/assets/agentonweb-demo-cover.png)](https://www.youtube.com/watch?v=s083RpD38HU)

@@ -5,7 +5,7 @@ The containing app is a macOS-only Safari Web Extension, built with Xcode. It gi
 - App Store Connect app ID: recorded in the gitignored `docs/verification/local/` notes and intentionally not published
 - App bundle ID: `dev.agentonweb.extension`
 - Extension bundle ID: `dev.agentonweb.extension.safari`
-- Version: `0.4.1`, build `10`
+- Prepared source version: `0.4.2`, build `11`; this Chrome/Firefox release does not submit a Safari store update.
 - Minimum: macOS 15.4 and Safari 18.4
 - Architectures: Apple Silicon and Intel
 
@@ -36,11 +36,11 @@ To archive and export:
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
   -project apps/safari/AgentOnWeb/AgentOnWeb.xcodeproj \
   -scheme AgentOnWeb -configuration Release \
-  -archivePath release/safari/AgentOnWeb-0.4.1-10.xcarchive \
+  -archivePath release/safari/AgentOnWeb-0.4.2-11.xcarchive \
   -derivedDataPath output/safari-derived -allowProvisioningUpdates archive
 
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
-  -exportArchive -archivePath release/safari/AgentOnWeb-0.4.1-10.xcarchive \
+  -exportArchive -archivePath release/safari/AgentOnWeb-0.4.2-11.xcarchive \
   -exportPath release/safari/app-store \
   -exportOptionsPlist apps/safari/config/ExportOptions.plist \
   -allowProvisioningUpdates

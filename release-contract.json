@@ -1,13 +1,13 @@
 {
-  "extensionVersion": "0.4.1",
+  "extensionVersion": "0.4.2",
   "pluginVersion": "0.4.0",
   "terminalHostVersion": "0.4.3",
   "dsh": "0.1.7-rc.2",
   "connectorProtocol": 1,
   "artifacts": {
-    "extension": "agentonweb-extension-0.4.1.zip",
-    "firefoxExtension": "agentonweb-extension-firefox-0.4.1.zip",
-    "extensionSource": "agentonweb-extension-source-0.4.1.zip",
+    "extension": "agentonweb-extension-0.4.2.zip",
+    "firefoxExtension": "agentonweb-extension-firefox-0.4.2.zip",
+    "extensionSource": "agentonweb-extension-source-0.4.2.zip",
     "dshPlugin": "agentonweb-dsh-surface-0.4.0.tgz",
     "terminalHost": "agentonweb-terminal-host-0.4.3.tgz"
   }

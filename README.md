@@ -16,6 +16,8 @@ AgentOnWeb brings your coding workspace onto the page you already have open. Wat
 
 Switching modes keeps your session running. In Chill, double-tap **Option / Alt** to interact with the website; double-tap again to return to your workspace.
 
+Drag the floating AgentOnWeb icon to keep page controls accessible. Its position is remembered across pages and reloads, and the controls stay within the window when opened.
+
 ## Watch the demo
 
 [![Watch the AgentOnWeb demo on YouTube](docs/assets/agentonweb-demo-cover.png)](https://www.youtube.com/watch?v=s083RpD38HU)

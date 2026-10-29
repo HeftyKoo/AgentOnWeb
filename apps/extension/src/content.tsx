@@ -137,6 +137,7 @@ if (!document.getElementById(HOST_ID)) {
     postOpacity(opacity);
     send({ source: "agentonweb-content", type: "opacity.set", opacity });
   };
+  dock.onPosition = position => send({ source: "agentonweb-content", type: "dock.position.set", position });
   dock.onOpacityPreview = (opacity) => {
     host.style.setProperty("--agentonweb-surface-opacity", String(opacity));
     postOpacity(opacity);
