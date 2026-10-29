@@ -67,6 +67,42 @@ it('restricts update status to admins and maintenance to the local CLI, preservi
   await expect.poll(async () => (await (await control()).json()).activeTerminals).toBe(0);
   expect((await control({ action: 'prepare' })).status).toBe(200);
 });
+it("persists its initial endpoint before publishing the one-time launch URL", async () => {
+  directory = await mkdtemp(join(tmpdir(), "aow-startup-readiness-test-"));
+  const guard = join(directory, "slow-endpoint-writes.mjs");
+  await writeFile(guard, `
+    import fs from "node:fs";
+    import { syncBuiltinESMExports } from "node:module";
+    const writeFile = fs.promises.writeFile;
+    let endpointWrites = 0;
+    fs.promises.writeFile = async (path, ...args) => {
+      const delay = String(path).endsWith("endpoint.tmp") ? (++endpointWrites === 1 ? 100 : 250) : 0;
+      await writeFile(path, ...args);
+      if (delay) await new Promise(resolveDelay => setTimeout(resolveDelay, delay));
+    };
+    syncBuiltinESMExports();
+  `);
+  host = spawn(process.execPath, ["--import", guard, resolve("packages/terminal-host/lib/cli.js"), "terminal"], {
+    env: { ...process.env, HOME: directory, SHELL: "/bin/sh", ENV: undefined, BASH_ENV: undefined, ZDOTDIR: undefined },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let output = "";
+  host.stdout!.on("data", chunk => { output += chunk; });
+  await expect.poll(() => output.includes("Open once:"), { timeout: 10000 }).toBe(true);
+  const launchUrl = /Open once: (http:\/\/[^\s]+)/u.exec(output)![1]!;
+  const origin = new URL(launchUrl).origin;
+  const launch = await fetch(launchUrl);
+  expect(launch.status, await launch.text()).toBe(200);
+  const cookies = launch.headers.getSetCookie().map(value => value.split(";")[0]!).join("; ");
+  expect(cookies).toContain("aow_admin_");
+  const headers = { Cookie: cookies, "X-AgentOnWeb-Terminal": "1", Origin: origin };
+  for (const path of ["/api/terminals", "/api/connections"]) {
+    const response = await fetch(origin + path, { headers });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toBeTruthy();
+  }
+});
+
 it("preserves Unicode terminal names split across HTTP body chunks and publishes terminal registry changes", async () => {
   directory = await mkdtemp(join(tmpdir(), "aow-unicode-test-"));
   host = spawn(process.execPath, [resolve("packages/terminal-host/lib/cli.js"), "terminal"], {
