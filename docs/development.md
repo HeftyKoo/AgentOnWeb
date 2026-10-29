@@ -1,6 +1,7 @@
 # Development
 
-Use Node.js 22.19+ and pnpm 11.5.0.
+Use Node.js 24.22.2 and pnpm 11.5.0 for builds and CI. The installed terminal
+host continues to support Node.js 22.19+.
 
 ```sh
 git clone https://github.com/HeftyKoo/AgentOnWeb.git

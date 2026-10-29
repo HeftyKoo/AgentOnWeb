@@ -572,11 +572,11 @@ authority.onRevoke(() => {
   for (const socket of sockets.clients) socket.close(4401, "Authorization revoked");
   connector.refreshSurfaces();
 });
+await saveEndpoint();
 console.log(
   `${terminalUi().banner('LOCAL SHELL')}\nExecutable: ${executable}\nInitial directory: ${cwd}\nConnector: ${connector.port}\nOpen once: ${origin}/launch?token=${launchToken}`,
 );
 printStatus('info', 'Approve your browser through the private setup page.');
-await saveEndpoint();
 const stopUpdateChecks = updates.start(status => {
   printStatus('warn', `AgentOnWeb ${status.latest} is available (running ${VERSION}). Run aow update after closing terminal sessions.`);
 });
