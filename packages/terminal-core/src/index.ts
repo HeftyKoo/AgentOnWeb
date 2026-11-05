@@ -17,6 +17,7 @@ export class TerminalSession {
   #lease = 0;
   #sequence = 0;
   #pendingBytes = 0;
+  #paused = false;
   #exited: number | undefined;
 
   constructor(executable: string, args: string[], cwd: string, env: Record<string, string>) {
@@ -26,10 +27,13 @@ export class TerminalSession {
     this.terminal.onData(data => { if (this.#exited === undefined) this.pty.write(data); });
     this.pty.onData(data => {
       this.#pendingBytes += data.length;
-      if (this.#pendingBytes > 256_000) this.pty.pause();
+      if (!this.#paused && this.#pendingBytes > 256_000) { this.#paused = true; this.pty.pause(); }
       this.terminal.write(data, () => {
         this.#pendingBytes -= data.length;
-        if (this.#pendingBytes < 64_000 && this.#exited === undefined) this.pty.resume();
+        if (this.#paused && this.#pendingBytes < 64_000 && this.#exited === undefined) {
+          this.#paused = false;
+          this.pty.resume();
+        }
         const sequence = ++this.#sequence;
         for (const [id, client] of this.#clients) {
           if (!client.ready) continue;
@@ -67,7 +71,13 @@ export class TerminalSession {
     if (!client || !message || typeof message !== "object") return;
     const m = message as Record<string, unknown>;
     if (m.type === "ack" && Number.isSafeInteger(m.sequence)) {
-      for (const [seq, bytes] of client.outstanding) if (seq <= (m.sequence as number)) { client.bytes -= bytes; client.outstanding.delete(seq); }
+      // Map insertion order is output sequence order. Never rescan the entire
+      // unacknowledged tail for every ACK (quadratic during output bursts).
+      for (const [seq, bytes] of client.outstanding) {
+        if (seq > (m.sequence as number)) break;
+        client.bytes -= bytes;
+        client.outstanding.delete(seq);
+      }
       return;
     }
     if (!client.ready || m.epoch !== this.epoch || this.#exited !== undefined) return;
@@ -87,6 +97,7 @@ export class TerminalSession {
       && /^[\x00-\xff]*$/u.test(m.data)) this.pty.write(Buffer.from(m.data, "latin1"));
     if (m.type === "resize" && id === this.#resizeOwner && m.lease === this.#lease && Number.isInteger(m.cols) && Number.isInteger(m.rows)
       && (m.cols as number) >= 2 && (m.cols as number) <= 500 && (m.rows as number) >= 2 && (m.rows as number) <= 300) {
+      if (m.cols === this.terminal.cols && m.rows === this.terminal.rows) return;
       this.terminal.resize(m.cols as number, m.rows as number);
       this.pty.resize(m.cols as number, m.rows as number);
       this.#broadcast({ type: "resize", cols: m.cols, rows: m.rows });

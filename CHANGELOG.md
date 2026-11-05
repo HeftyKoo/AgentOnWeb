@@ -1,5 +1,12 @@
 # Changelog
 
+## Terminal host 0.4.4 — 2026-11-05
+
+- Keep a WebGL terminal renderer across Focus and Chill modes to improve typing and scrolling under dense output. Preserve translucent ANSI/truecolor backgrounds, opaque text, selection and cursor, with a DOM fallback when GPU rendering is unavailable.
+- Bound large output writes, coalesce cumulative acknowledgements and drain the host output queue in linear time. Avoid redundant PTY pause/resume calls, viewport updates and presentation changes.
+- Preserve ordinary text selection, copy, TUI mouse input and keyboard mode switching. Keep 3,000 lines of scrollback.
+- This patch ships with terminal host 0.4.4. Extension 0.4.2, DSH 0.4.0 and connector protocol 1 remain unchanged. Finish live shells, then run `aow update` from a separate macOS Terminal.
+
 ## Extension 0.4.2 — 2026-10-29
 
 - Drag the floating AgentOnWeb icon with a mouse, trackpad or touch to uncover page controls. Remember its position across pages and reloads, and adapt it when the window changes size.

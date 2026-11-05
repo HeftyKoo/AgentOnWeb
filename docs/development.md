@@ -34,6 +34,21 @@ pnpm release:audit
 
 For an offline presentation sample, run `pnpm build:preview` and `pnpm preview`. The sample does not execute commands. See the [architecture](architecture.md) and [release guide](releasing.md) for implementation and packaging details.
 
+For terminal performance regressions, build the terminal surface and run
+`scripts/check-terminal-performance-browser.mjs --deps <npm-prefix-with-playwright-core> --chromium <chromium-executable>`.
+It exercises the actual browser UI with 3,000 history lines, continuous ANSI
+redraws and concurrent typing under 4× CPU throttling, checking ordered input and
+100 ms p95 keyboard/frame budgets at 120×40. Optional `--profile <file>` captures
+a CPU profile; `--columns`, `--rows`, `--history` and `--assets` support stress and
+before/after comparisons. Add `--scroll --columns 140 --rows 48` to test actual
+wheel and native scrollbar dragging through dense, varying colored history;
+`--live` adds ongoing output and `--dom` measures the fallback baseline. The
+scroll frame budget is 50 ms. The transport is a local fixture; the installed
+host and existing browser profile are untouched. The copy browser check accepts
+`--chill` and `--dom`. `check-terminal-presentation-browser.mjs` checks actual
+pixels for background transparency, opaque text/cursor/selection, mode changes,
+GPU context restoration and DOM fallback.
+
 [Report an issue](https://github.com/HeftyKoo/AgentOnWeb/issues) · [Privacy policy](https://heftykoo.github.io/AgentOnWeb/privacy.html)
 
 

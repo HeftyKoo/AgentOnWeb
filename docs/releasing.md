@@ -1,6 +1,12 @@
 # Release AgentOnWeb
 
-## Extension launcher patch release
+## Terminal performance patch release
+
+Terminal host **0.4.4** improves terminal typing and scrolling during dense output. Focus and Chill retain one WebGL renderer with translucent cell backgrounds and a DOM fallback. Output chunks, cumulative acknowledgements and host queue draining keep input responsive without reducing the 3,000-line history. See the [performance verification record](verification/terminal-performance-2026-11-05.md) for workload limits and browser acceptance.
+
+Publish only `terminal-v0.4.4`: the audited npm package, version-pinned installer and GitHub release. Extension **0.4.2**, Safari source **0.4.2** / build **11**, DSH **0.4.0** and connector protocol **1** retain their versions; no browser-store submission is needed. After finishing live shells, run `aow update` from a separate macOS Terminal.
+
+## Previous extension launcher patch release
 
 Extension **0.4.2** adds mouse and touch dragging for the floating launcher, remembers its position across pages and reloads, and keeps the controls within the viewport. This release targets the Chrome Web Store and Firefox Add-ons. Safari source metadata is prepared at **0.4.2** / build **11**, without submitting a Safari update. Terminal host **0.4.3**, DSH **0.4.0** and connector protocol **1** are unchanged.
 
@@ -10,7 +16,7 @@ Extension **0.4.2** adds mouse and touch dragging for the floating launcher, rem
 | DSH plugin TGZ | `pluginVersion` | Remains 0.4.0; no publication |
 | Terminal host TGZ + installer | `terminalHostVersion` | Remains 0.4.3; no publication |
 
-## Terminal host update patch release
+## Previous terminal host update patch release
 
 Terminal host **0.4.3** repairs forced updates when an older host is still running, reinstalls the current stable version on explicit force, and retries transient manual npm checks with longer deadlines. It retains the direct terminal selection improvements from 0.4.2. Extension **0.4.1**, Safari marketing version **0.4.1** / build **10**, DSH **0.4.0** and connector protocol **1** remain unchanged; this release publishes only the terminal host.
 
@@ -56,19 +62,19 @@ The `dsh-latest` CI job installs `@deepseek-ai/dsh@latest`, builds the actual pl
 After the relevant release is public, users can run:
 
 ```sh
-npm install -g @agentonweb/terminal-host@0.4.3
+npm install -g @agentonweb/terminal-host@0.4.4
 # Repair setup or run it explicitly when lifecycle scripts were blocked:
 aow setup
 ```
 
-The release installer at `https://github.com/HeftyKoo/AgentOnWeb/releases/download/terminal-v0.4.3/install.sh` pins the package to 0.4.3 and explicitly calls setup. The user-facing command downloads `https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh`. Both that script and its pinned npm package must be live before announcing the installation flow. The installer uses the user-owned `~/.local` npm prefix, configures zsh/bash/fish startup paths, and links `aow` beside Node when that directory is writable and already on PATH. Existing AgentOnWeb npm links are updated; unrelated commands are preserved. The versioned release URL is a publication target, not proof that the asset exists. Download and inspect it before running it; do not advertise it until the release and clean-install test succeed.
+The release installer at `https://github.com/HeftyKoo/AgentOnWeb/releases/download/terminal-v0.4.4/install.sh` pins the package to 0.4.4 and explicitly calls setup. The user-facing command downloads `https://raw.githubusercontent.com/HeftyKoo/AgentOnWeb/main/scripts/install.sh`. Both that script and its pinned npm package must be live before announcing the installation flow. The installer uses the user-owned `~/.local` npm prefix, configures zsh/bash/fish startup paths, and links `aow` beside Node when that directory is writable and already on PATH. Existing AgentOnWeb npm links are updated; unrelated commands are preserved. The versioned release URL is a publication target, not proof that the asset exists. Download and inspect it before running it; do not advertise it until the release and clean-install test succeed.
 
 ## Local installation and upgrades
 
 Before publishing, use the audited archive with the source-built extension:
 
 ```sh
-AOW_SKIP_SETUP=1 npm install -g ./release/agentonweb-terminal-host-0.4.3.tgz
+AOW_SKIP_SETUP=1 npm install -g ./release/agentonweb-terminal-host-0.4.4.tgz
 aow setup --extension-id YOUR_UNPACKED_CHROME_EXTENSION_ID
 ```
 

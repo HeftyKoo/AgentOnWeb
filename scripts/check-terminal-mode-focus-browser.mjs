@@ -82,6 +82,14 @@ try {
     }, true);
     const NativeWebSocket = window.WebSocket;
     window.WebSocket = class extends NativeWebSocket {
+      constructor(...args) {
+        super(...args);
+        window.modeKeyOutput = "";
+        this.addEventListener("message", event => {
+          const message = JSON.parse(event.data);
+          if (message.type === "output" || message.type === "snapshot") window.modeKeyOutput += message.data;
+        });
+      }
       send(data) {
         const message = JSON.parse(data);
         if (["input", "input-binary"].includes(message.type)) (window.modeKeyInputs ??= []).push(message.data);
@@ -201,7 +209,7 @@ try {
   const text = 'printf "%s\\n" AOW_"MODE_KEYS_OK"';
   await a.page.keyboard.type(text);
   await a.page.keyboard.press("Enter");
-  await until(async () => (await frameA.locator(".xterm-rows").innerText()).includes("AOW_MODE_KEYS_OK"), "real shell input after mode switches");
+  await until(() => frameA.evaluate(() => window.modeKeyOutput.includes("AOW_MODE_KEYS_OK")), "real shell input after mode switches");
   passed("15 background presentation updates retain focus, followed by successful real PTY input");
   await a.page.screenshot({ path: resolve(output, "focus-terminal-input.png") });
   const delivery = await worker.evaluate(() => ({ browserCommands: globalThis.modeCommands, iframeOrPageFallback: globalThis.modeRequests }));

@@ -2,8 +2,10 @@ import { surfaceShortcut } from "@agentonweb/connector-contract";
 import { OptionTapTracker } from "@agentonweb/connector-contract";
 import { Terminal } from "@xterm/xterm";
 import { splitInput } from "./input.js";
+import { writeOutput } from "./output.js";
 import { installCellBackgroundOpacity } from "./cell-backgrounds.js";
 import { installMouseSelection } from "./mouse-selection.js";
+import { installRenderer } from "./renderer.js";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import "./style.css";
@@ -34,6 +36,8 @@ function showStatus(message: string) {
 terminal.open(container);
 installMouseSelection(terminal, container);
 const setCellBackgroundOpacity = installCellBackgroundOpacity(terminal, container);
+const setBackgroundOpacity = installRenderer(terminal, setCellBackgroundOpacity);
+setBackgroundOpacity(1);
 const sessionPicker = document.querySelector<HTMLElement>("#sessions")!;
 const newButton = document.querySelector<HTMLButtonElement>("#new")!;
 type ConnectionState = "background" | "connecting" | "connected" | "disconnected" | "exited";
@@ -286,7 +290,8 @@ function send(message: object) {
 function resize() {
   if (!active || !ready || !resizeOwner || !document.hasFocus() || document.hidden || container.clientWidth < 30 || container.clientHeight < 30) return;
   const size = fit.proposeDimensions();
-  if (size && size.cols >= 2 && size.rows >= 2) send({ type: "resize", ...size, epoch, lease });
+  if (size && size.cols >= 2 && size.rows >= 2 && (size.cols !== terminal.cols || size.rows !== terminal.rows))
+    send({ type: "resize", ...size, epoch, lease });
 }
 function input(data: string, binary = false) {
   if (!active || !ready) return;
@@ -369,6 +374,21 @@ async function connect(automaticRetry = false) {
     const info = await response.json();
     if (current !== generation) return;
     const ws = new WebSocket(`ws://${location.host}/terminal`, info.token);
+    let ackTimer: ReturnType<typeof setTimeout> | undefined;
+    let ackSequence = 0;
+    const acknowledge = (sequence: number) => {
+      if (current !== generation || ws.readyState !== WebSocket.OPEN) return;
+      ackSequence = sequence;
+      if (ackTimer !== undefined) return;
+      // ACKs are cumulative. One per parser turn avoids thousands of frames
+      // competing with keyboard input during a burst; never wait for rAF in
+      // background tabs where it can be suspended.
+      ackTimer = setTimeout(() => {
+        ackTimer = undefined;
+        if (current === generation && ws.readyState === WebSocket.OPEN)
+          ws.send(JSON.stringify({ type: "ack", sequence: ackSequence }));
+      }, 0);
+    };
     socket = ws;
     ws.onmessage = (event) => {
       if (current !== generation) return;
@@ -385,7 +405,7 @@ async function connect(automaticRetry = false) {
         setConnectionState(m.exitCode !== undefined ? "exited" : "connected");
         terminal.reset();
         terminal.resize(m.cols, m.rows);
-        terminal.write(m.data, () => {
+        writeOutput(terminal, m.data, () => {
           if (current !== generation) return;
           ready = true;
           if (focusOnConnect) {
@@ -398,10 +418,7 @@ async function connect(automaticRetry = false) {
         if (m.exitCode !== undefined)
           showStatus(`Process exited (${m.exitCode}). Open a new terminal with +.`);
       } else if (m.type === "output" && m.epoch === epoch) {
-        terminal.write(m.data, () => {
-          if (current === generation && ws.readyState === WebSocket.OPEN)
-            ws.send(JSON.stringify({ type: "ack", sequence: m.sequence }));
-        });
+        writeOutput(terminal, m.data, () => acknowledge(m.sequence));
         if (nonce && Date.now() - outputNoticeAt > 1000) {
           outputNoticeAt = Date.now();
           parent.postMessage({ source: "agentonweb-surface", type: "surface.output", nonce }, "*");
@@ -430,6 +447,7 @@ async function connect(automaticRetry = false) {
       }
     };
     ws.onclose = (event) => {
+      clearTimeout(ackTimer);
       if (current !== generation) return;
       setConnectionState("disconnected");
       ready = active = resizeOwner = false;
@@ -615,7 +633,11 @@ let authorizedParent = parent === window;
 let modeShortcuts: readonly string[] = [];
 let mode = "focus",
   opacity = 0.82;
+let presentedOpacity = 1;
 function presentation() {
+  const backgroundOpacity = mode === "chill" ? opacity : 1;
+  if (backgroundOpacity === presentedOpacity) return;
+  presentedOpacity = backgroundOpacity;
   terminal.options.theme = {
     background:
       mode === "chill"
@@ -625,7 +647,7 @@ function presentation() {
         : "#15171cff",
     foreground: "#f1f3f5",
   };
-  setCellBackgroundOpacity(mode === "chill" ? opacity : 1);
+  setBackgroundOpacity(backgroundOpacity);
 }
 window.addEventListener("message", (event) => {
   if (event.source !== parent || !/^(chrome-extension|moz-extension|safari-web-extension):\/\//u.test(event.origin))
@@ -645,10 +667,14 @@ window.addEventListener("message", (event) => {
     focusOnConnect = true;
     void connect();
   }
-  if (m.type === "mode.set" && ["focus", "chill", "watch"].includes(m.mode)) mode = m.mode;
-  if (m.type === "opacity.set" && typeof m.opacity === "number" && m.opacity >= 0 && m.opacity <= 1)
+  if (m.type === "mode.set" && ["focus", "chill", "watch"].includes(m.mode)) {
+    mode = m.mode;
+    presentation();
+  }
+  if (m.type === "opacity.set" && typeof m.opacity === "number" && m.opacity >= 0 && m.opacity <= 1) {
     opacity = m.opacity;
-  presentation();
+    presentation();
+  }
 });
 const optionTap = new OptionTapTracker();
 window.addEventListener("keydown", (event) => {

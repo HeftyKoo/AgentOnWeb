@@ -7,7 +7,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
-const { values } = parseArgs({ options: { deps: { type: "string" }, chromium: { type: "string" } } });
+const { values } = parseArgs({ options: { deps: { type: "string" }, chromium: { type: "string" }, dom: { type: "boolean", default: false }, chill: { type: "boolean", default: false } } });
 assert.ok(values.deps && values.chromium, "Required: --deps <npm prefix> --chromium <executable>");
 const { chromium } = await import(pathToFileURL(resolve(values.deps, "node_modules/playwright-core/index.mjs")));
 const root = new URL("../apps/terminal-surface/dist/", import.meta.url);
@@ -40,7 +40,8 @@ try {
   browser = await chromium.launch({ executablePath: values.chromium, headless: false });
   const context = await browser.newContext({ permissions: ["clipboard-read"], viewport: { width: 1000, height: 600 } });
   page = await context.newPage();
-  await page.addInitScript(() => {
+  await page.addInitScript(dom => {
+    if (dom) Object.defineProperty(window, "WebGL2RenderingContext", { value: undefined });
     window.copyInputs = [];
     window.WebSocket = class {
       static OPEN = 1;
@@ -59,14 +60,20 @@ try {
       }
       close() { this.readyState = 3; }
     };
+  }, values.dom);
+  await page.goto(`http://127.0.0.1:${server.address().port}/#agentonweb=fixture`);
+  await page.locator('.terminal-tab[data-state="connected"]').waitFor();
+  if (values.chill) await page.evaluate(() => {
+    for (const message of [{ type: "mode.set", mode: "chill" }, { type: "opacity.set", opacity: 0.4 }]) {
+      window.dispatchEvent(new MessageEvent("message", { source: window, origin: "chrome-extension://fixture",
+        data: { source: "agentonweb-extension", nonce: "fixture", ...message } }));
+    }
   });
-  await page.goto(`http://127.0.0.1:${server.address().port}/`);
-  await page.getByText("COPY_ME_123", { exact: true }).waitFor();
+  await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
   originalClipboard = await page.evaluate(() => navigator.clipboard.readText());
   const screen = await page.locator(".xterm-screen").boundingBox();
-  const row = await page.locator(".xterm-rows > div").first().boundingBox();
   const cellWidth = screen.width / 100;
-  const point = (column, line = 0) => ({ x: screen.x + cellWidth * column, y: row.y + row.height * (line + 0.5) });
+  const point = (column, line = 0) => ({ x: screen.x + cellWidth * column, y: screen.y + screen.height / 30 * (line + 0.5) });
   const inputs = () => page.evaluate(() => window.copyInputs);
   const clearInputs = () => page.evaluate(() => { window.copyInputs = []; });
   const output = data => page.evaluate(data => window.copySocket.emit({ type: "output", epoch: "one", sequence: 1, data }), data);
