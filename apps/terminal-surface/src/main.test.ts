@@ -3,13 +3,14 @@ import { JSDOM } from "jsdom";
 import { afterEach, expect, it, vi } from "vitest";
 const terminalMock = vi.hoisted(() => ({
   focus: vi.fn(),
+  theme: vi.fn(),
   writes: [] as (() => void)[],
   input: undefined as ((data: string) => void) | undefined,
   binary: undefined as ((data: string) => void) | undefined,
 }));
 vi.mock("@xterm/xterm", () => ({
   Terminal: class {
-    options: any = {};
+    options: any = Object.defineProperty({}, "theme", { set: terminalMock.theme });
     modes = { mouseTrackingMode: "none" };
     parser = { registerCsiHandler() {}, registerOscHandler() {} };
     loadAddon() {}
@@ -36,6 +37,7 @@ vi.mock("@xterm/addon-fit", () => ({
     }
   },
 }));
+vi.mock("@xterm/addon-webgl", () => ({ WebglAddon: class {} }));
 let dom: JSDOM;
 afterEach(() => {
   dom.window.close();
@@ -44,20 +46,22 @@ afterEach(() => {
   vi.resetModules();
   terminalMock.writes.length = 0;
   terminalMock.focus.mockClear();
+  terminalMock.theme.mockClear();
   terminalMock.input = terminalMock.binary = undefined;
 });
-async function terminalFixture() {
-  dom = new JSDOM(await readFile(new URL("./index.html", import.meta.url), "utf8"), { url: "http://localhost:1234/" });
+async function terminalFixture(hash = "") {
+  dom = new JSDOM(await readFile(new URL("./index.html", import.meta.url), "utf8"), { url: "http://localhost:1234/" + hash });
   for (const key of ["window", "document", "location", "sessionStorage"]) vi.stubGlobal(key, (dom.window as any)[key]);
   vi.stubGlobal("parent", dom.window);
   vi.stubGlobal("ResizeObserver", class { observe() {} });
-  vi.useFakeTimers({ toFake: ["setTimeout", "setInterval"] });
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
   const sockets: any[] = [];
   vi.stubGlobal("WebSocket", class {
     static OPEN = 1;
     readyState = 1;
     constructor() { sockets.push(this); }
-    send() {}
+    sent: any[] = [];
+    send(data: string) { this.sent.push(JSON.parse(data)); }
     close() { this.readyState = 3; }
   });
   let failure = 0;
@@ -73,6 +77,48 @@ async function terminalFixture() {
   await vi.waitFor(() => expect(sockets).toHaveLength(1));
   return { sockets, list, fetch, fail: (status: number) => { failure = status; } };
 }
+
+it("coalesces parsed output ACKs while keyboard input is sent immediately", async () => {
+  const { sockets } = await terminalFixture();
+  const socket = sockets[0];
+  const emit = (message: object) => socket.onmessage({ data: JSON.stringify(message) });
+  emit({ type: "snapshot", epoch: "one", cols: 80, rows: 24, data: "" });
+  terminalMock.writes.shift()!();
+  emit({ type: "control", epoch: "one", lease: 1, active: true });
+  socket.sent.length = 0;
+  for (let sequence = 1; sequence <= 100; sequence++) {
+    emit({ type: "output", epoch: "one", sequence, data: "x" });
+    terminalMock.writes.shift()!();
+  }
+  terminalMock.input!("typed now");
+  expect(socket.sent).toEqual([{ type: "input", epoch: "one", lease: 1, data: "typed now" }]);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(socket.sent.at(-1)).toEqual({ type: "ack", sequence: 100 });
+  expect(socket.sent).toHaveLength(2);
+  emit({ type: "output", epoch: "one", sequence: 101, data: "late" });
+  terminalMock.writes.shift()!();
+  socket.onclose({ code: 1006 });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(socket.sent).toHaveLength(2);
+});
+
+it("does not repaint on focus messages, duplicate modes or inactive opacity changes", async () => {
+  await terminalFixture("#agentonweb=fixture");
+  const emit = (extra: object) => dom.window.dispatchEvent(new dom.window.MessageEvent("message", {
+    source: dom.window as unknown as Window, origin: "chrome-extension://fixture",
+    data: { source: "agentonweb-extension", nonce: "fixture", ...extra },
+  }));
+  emit({ type: "surface.focus" });
+  emit({ type: "mode.set", mode: "focus" });
+  emit({ type: "opacity.set", opacity: 0.4 });
+  expect(terminalMock.theme).not.toHaveBeenCalled();
+  emit({ type: "mode.set", mode: "chill" });
+  emit({ type: "mode.set", mode: "chill" });
+  emit({ type: "opacity.set", opacity: 0.4 });
+  expect(terminalMock.theme).toHaveBeenCalledTimes(1);
+  emit({ type: "mode.set", mode: "focus" });
+  expect(terminalMock.theme).toHaveBeenCalledTimes(2);
+});
 
 it("continues automatic retries after a temporary HTTP failure and stops on revoked access", async () => {
   const fixture = await terminalFixture();

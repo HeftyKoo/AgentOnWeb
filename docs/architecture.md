@@ -25,6 +25,21 @@ The local terminal launches a new interactive login shell in the user's home dir
 
 The terminal runtime ID is `terminal`. `@agentonweb/terminal-host` launches the user’s shell; installed CLI tools run inside that shell.
 
+Focus and Chill share one WebGL renderer, including while scrolling history or
+changing opacity. Chill changes only the visible background draw batch; glyphs,
+the cursor and selection remain opaque. A reusable viewport-sized buffer keeps
+this work independent of history length. `webgl-backgrounds.ts` isolates the
+version-specific bridge for pinned xterm 5.5.0 / WebGL addon 0.18.0; upgrading
+either requires its unit and real-browser pixel tests. Context restoration
+reattaches the bridge to the restored draw objects. Initialization failure or
+unrecoverable context loss falls back to DOM rendering with the same opacity.
+The DOM fallback uses shared palette CSS and per-cell truecolor updates.
+Unchanged presentation messages do not rebuild the theme. Large snapshots and
+output strings are parsed in bounded chunks, with cumulative acknowledgements
+coalesced after parsing. The host drains acknowledged queue entries in sequence
+order, and only changes PTY flow control or size when the corresponding state
+changes. Scrollback remains 3,000 lines.
+
 ## Process and connection lifetime
 
 A host owns up to eight shells. Viewers attach to a shell's canonical headless terminal snapshot and then receive ordered output. Detaching a viewer, closing the overlay, refreshing a page or switching runtimes does not stop the shell. Every connected viewer can type into the same shell. Only the focused viewer controls resizing; focus changes rotate the resize lease. Input is not replayed after an uncertain disconnect. Binary terminal events preserve their bytes separately from Unicode text.
