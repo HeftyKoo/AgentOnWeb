@@ -5,8 +5,44 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('ci-ci-pr-{0}', github.event.pull_request.number) || format('ci-ci-run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      pull-requests: read
+    outputs:
+      run: ${{ steps.filter.outputs.run }}
+    steps:
+      - id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" > "$RUNNER_TEMP/changes.json" &&
+            jq -e --argjson count "$CHANGED_FILES" '
+              add as $files |
+              ($files | length) == $count and $count > 0 and
+              all($files[]; all([.filename, (.previous_filename // .filename)][]; test("^README[.]md$")))
+            ' "$RUNNER_TEMP/changes.json" >/dev/null &&
+            test "$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)" = "$PR_HEAD"; then
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          fi
+
   verify:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.run != 'false' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
@@ -29,6 +65,8 @@ jobs:
           path: release/
 
   dsh-latest:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.run != 'false' }}
     runs-on: ubuntu-24.04
     env:
       DSH_TEST_PREFIX: /tmp/agentonweb-dsh-latest
