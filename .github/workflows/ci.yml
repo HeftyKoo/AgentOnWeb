@@ -87,7 +87,17 @@ jobs:
       - name: Install the latest DSH and an isolated test browser
         run: |
           npm install --prefix "$DSH_TEST_PREFIX" --no-audit --no-fund @deepseek-ai/dsh@latest playwright-core
-          node "$DSH_TEST_PREFIX/node_modules/playwright-core/cli.js" install --with-deps chromium
+          playwright="$DSH_TEST_PREFIX/node_modules/playwright-core/cli.js"
+          node "$playwright" install chromium --no-shell
+          if ! xvfb-run -a node <<'NODE'
+          const { chromium } = require(process.env.DSH_TEST_PREFIX + '/node_modules/playwright-core');
+          chromium.launch({ headless: false, timeout: 10000 })
+            .then((browser) => browser.close())
+            .catch((error) => { console.warn(error.message); process.exitCode = 1; });
+          NODE
+          then
+            node "$playwright" install-deps chromium
+          fi
       - name: Verify latest DSH plugin, settings UI and cookie authentication
         run: |
           chromium_executable=$(node -e 'console.log(require(process.env.DSH_TEST_PREFIX + "/node_modules/playwright-core").chromium.executablePath())')
