@@ -56,8 +56,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install shells for installer tests
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends zsh fish
+          missing=()
+          for shell in zsh fish; do
+            command -v "$shell" >/dev/null || missing+=("$shell")
+          done
+          if (( ${#missing[@]} )); then
+            if ! sudo apt-get -o Acquire::Retries=0 install -y --no-install-recommends "${missing[@]}"; then
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends "${missing[@]}"
+            fi
+          fi
+          command -v zsh fish
       - run: pnpm release:audit
       - uses: actions/upload-artifact@v7.0.2
         with:
